@@ -30,7 +30,9 @@ class BertSelfAttention(nn.Module):
         proj = linear_layer(x)
         # next, we need to produce multiple heads for the proj
         # this is done by spliting the hidden state to self.num_attention_heads, each of size self.attention_head_size
-        proj = proj.view(bs, seq_len, self.num_attention_heads, self.attention_head_size)
+        proj = proj.view(
+            bs, seq_len, self.num_attention_heads, self.attention_head_size
+        )
         # by proper transpose, we have proj of [bs, num_attention_heads, seq_len, attention_head_size]
         proj = proj.transpose(1, 2)
         return proj
@@ -47,11 +49,26 @@ class BertSelfAttention(nn.Module):
         # adding tokens with a large negative number.
 
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
         # Normalize the scores.
         # Multiply the attention scores to the value and get back V'.
         # Next, we need to concat multi-heads and recover the original shape
         # [bs, seq_len, num_attention_heads * attention_head_size = hidden_size].
+
+        # bs, seq_len = query.shape[:2]
+        # d_k = query.size(-1)
+        bs, num_att_heads, seq_len, att_head_size = key.size()
+        scores = torch.matmul(query, key.transpose(-1, -2)) / torch.sqrt(
+            torch.tensor(att_head_size, dtype=torch.float32)
+        )
+        scores += attention_mask
+        attention_weights = F.softmax(scores, dim=-1)
+        attention_output = (
+            torch.matmul(attention_weights, value).transpose(1, 2).contiguous()
+        )
+        attention_output = attention_output.view(bs, seq_len, -1)
+        print(f"attention_output_shape: {attention_output.shape}")
+        return attention_output
 
     def forward(self, hidden_states, attention_mask):
         """
@@ -76,14 +93,18 @@ class BertLayer(nn.Module):
         self.self_attention = BertSelfAttention(config)
         # add-norm
         self.attention_dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.attention_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.attention_layer_norm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.attention_dropout = nn.Dropout(config.hidden_dropout_prob)
         # feed forward
         self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.interm_af = F.gelu
         # another add-norm
         self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
-        self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.out_layer_norm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.out_dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def add_norm(self, input, output, dense_layer, dropout, ln_layer):
@@ -98,9 +119,15 @@ class BertLayer(nn.Module):
         ln_layer: the layer norm to be applied
         """
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
         # Hint: Remember that BERT applies dropout to the output of each sub-layer,
         # before it is added to the sub-layer input and normalized.
+
+        fc_layer = dense_layer(output)
+        fc_output = dropout(fc_layer)
+        skip_connect = input + fc_output
+        normalized_output = ln_layer(skip_connect)
+        return normalized_output
 
     def forward(self, hidden_states, attention_mask):
         """
@@ -117,7 +144,29 @@ class BertLayer(nn.Module):
         4. a add-norm that takes the input and output of the feed forward layer
         """
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+
+        attention_output = self.self_attention(hidden_states, attention_mask)
+        print(f"attention unnormalized shape: {attention_output.shape}")
+        attention_output = self.add_norm(
+            hidden_states,
+            attention_output,
+            self.attention_dense,
+            self.attention_dropout,
+            self.attention_layer_norm,
+        )
+        print(f"attention normalized shape: {attention_output.shape}")
+        interm_output = self.interm_af(self.interm_dense(attention_output))
+        print(f"interm_output_shape: {interm_output.shape}")
+        layer_output = self.add_norm(
+            attention_output,
+            interm_output,
+            self.out_dense,
+            self.out_dropout,
+            self.out_layer_norm,
+        )
+        print(f"layer_output_shape: {layer_output.shape}")
+        return layer_output
 
 
 class BertModel(BertPreTrainedModel):
@@ -137,9 +186,15 @@ class BertModel(BertPreTrainedModel):
         self.word_embedding = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
         )
-        self.pos_embedding = nn.Embedding(config.max_position_embeddings, config.hidden_size)
-        self.tk_type_embedding = nn.Embedding(config.type_vocab_size, config.hidden_size)
-        self.embed_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.pos_embedding = nn.Embedding(
+            config.max_position_embeddings, config.hidden_size
+        )
+        self.tk_type_embedding = nn.Embedding(
+            config.type_vocab_size, config.hidden_size
+        )
+        self.embed_layer_norm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.embed_dropout = nn.Dropout(config.hidden_dropout_prob)
         # position_ids (1, len position emb) is a constant, register to buffer
         position_ids = torch.arange(config.max_position_embeddings).unsqueeze(0)
@@ -161,25 +216,36 @@ class BertModel(BertPreTrainedModel):
         seq_length = input_shape[1]
 
         # Get word embedding from self.word_embedding into input_embeds.
-        inputs_embeds = None
+        input_embeds = self.word_embedding(input_ids)
+        print(f"input_embeds_shape: {input_embeds.shape}")
+
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
 
         # Get position index and position embedding from self.pos_embedding into pos_embeds.
         pos_ids = self.position_ids[:, :seq_length]
 
-        pos_embeds = None
+        pos_embeds = self.pos_embedding(pos_ids)
+        print(f"pos_embeds_shape: {pos_embeds.shape}")
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
         # Get token type ids, since we are not considering token type,
         # this is just a placeholder.
-        tk_type_ids = torch.zeros(input_shape, dtype=torch.long, device=input_ids.device)
+        tk_type_ids = torch.zeros(
+            input_shape, dtype=torch.long, device=input_ids.device
+        )
         tk_type_embeds = self.tk_type_embedding(tk_type_ids)
+        print(f"tk_type_embeds_shape: {tk_type_embeds.shape}")
 
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
         # Add three embeddings together; then apply embed_layer_norm and dropout and
         # return the hidden states.
+        embeds = input_embeds + pos_embeds + tk_type_embeds
+        embeds = self.embed_layer_norm(embeds)
+        embeds = self.embed_dropout(embeds)
+        print(f"embeds_shape: {embeds.shape}")
+        return embeds
 
     def encode(self, hidden_states, attention_mask):
         """
@@ -197,6 +263,7 @@ class BertModel(BertPreTrainedModel):
         for i, layer_module in enumerate(self.bert_layers):
             # feed the encoding from the last bert_layer to the next
             hidden_states = layer_module(hidden_states, extended_attention_mask)
+        print(f"hidden_states_shape: {hidden_states.shape}")
 
         return hidden_states
 
@@ -215,5 +282,6 @@ class BertModel(BertPreTrainedModel):
         first_tk = sequence_output[:, 0]
         first_tk = self.pooler_dense(first_tk)
         first_tk = self.pooler_af(first_tk)
+        print(f"first_tk_shape: {first_tk.shape}")
 
         return {"last_hidden_state": sequence_output, "pooler_output": first_tk}

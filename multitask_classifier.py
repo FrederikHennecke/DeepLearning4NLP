@@ -65,7 +65,14 @@ class MultitaskBERT(nn.Module):
             elif config.option == "finetune":
                 param.requires_grad = True
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+        self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        self.paraphrase_classifier = nn.Linear(BERT_HIDDEN_SIZE, 1)
+        self.similarity_classifier = nn.Linear(BERT_HIDDEN_SIZE, 1)
+        self.paraphrase_type_classifier = nn.Linear(BERT_HIDDEN_SIZE, 7)
+
+        # Dropout for regularization
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
@@ -76,7 +83,10 @@ class MultitaskBERT(nn.Module):
         # When thinking of improvements, you can later try modifying this
         # (e.g., by adding other layers).
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+        outputs = self.bert(input_ids, attention_mask)
+        pooled_output = outputs[1]
+        pooled_output = self.dropout(pooled_output)
 
     def predict_sentiment(self, input_ids, attention_mask):
         """
@@ -87,9 +97,14 @@ class MultitaskBERT(nn.Module):
         Dataset: SST
         """
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+        embeddings = self.forward(input_ids, attention_mask)
+        sentiment_logits = self.sentiment_classifier(embeddings)
+        return sentiment_logits
 
-    def predict_paraphrase(self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2):
+    def predict_paraphrase(
+        self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2
+    ):
         """
         Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
         Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
@@ -97,9 +112,18 @@ class MultitaskBERT(nn.Module):
         Dataset: Quora
         """
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+        embeddings_1 = self.forward(input_ids_1, attention_mask_1)
+        embeddings_2 = self.forward(input_ids_2, attention_mask_2)
+        combined_embeddings = torch.cat(
+            [embeddings_1, embeddings_2, torch.abs(embeddings_1 - embeddings_2)], dim=-1
+        )
+        paraphrase_logits = self.paraphrase_classifier(combined_embeddings).squeeze(-1)
+        return paraphrase_logits
 
-    def predict_similarity(self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2):
+    def predict_similarity(
+        self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2
+    ):
         """
         Given a batch of pairs of sentences, outputs a single logit corresponding to how similar they are.
         Since the similarity label is a number in the interval [0,5], your output should be normalized to the interval [0,5];
@@ -107,7 +131,15 @@ class MultitaskBERT(nn.Module):
         Dataset: STS
         """
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+        embeddings_1 = self.forward(input_ids_1, attention_mask_1)
+        embeddings_2 = self.forward(input_ids_2, attention_mask_2)
+        combined_embeddings = torch.cat(
+            [embeddings_1, embeddings_2, torch.abs(embeddings_1 - embeddings_2)], dim=-1
+        )
+        similarity_logits = self.similarity_classifier(combined_embeddings).squeeze(-1)
+        similarity_logits = torch.sigmoid(similarity_logits) * 5.0
+        return similarity_logits
 
     def predict_paraphrase_types(
         self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2
@@ -120,7 +152,14 @@ class MultitaskBERT(nn.Module):
         Dataset: ETPC
         """
         ### TODO
-        raise NotImplementedError
+        # raise NotImplementedError
+        embeddings_1 = self.forward(input_ids_1, attention_mask_1)
+        embeddings_2 = self.forward(input_ids_2, attention_mask_2)
+        combined_embeddings = torch.cat(
+            [embeddings_1, embeddings_2, torch.abs(embeddings_1 - embeddings_2)], dim=-1
+        )
+        paraphrase_type_logits = self.paraphrase_type_classifier(combined_embeddings)
+        return paraphrase_type_logits
 
 
 def save_model(model, optimizer, args, config, filepath):
@@ -143,8 +182,14 @@ def train_multitask(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     # Load data
     # Create the data and its corresponding datasets and dataloader:
-    sst_train_data, _, quora_train_data, sts_train_data, etpc_train_data = load_multitask_data(
-        args.sst_train, args.quora_train, args.sts_train, args.etpc_train, split="train"
+    sst_train_data, _, quora_train_data, sts_train_data, etpc_train_data = (
+        load_multitask_data(
+            args.sst_train,
+            args.quora_train,
+            args.sts_train,
+            args.etpc_train,
+            split="train",
+        )
     )
     sst_dev_data, _, quora_dev_data, sts_dev_data, etpc_dev_data = load_multitask_data(
         args.sst_dev, args.quora_dev, args.sts_dev, args.etpc_dev, split="train"
@@ -255,28 +300,50 @@ def train_multitask(args):
 
         train_loss = train_loss / num_batches
 
-        quora_train_acc, _, _, sst_train_acc, _, _, sts_train_corr, _, _, etpc_train_acc, _, _ = (
-            model_eval_multitask(
-                sst_train_dataloader,
-                quora_train_dataloader,
-                sts_train_dataloader,
-                etpc_train_dataloader,
-                model=model,
-                device=device,
-                task=args.task,
-            )
+        (
+            quora_train_acc,
+            _,
+            _,
+            sst_train_acc,
+            _,
+            _,
+            sts_train_corr,
+            _,
+            _,
+            etpc_train_acc,
+            _,
+            _,
+        ) = model_eval_multitask(
+            sst_train_dataloader,
+            quora_train_dataloader,
+            sts_train_dataloader,
+            etpc_train_dataloader,
+            model=model,
+            device=device,
+            task=args.task,
         )
 
-        quora_dev_acc, _, _, sst_dev_acc, _, _, sts_dev_corr, _, _, etpc_dev_acc, _, _ = (
-            model_eval_multitask(
-                sst_dev_dataloader,
-                quora_dev_dataloader,
-                sts_dev_dataloader,
-                etpc_dev_dataloader,
-                model=model,
-                device=device,
-                task=args.task,
-            )
+        (
+            quora_dev_acc,
+            _,
+            _,
+            sst_dev_acc,
+            _,
+            _,
+            sts_dev_corr,
+            _,
+            _,
+            etpc_dev_acc,
+            _,
+            _,
+        ) = model_eval_multitask(
+            sst_dev_dataloader,
+            quora_dev_dataloader,
+            sts_dev_dataloader,
+            etpc_dev_dataloader,
+            model=model,
+            device=device,
+            task=args.task,
         )
 
         train_acc, dev_acc = {
@@ -339,23 +406,39 @@ def get_args():
     # Dataset paths
     parser.add_argument("--sst_train", type=str, default="data/sst-sentiment-train.csv")
     parser.add_argument("--sst_dev", type=str, default="data/sst-sentiment-dev.csv")
-    parser.add_argument("--sst_test", type=str, default="data/sst-sentiment-test-student.csv")
+    parser.add_argument(
+        "--sst_test", type=str, default="data/sst-sentiment-test-student.csv"
+    )
 
-    parser.add_argument("--quora_train", type=str, default="data/quora-paraphrase-train.csv")
-    parser.add_argument("--quora_dev", type=str, default="data/quora-paraphrase-dev.csv")
-    parser.add_argument("--quora_test", type=str, default="data/quora-paraphrase-test-student.csv")
+    parser.add_argument(
+        "--quora_train", type=str, default="data/quora-paraphrase-train.csv"
+    )
+    parser.add_argument(
+        "--quora_dev", type=str, default="data/quora-paraphrase-dev.csv"
+    )
+    parser.add_argument(
+        "--quora_test", type=str, default="data/quora-paraphrase-test-student.csv"
+    )
 
-    parser.add_argument("--sts_train", type=str, default="data/sts-similarity-train.csv")
+    parser.add_argument(
+        "--sts_train", type=str, default="data/sts-similarity-train.csv"
+    )
     parser.add_argument("--sts_dev", type=str, default="data/sts-similarity-dev.csv")
-    parser.add_argument("--sts_test", type=str, default="data/sts-similarity-test-student.csv")
+    parser.add_argument(
+        "--sts_test", type=str, default="data/sts-similarity-test-student.csv"
+    )
 
     # TODO
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
-    parser.add_argument("--etpc_train", type=str, default="data/etpc-paraphrase-train.csv")
+    parser.add_argument(
+        "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
+    )
     parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
     parser.add_argument(
-        "--etpc_test", type=str, default="data/etpc-paraphrase-detection-test-student.csv"
+        "--etpc_test",
+        type=str,
+        default="data/etpc-paraphrase-detection-test-student.csv",
     )
 
     # Output paths
@@ -436,7 +519,9 @@ def get_args():
     )
 
     # Hyperparameters
-    parser.add_argument("--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64)
+    parser.add_argument(
+        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64
+    )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument(
         "--lr",
@@ -452,7 +537,9 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    args.filepath = f"models/{args.option}-{args.epochs}-{args.lr}-{args.task}.pt"  # save path
+    args.filepath = (
+        f"models/{args.option}-{args.epochs}-{args.lr}-{args.task}.pt"  # save path
+    )
     seed_everything(args.seed)  # fix the seed for reproducibility
     train_multitask(args)
     test_model(args)

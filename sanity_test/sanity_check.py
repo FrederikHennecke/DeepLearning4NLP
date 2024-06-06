@@ -14,12 +14,15 @@ Can only be called from same directory as the file.
 The test is successful if the output of the forward pass is close to the reference.
 """
 
-sanity_data = torch.load("sanity_check.data")
+sanity_data = torch.load("./sanity_test/sanity_check.data")
 
 # text_batch = ["hello world", "hello neural network for NLP"]
 # Tokenizer here
 sent_ids = torch.tensor(
-    [[101, 7592, 2088, 102, 0, 0, 0, 0], [101, 7592, 15756, 2897, 2005, 17953, 2361, 102]]
+    [
+        [101, 7592, 2088, 102, 0, 0, 0, 0],
+        [101, 7592, 15756, 2897, 2005, 17953, 2361, 102],
+    ]
 )
 att_mask = torch.tensor([[1, 1, 1, 1, 0, 0, 0, 0], [1, 1, 1, 1, 1, 1, 1, 1]])
 

@@ -45,7 +45,7 @@ def test_optimizer(opt_class: torch.optim.Optimizer) -> torch.Tensor:
     return model.weight.detach()
 
 
-ref = torch.tensor(np.load("optimizer_test.npy"))
+ref = torch.tensor(np.load("./sanity_test/optimizer_test.npy"))
 actual = test_optimizer(AdamW)
 print(ref)
 print(actual)

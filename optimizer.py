@@ -28,7 +28,11 @@ class AdamW(Optimizer):
         if not 0.0 <= eps:
             raise ValueError("Invalid epsilon value: {} - should be >= 0.0".format(eps))
         defaults = dict(
-            lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, correct_bias=correct_bias
+            lr=lr,
+            betas=betas,
+            eps=eps,
+            weight_decay=weight_decay,
+            correct_bias=correct_bias,
         )
         super().__init__(params, defaults)
 
@@ -49,10 +53,7 @@ class AdamW(Optimizer):
 
                 # State should be stored in this dictionary
                 state = self.state[p]
-
-                # Access hyperparameters from the `group` dictionary
                 alpha = group["lr"]
-
                 # Complete the implementation of AdamW here, reading and saving
                 # your state in the `state` dictionary above.
                 # The hyperparameters can be read from the `group` dictionary
@@ -68,6 +69,29 @@ class AdamW(Optimizer):
                 #    (incorporating the learning rate again).
 
                 ### TODO
-                raise NotImplementedError
+                # raise NotImplementedError
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+
+                if "t" not in state.keys():
+                    state["t"] = 0
+                    state["mt"] = torch.zeros(p.data.shape).to(device)
+                    state["vt"] = torch.zeros(p.data.shape).to(device)
+
+                t = state["t"]
+                beta1, beta2 = group["betas"]
+                lr = group["lr"]
+                state["t"] = t + 1
+                state["mt"] = beta1 * state["mt"] + (1 - beta1) * grad
+                state["vt"] = beta2 * state["vt"] + (1 - beta2) * (
+                    torch.mul(grad, grad)
+                )
+
+                state["alpha"] = (lr * math.sqrt(1 - beta2 ** state["t"])) / (
+                    1 - beta1 ** state["t"]
+                )
+                p.data = p.data - state["alpha"] * (
+                    state["mt"] / (torch.sqrt(state["vt"]) + group["eps"])
+                )
+                p.data = p.data - (lr * group["weight_decay"] * p.data)
 
         return loss
