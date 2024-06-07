@@ -163,6 +163,7 @@ class MultitaskBERT(nn.Module):
 
 
 def save_model(model, optimizer, args, config, filepath):
+    # save the model
     save_info = {
         "model": model.state_dict(),
         "optim": optimizer.state_dict(),
