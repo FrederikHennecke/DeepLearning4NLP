@@ -55,7 +55,36 @@ def transform_data(dataset, max_length=512):
     Return a DataLoader with the TensorDataset. You can choose a batch size of your
     choice.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large")
+    sentences1 = dataset["sentence1"].tolist()
+    sentences2 = dataset["sentence2"].tolist()
+    has_labels = "paraphrase_types" in dataset.columns
+
+    if has_labels:
+        labels = (
+            dataset["paraphrase_types"]
+            .apply(lambda x: list(map(int, x.strip("[]").split(", "))))
+            .tolist()
+        )
+        binary_labels = [1 if i in label else 0 for i in range(7) for label in labels]
+    else:
+        binary_labels = None
+
+    encodings = tokenizer(
+        sentences1, sentences2, truncation=True, padding=True, max_length=max_length
+    )
+    input_ids = torch.tensor(encodings["input_ids"])
+    attention_mask = torch.tensor(encodings["attention_mask"])
+
+    if binary_labels:
+        labels_tensors = torch.tensor(binary_labels)
+        dataset = TensorDataset(input_ids, attention_mask, labels_tensors)
+    else:
+        dataset = TensorDataset(input_ids, attention_mask)
+
+    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    return dataloader
 
 
 def train_model(model, train_data, dev_data, device):
@@ -71,7 +100,6 @@ def train_model(model, train_data, dev_data, device):
     """
     ### TODO
     raise NotImplementedError
-
 
 
 def test_model(model, test_data, test_ids, device):
@@ -155,7 +183,9 @@ def finetune_paraphrase_detection(args):
     model.to(device)
 
     train_dataset = pd.read_csv("data/etpc-paraphrase-train.csv", sep="\t")
-    test_dataset = pd.read_csv("data/etpc-paraphrase-detection-test-student.csv", sep="\t")
+    test_dataset = pd.read_csv(
+        "data/etpc-paraphrase-detection-test-student.csv", sep="\t"
+    )
 
     # TODO You might do a split of the train data into train/validation set here
     # (or in the csv files directly)
@@ -174,7 +204,9 @@ def finetune_paraphrase_detection(args):
     test_ids = test_dataset["id"]
     test_results = test_model(model, test_data, test_ids, device)
     test_results.to_csv(
-        "predictions/bart/etpc-paraphrase-detection-test-output.csv", index=False, sep="\t"
+        "predictions/bart/etpc-paraphrase-detection-test-output.csv",
+        index=False,
+        sep="\t",
     )
 
 
