@@ -620,7 +620,7 @@ def get_args():
     return args
 
 
-def etpc_dev(args):
+def etpc_split(args):
     sst_data, num_labels, quora_data, sts_data, etpc_data = load_multitask_data(
         args.sst_train, args.quora_train, args.sts_train, args.etpc_train, split="train"
     )
@@ -686,6 +686,6 @@ if __name__ == "__main__":
     #     f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     # )
     seed_everything(args.seed)  # fix the seed for reproducibility
-    etpc_dev(args)
+    etpc_split(args)
     # train_multitask(args)
     # test_model(args)
