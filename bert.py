@@ -67,7 +67,7 @@ class BertSelfAttention(nn.Module):
             torch.matmul(attention_weights, value).transpose(1, 2).contiguous()
         )
         attention_output = attention_output.view(bs, seq_len, -1)
-        print(f"attention_output_shape: {attention_output.shape}")
+        # print(f"attention_output_shape: {attention_output.shape}")
         return attention_output
 
     def forward(self, hidden_states, attention_mask):
@@ -147,7 +147,7 @@ class BertLayer(nn.Module):
         # raise NotImplementedError
 
         attention_output = self.self_attention(hidden_states, attention_mask)
-        print(f"attention unnormalized shape: {attention_output.shape}")
+        # print(f"attention unnormalized shape: {attention_output.shape}")
         attention_output = self.add_norm(
             hidden_states,
             attention_output,
@@ -155,9 +155,9 @@ class BertLayer(nn.Module):
             self.attention_dropout,
             self.attention_layer_norm,
         )
-        print(f"attention normalized shape: {attention_output.shape}")
+        # print(f"attention normalized shape: {attention_output.shape}")
         interm_output = self.interm_af(self.interm_dense(attention_output))
-        print(f"interm_output_shape: {interm_output.shape}")
+        # print(f"interm_output_shape: {interm_output.shape}")
         layer_output = self.add_norm(
             attention_output,
             interm_output,
@@ -165,7 +165,7 @@ class BertLayer(nn.Module):
             self.out_dropout,
             self.out_layer_norm,
         )
-        print(f"layer_output_shape: {layer_output.shape}")
+        # print(f"layer_output_shape: {layer_output.shape}")
         return layer_output
 
 
@@ -217,7 +217,7 @@ class BertModel(BertPreTrainedModel):
 
         # Get word embedding from self.word_embedding into input_embeds.
         input_embeds = self.word_embedding(input_ids)
-        print(f"input_embeds_shape: {input_embeds.shape}")
+        # print(f"input_embeds_shape: {input_embeds.shape}")
 
         ### TODO
         # raise NotImplementedError
@@ -226,7 +226,7 @@ class BertModel(BertPreTrainedModel):
         pos_ids = self.position_ids[:, :seq_length]
 
         pos_embeds = self.pos_embedding(pos_ids)
-        print(f"pos_embeds_shape: {pos_embeds.shape}")
+        # print(f"pos_embeds_shape: {pos_embeds.shape}")
         ### TODO
         # raise NotImplementedError
         # Get token type ids, since we are not considering token type,
@@ -235,7 +235,7 @@ class BertModel(BertPreTrainedModel):
             input_shape, dtype=torch.long, device=input_ids.device
         )
         tk_type_embeds = self.tk_type_embedding(tk_type_ids)
-        print(f"tk_type_embeds_shape: {tk_type_embeds.shape}")
+        # print(f"tk_type_embeds_shape: {tk_type_embeds.shape}")
 
         ### TODO
         # raise NotImplementedError
@@ -244,7 +244,7 @@ class BertModel(BertPreTrainedModel):
         embeds = input_embeds + pos_embeds + tk_type_embeds
         embeds = self.embed_layer_norm(embeds)
         embeds = self.embed_dropout(embeds)
-        print(f"embeds_shape: {embeds.shape}")
+        # print(f"embeds_shape: {embeds.shape}")
         return embeds
 
     def encode(self, hidden_states, attention_mask):
@@ -263,7 +263,7 @@ class BertModel(BertPreTrainedModel):
         for i, layer_module in enumerate(self.bert_layers):
             # feed the encoding from the last bert_layer to the next
             hidden_states = layer_module(hidden_states, extended_attention_mask)
-        print(f"hidden_states_shape: {hidden_states.shape}")
+        # print(f"hidden_states_shape: {hidden_states.shape}")
 
         return hidden_states
 
@@ -282,6 +282,6 @@ class BertModel(BertPreTrainedModel):
         first_tk = sequence_output[:, 0]
         first_tk = self.pooler_dense(first_tk)
         first_tk = self.pooler_af(first_tk)
-        print(f"first_tk_shape: {first_tk.shape}")
+        # print(f"first_tk_shape: {first_tk.shape}")
 
         return {"last_hidden_state": sequence_output, "pooler_output": first_tk}

@@ -19,18 +19,17 @@ echo -e "\nCurrent Branch: $(git rev-parse --abbrev-ref HEAD)"
 echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
-epochs=2
-batch_size=128
-lr=1e-1
-dropout=0.1
+epochs=1
+batch_size=600
+lr=10
+dropout=0.5
 sst_filename="./data/sst-sentiment-train.csv"
 quora_filename="./data/quora-paraphrase-train.csv"
-sts_filename="./data/sts-similar-train.csv"
+sts_filename="./data/sts-similarity-train.csv"
 etpc_filename="./data/etpc-paraphrase-train.csv"
 
 # Run the script:
-python -u multitask_classifier.py --task sst --epochs $epochs --sst_train $sst_filename --quora_train $quora_filename --sts_train $sts_filename --etpc_train $etpc_filename \
---option pretrain --use_gpu --batch_size $batch_size --lr $lr --local_files_only --hidden_dropout_prob $dropout
+python -u multitask_classifier.py --task sst --use_gpu --epochs $epochs --option pretrain --use_gpu --batch_size $batch_size --lr $lr --local_files_only --hidden_dropout_prob $dropout
 # rm slurm*
 
 # Run

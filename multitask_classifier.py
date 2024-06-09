@@ -87,9 +87,10 @@ class MultitaskBERT(nn.Module):
         # (e.g., by adding other layers).
         ### TODO
         # raise NotImplementedError
-        outputs = self.bert(input_ids, attention_mask)
-        pooled_output = outputs[1]
-        pooled_output = self.dropout(pooled_output)
+        output = self.bert(input_ids, attention_mask)
+        # print(output)
+        pooled_output = self.dropout(output["pooler_output"])
+        return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
         """
@@ -230,6 +231,57 @@ def train_multitask(args):
     #   Load data for the other datasets
     # If you are doing the paraphrase type detection with the minBERT model as well, make sure
     # to transform the the data labels into binaries (as required in the bart_detection.py script)
+
+    if args.task == "sts" or args.task == "multitask":
+        sts_train_data = SentencePairDataset(sts_train_data, args)
+        sts_dev_data = SentencePairDataset(sts_dev_data, args)
+
+        sts_train_dataloader = DataLoader(
+            sts_train_data,
+            shuffle=True,
+            batch_size=args.batch_size,
+            collate_fn=sts_train_data.collate_fn,
+        )
+        sts_dev_dataloader = DataLoader(
+            sts_dev_data,
+            shuffle=False,
+            batch_size=args.batch_size,
+            collate_fn=sts_dev_data.collate_fn,
+        )
+
+    if args.task == "qqp" or args.task == "multitask":
+        quora_train_data = SentencePairDataset(quora_train_data, args)
+        quora_dev_data = SentencePairDataset(quora_dev_data, args)
+
+        quora_train_dataloader = DataLoader(
+            quora_train_data,
+            shuffle=True,
+            batch_size=args.batch_size,
+            collate_fn=quora_train_data.collate_fn,
+        )
+        quora_dev_dataloader = DataLoader(
+            quora_dev_data,
+            shuffle=False,
+            batch_size=args.batch_size,
+            collate_fn=quora_dev_data.collate_fn,
+        )
+
+    if args.task == "etpc" or args.task == "multitask":
+        etpc_train_data = SentencePairDataset(etpc_train_data, args)
+        etpc_dev_data = SentencePairDataset(etpc_dev_data, args)
+
+        etpc_train_dataloader = DataLoader(
+            etpc_train_data,
+            shuffle=True,
+            batch_size=args.batch_size,
+            collate_fn=etpc_train_data.collate_fn,
+        )
+        etpc_dev_dataloader = DataLoader(
+            etpc_dev_data,
+            shuffle=False,
+            batch_size=args.batch_size,
+            collate_fn=etpc_dev_data.collate_fn,
+        )
 
     # Init model
     config = {
@@ -480,7 +532,7 @@ def get_args():
         choices=("pretrain", "finetune"),
         default="pretrain",
     )
-    parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--use_gpu", action="store_false")
 
     args, _ = parser.parse_known_args()
 
@@ -513,7 +565,7 @@ def get_args():
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
 
-    ## Done down in the main
+    ## Done down in a function
 
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
@@ -682,10 +734,8 @@ def etpc_split(args):
 
 if __name__ == "__main__":
     args = get_args()
-    # args.filepath = (
-    #     f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
-    # )
+    args.filepath = f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
-    etpc_split(args)
-    # train_multitask(args)
-    # test_model(args)
+    # etpc_split(args)
+    train_multitask(args)
+    test_model(args)
