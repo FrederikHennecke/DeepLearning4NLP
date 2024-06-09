@@ -624,13 +624,34 @@ def etpc_dev(args):
     sst_data, num_labels, quora_data, sts_data, etpc_data = load_multitask_data(
         args.sst_train, args.quora_train, args.sts_train, args.etpc_train, split="train"
     )
+    random.shuffle(etpc_data)
     train_size = int(len(etpc_data) * 0.75)
-    # random.shuffle(etpc_data)
-    # print(f"etpc_train_data: {etpc_data}")
-
+    etpc_data_train = etpc_data[:train_size]
     etpc_data_dev = etpc_data[train_size:]
+
+    with open(args.etpc_train, mode="w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
+        writer.writerow(
+            [
+                "sentence1",
+                "sentence2",
+                "paraphrase_types",
+                "sentence1_segment_location",
+                "sentence2_segment_location",
+                "sentence1_tokenized",
+                "sentence2_tokenized",
+                "id",
+            ]
+        )
+        for item in etpc_data_train:
+            writer.writerow(item)
+
+    print(
+        f"Shuffled etpcs_data_train is saved to {args.etpc_train} with size {len(etpc_data_train)} and ratio {len(etpc_data_train)/len(etpc_data)}"
+    )
+
     with open(args.etpc_dev, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file, delimiter="\t", quoting=csv.QUOTE_ALL)
+        writer = csv.writer(file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
         writer.writerow(
             [
                 "sentence1",
@@ -647,7 +668,7 @@ def etpc_dev(args):
             writer.writerow(item)
 
     print(
-        f"Shuffled etpcs_data_dev is saved to {args.etpc_dev} with size {len(etpc_data_dev)} and ratio {len(etpc_data_dev)/len(etpc_data)}"
+        f"Shuffled etpcs_data_train is saved to {args.etpc_dev} with size {len(etpc_data_dev)} and ratio {len(etpc_data_dev)/len(etpc_data)}"
     )
 
     # print(f"etpc_dev: {etpc_dev[0]}\n")
