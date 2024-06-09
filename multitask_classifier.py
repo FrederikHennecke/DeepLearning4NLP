@@ -22,6 +22,9 @@ from datasets import (
 )
 from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW
+from datasets import preprocess_string
+import random
+import csv
 
 TQDM_DISABLE = True
 
@@ -287,17 +290,94 @@ def train_multitask(args):
         if args.task == "sts" or args.task == "multitask":
             # Trains the model on the sts dataset
             ### TODO
-            raise NotImplementedError
+            # raise NotImplementedError
+            for batch in tqdm(
+                sts_train_dataloader, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE
+            ):
+                b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
+                    batch["token_ids_1"],
+                    batch["attention_mask_1"],
+                    batch["token_ids_2"],
+                    batch["attention_mask_2"],
+                    batch["labels"],
+                )
+
+                b_ids_1 = b_ids_1.to(device)
+                b_mask_1 = b_mask_1.to(device)
+                b_ids_2 = b_ids_2.to(device)
+                b_mask_2 = b_mask_2.to(device)
+                b_labels = b_labels.to(device)
+
+                optimizer.zero_grad()
+                logits = model.predict_similarity(b_ids_1, b_mask_1, b_ids_2, b_mask_2)
+                loss = F.mse_loss(logits, b_labels.view(-1))
+                loss.backward()
+                optimizer.step()
+
+                train_loss += loss.item()
+                num_batches += 1
 
         if args.task == "qqp" or args.task == "multitask":
             # Trains the model on the qqp dataset
             ### TODO
-            raise NotImplementedError
+            # raise NotImplementedError
+            for batch in tqdm(
+                quora_train_dataloader, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE
+            ):
+                b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
+                    batch["token_ids_1"],
+                    batch["attention_mask_1"],
+                    batch["token_ids_2"],
+                    batch["attention_mask_2"],
+                    batch["labels"],
+                )
+
+                b_ids_1 = b_ids_1.to(device)
+                b_mask_1 = b_mask_1.to(device)
+                b_ids_2 = b_ids_2.to(device)
+                b_mask_2 = b_mask_2.to(device)
+                b_labels = b_labels.to(device)
+
+                optimizer.zero_grad()
+                logits = model.predict_paraphrase(b_ids_1, b_mask_1, b_ids_2, b_mask_2)
+                loss = F.binary_cross_entropy_with_logits(logits, b_labels.view(-1))
+                loss.backward()
+                optimizer.step()
+
+                train_loss += loss.item()
+                num_batches += 1
 
         if args.task == "etpc" or args.task == "multitask":
             # Trains the model on the etpc dataset
             ### TODO
-            raise NotImplementedError
+            # raise NotImplementedError
+            for batch in tqdm(
+                etpc_train_dataloader, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE
+            ):
+                b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
+                    batch["token_ids_1"],
+                    batch["attention_mask_1"],
+                    batch["token_ids_2"],
+                    batch["attention_mask_2"],
+                    batch["labels"],
+                )
+
+                b_ids_1 = b_ids_1.to(device)
+                b_mask_1 = b_mask_1.to(device)
+                b_ids_2 = b_ids_2.to(device)
+                b_mask_2 = b_mask_2.to(device)
+                b_labels = b_labels.to(device)
+
+                optimizer.zero_grad()
+                logits = model.predict_paraphrase_types(
+                    b_ids_1, b_mask_1, b_ids_2, b_mask_2
+                )
+                loss = F.binary_cross_entropy_with_logits(logits, b_labels)
+                loss.backward()
+                optimizer.step()
+
+                train_loss += loss.item()
+                num_batches += 1
 
         train_loss = train_loss / num_batches
 
@@ -432,10 +512,14 @@ def get_args():
     # TODO
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
+
+    ## Done down in the main
+
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
     )
     parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
+
     parser.add_argument(
         "--etpc_test",
         type=str,
@@ -536,11 +620,51 @@ def get_args():
     return args
 
 
+def etpc_dev(args):
+    sst_data, num_labels, quora_data, sts_data, etpc_data = load_multitask_data(
+        args.sst_train, args.quora_train, args.sts_train, args.etpc_train, split="train"
+    )
+    train_size = int(len(etpc_data) * 0.75)
+    # random.shuffle(etpc_data)
+    # print(f"etpc_train_data: {etpc_data}")
+
+    etpc_data_dev = etpc_data[train_size:]
+    with open(args.etpc_dev, mode="w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file, delimiter="\t", quoting=csv.QUOTE_ALL)
+        writer.writerow(
+            [
+                "sentence1",
+                "sentence2",
+                "paraphrase_types",
+                "sentence1_segment_location",
+                "sentence2_segment_location",
+                "sentence1_tokenized",
+                "sentence2_tokenized",
+                "id",
+            ]
+        )
+        for item in etpc_data_dev:
+            writer.writerow(item)
+
+    print(
+        f"Shuffled etpcs_data_dev is saved to {args.etpc_dev} with size {len(etpc_data_dev)} and ratio {len(etpc_data_dev)/len(etpc_data)}"
+    )
+
+    # print(f"etpc_dev: {etpc_dev[0]}\n")
+    # print(f"etpc_dev: {len(etpc_dev)}\n")
+
+    # print(f"sst: {sst_data[0]}\n")
+    # print(f"quora: {quora_data[0]}\n")
+    # print(f"sts: {sts_data[0]}\n")
+    # print(f"etpc: {etpc_data[0]}\n")
+
+
 if __name__ == "__main__":
     args = get_args()
-    args.filepath = (
-        f"models/{args.option}-{args.epochs}-{args.lr}-{args.task}.pt"  # save path
-    )
+    # args.filepath = (
+    #     f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
+    # )
     seed_everything(args.seed)  # fix the seed for reproducibility
-    train_multitask(args)
-    test_model(args)
+    etpc_dev(args)
+    # train_multitask(args)
+    # test_model(args)

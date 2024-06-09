@@ -1,19 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=train-multitask_classifier
-#SBATCH -t 00:20:00                  # estimated time # TODO: adapt to your needs
-#SBATCH -p grete                     # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
-#SBATCH -G A100:1                    # take 1 GPU, see https://docs.hpc.gwdg.de/compute_partitions/gpu_partitions/index.html for more options
-#SBATCH --mem-per-gpu=8G             # setting the right constraints for the splitted gpu partitions
-#SBATCH --nodes=1                    # total number of nodes
-#SBATCH --ntasks=1                   # total number of tasks
-#SBATCH --cpus-per-task=8            # number cores per task
-#SBATCH --mail-type=all              # send mail when job begins and ends
-#SBATCH --mail-user=TODO@stud.uni-goettingen.de   
-#SBATCH --output=./slurm_files/slurm-%x-%j.out     # where to write output, %x give job name, %j names job id
-#SBATCH --error=./slurm_files/slurm-%x-%j.err      # where to write slurm error
 
 module load anaconda3
-source activate dnlp # Or whatever you called your environment.
+source activate dl-gpu # Or whatever you called your environment.
 
 # Printing out some info.
 echo "Submitting job with sbatch from directory: ${SLURM_SUBMIT_DIR}"
@@ -31,5 +19,18 @@ echo -e "\nCurrent Branch: $(git rev-parse --abbrev-ref HEAD)"
 echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
+epochs=2
+batch_size=128
+lr=1e-1
+dropout=0.1
+sst_filename="./data/sst-sentiment-train.csv"
+quora_filename="./data/quora-paraphrase-train.csv"
+sts_filename="./data/sts-similar-train.csv"
+etpc_filename="./data/etpc-paraphrase-train.csv"
+
 # Run the script:
-python -u multitask_classifier.py --use_gpu --local_files_only --option finetune --task sst --hidden_dropout_prob 0.1
+python -u multitask_classifier.py --task sst --epochs $epochs --sst_train $sst_filename --quora_train $quora_filename --sts_train $sts_filename --etpc_train $etpc_filename \
+--option pretrain --use_gpu --batch_size $batch_size --lr $lr --local_files_only --hidden_dropout_prob $dropout
+# rm slurm*
+
+# Run
