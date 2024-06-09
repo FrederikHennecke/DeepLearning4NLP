@@ -123,12 +123,8 @@ def train_model(model, train_data, dev_data, device):
         correct_preds = 0
 
         for batch in tqdm(train_data, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE):
-            print(f"batch: {batch}")
-            b_ids, b_mask, b_labels = (
-                batch["token_ids"],
-                batch["attention_mask"],
-                batch["labels"],
-            )
+            # print(f"batch: {batch}")
+            b_ids, b_mask, b_labels = batch
 
             b_ids = b_ids.to(device)
             b_mask = b_mask.to(device)
@@ -174,7 +170,7 @@ def test_model(model, test_data, test_ids, device):
 
     with torch.no_grad():
         for batch in tqdm(test_data, desc="test", disable=TQDM_DISABLE):
-            b_ids, b_mask = batch["token_ids"], batch["attention_mask"]
+            b_ids, b_mask = batch
             b_ids = b_ids.to(device)
             b_mask = b_mask.to(device)
 
@@ -285,6 +281,9 @@ def finetune_paraphrase_detection(args):
     test_dataset = pd.read_csv(
         "data/etpc-paraphrase-detection-test-student.csv", sep="\t"
     )
+
+    test_dataset = test_dataset.iloc[:, :3]
+    test_dataset.columns = ["id", "sentence1", "sentence2"]
 
     print(f"test_dataset shape: {test_dataset.shape}")
     print(f"test_dataset: {test_dataset.head()}")
