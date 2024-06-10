@@ -38,7 +38,12 @@ class BartWithClassifier(nn.Module):
         return probabilities
 
 
-def transform_data(dataset, max_length=512):
+def transform_data(
+    dataset,
+    batch_size,
+    shuffle,
+    max_length=512,
+):
     """
     dataset: pd.DataFrame
 
@@ -91,7 +96,7 @@ def transform_data(dataset, max_length=512):
         dataset = TensorDataset(input_ids, attention_mask)
 
     dataloader = DataLoader(
-        dataset, batch_size=512, shuffle=True
+        dataset, batch_size=batch_size, shuffle=shuffle
     )  # WARN: change batch size to 32
     return dataloader
 
@@ -245,10 +250,31 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument(
+        "--etpc_train_filename", type=str, default="data/etpc-paraphrase-train.csv"
+    )
+    parser.add_argument(
+        "--etpc_dev_filename", type=str, default="data/etpc-paraphrase-dev.csv"
+    )
+    parser.add_argument(
+        "--etpc_test_filename",
+        type=str,
+        default="data/etpc-paraphrase-detection-test-student.csv",
+    )
     args = parser.parse_args()
     return args
+
+
+def prepare_etpc_data(
+    filename: str, sep: str, idx: list, column_names: list
+) -> pd.DataFrame:
+    df = pd.read_csv(filename, sep=sep)
+    df = df.iloc[:, idx]
+    df.columns = column_names
+    return df
 
 
 def finetune_paraphrase_detection(args):
@@ -256,34 +282,30 @@ def finetune_paraphrase_detection(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     model.to(device)
 
-    train_dataset = pd.read_csv("data/etpc-paraphrase-train.csv")
-    train_dataset = train_dataset.iloc[:, :4]
-    train_dataset.columns = [
-        "sentence1",
-        "sentence2",
-        "paraphrase_types",
-        "id",
-    ]
+    train_dataset = prepare_etpc_data(
+        args.etpc_train_filename,
+        sep=",",
+        idx=[0, 1, 2],
+        column_names=["sentence1", "sentence2", "paraphrase_types"],
+    )
     print(f"train_dataset shape: {train_dataset.shape}")
     print(f"train_dataset: {train_dataset.head()}\n")
 
-    dev_dataset = pd.read_csv("data/etpc-paraphrase-dev.csv")
-    dev_dataset = dev_dataset.iloc[:, :4]
-    dev_dataset.columns = [
-        "sentence1",
-        "sentence2",
-        "paraphrase_types",
-        "id",
-    ]
+    dev_dataset = prepare_etpc_data(
+        args.etpc_dev_filename,
+        sep=",",
+        idx=[0, 1, 2],
+        column_names=["sentence1", "sentence2", "paraphrase_types"],
+    )
     print(f"dev_dataset shape: {dev_dataset.shape}")
     print(f"dev_dataset: {dev_dataset.head()}\n")
 
-    test_dataset = pd.read_csv(
-        "data/etpc-paraphrase-detection-test-student.csv", sep="\t"
+    test_dataset = prepare_etpc_data(
+        args.etpc_test_filename,
+        sep="\t",
+        idx=[0, 1, 2],
+        column_names=["id", "sentence1", "sentence2"],
     )
-
-    test_dataset = test_dataset.iloc[:, :3]
-    test_dataset.columns = ["id", "sentence1", "sentence2"]
 
     print(f"test_dataset shape: {test_dataset.shape}")
     print(f"test_dataset: {test_dataset.head()}")
@@ -293,9 +315,9 @@ def finetune_paraphrase_detection(args):
 
     # Already Done!
 
-    train_data = transform_data(train_dataset)
-    dev_data = transform_data(dev_dataset)
-    test_data = transform_data(test_dataset)
+    train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
+    dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
+    test_data = transform_data(test_dataset, args.batch_size, shuffle=True)
 
     print(f"Loaded {len(train_dataset)} training samples.")
 
@@ -317,8 +339,11 @@ def finetune_paraphrase_detection(args):
 
 if __name__ == "__main__":
     args = get_args()
+
+    # For code testing
     args.use_gpu = False
     args.epoch = 1
     args.lr = 10
+    args.batch_size = 256
     seed_everything(args.seed)
     finetune_paraphrase_detection(args)
