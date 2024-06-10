@@ -164,8 +164,8 @@ def test_model(model, test_data, test_ids, device):
     ### TODO
 
     # raise NotImplementedError
-    model.eval()
     model.to(device)
+    model.eval()
     all_preds = []
 
     with torch.no_grad():
