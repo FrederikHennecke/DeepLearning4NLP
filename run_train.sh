@@ -29,7 +29,5 @@ sts_filename="./data/sts-similarity-train.csv"
 etpc_filename="./data/etpc-paraphrase-train.csv"
 
 # Run the script:
-python -u multitask_classifier.py --task sst --use_gpu --epochs $epochs --option pretrain --use_gpu --batch_size $batch_size --lr $lr --local_files_only --hidden_dropout_prob $dropout
+python -u multitask_classifier.py --task sst --use_gpu --epochs $epochs --option pretrain --batch_size $batch_size --lr $lr --local_files_only --hidden_dropout_prob $dropout
 # rm slurm*
-
-# Run
