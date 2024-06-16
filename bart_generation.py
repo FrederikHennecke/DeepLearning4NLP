@@ -107,8 +107,8 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         )
         model.train()
 
-    model.save_pretrained("models/bart_generation")
-    tokenizer.save_pretrained("models/bart_generation")
+    model.save_pretrained("models/bart_generation.pt")
+    tokenizer.save_pretrained("models/bart_generation.pt")
 
     return model
 

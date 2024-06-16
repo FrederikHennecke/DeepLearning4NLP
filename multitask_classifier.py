@@ -59,9 +59,7 @@ class MultitaskBERT(nn.Module):
 
         # You will want to add layers here to perform the downstream tasks.
         # Pretrain mode does not require updating bert parameters.
-        self.bert = BertModel.from_pretrained(
-            "bert-base-uncased", local_files_only=config.local_files_only
-        )
+        self.bert = BertModel.from_pretrained("./models/bert-base-uncased")
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
@@ -70,9 +68,9 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
-        self.paraphrase_classifier = nn.Linear(BERT_HIDDEN_SIZE, 1)
-        self.similarity_classifier = nn.Linear(BERT_HIDDEN_SIZE, 1)
-        self.paraphrase_type_classifier = nn.Linear(BERT_HIDDEN_SIZE, 7)
+        self.paraphrase_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
+        self.similarity_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
+        self.paraphrase_type_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 7)
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -358,11 +356,11 @@ def train_multitask(args):
                 b_mask_1 = b_mask_1.to(device)
                 b_ids_2 = b_ids_2.to(device)
                 b_mask_2 = b_mask_2.to(device)
-                b_labels = b_labels.to(device)
+                b_labels = b_labels.to(device).float()
 
                 optimizer.zero_grad()
                 logits = model.predict_similarity(b_ids_1, b_mask_1, b_ids_2, b_mask_2)
-                loss = F.mse_loss(logits, b_labels.view(-1))
+                loss = F.mse_loss(logits.float(), b_labels.view(-1))
                 loss.backward()
                 optimizer.step()
 
@@ -388,11 +386,13 @@ def train_multitask(args):
                 b_mask_1 = b_mask_1.to(device)
                 b_ids_2 = b_ids_2.to(device)
                 b_mask_2 = b_mask_2.to(device)
-                b_labels = b_labels.to(device)
+                b_labels = b_labels.to(device).float()
 
                 optimizer.zero_grad()
                 logits = model.predict_paraphrase(b_ids_1, b_mask_1, b_ids_2, b_mask_2)
-                loss = F.binary_cross_entropy_with_logits(logits, b_labels.view(-1))
+                loss = F.binary_cross_entropy_with_logits(
+                    logits.float(), b_labels.view(-1)
+                )
                 loss.backward()
                 optimizer.step()
 
@@ -418,13 +418,13 @@ def train_multitask(args):
                 b_mask_1 = b_mask_1.to(device)
                 b_ids_2 = b_ids_2.to(device)
                 b_mask_2 = b_mask_2.to(device)
-                b_labels = b_labels.to(device)
+                b_labels = b_labels.to(device).float()
 
                 optimizer.zero_grad()
                 logits = model.predict_paraphrase_types(
                     b_ids_1, b_mask_1, b_ids_2, b_mask_2
                 )
-                loss = F.binary_cross_entropy_with_logits(logits, b_labels)
+                loss = F.binary_cross_entropy_with_logits(logits.float(), b_labels)
                 loss.backward()
                 optimizer.step()
 
@@ -491,9 +491,9 @@ def train_multitask(args):
             f"Epoch {epoch+1:02} ({args.task}): train loss :: {train_loss:.3f}, train :: {train_acc:.3f}, dev :: {dev_acc:.3f}"
         )
 
-        if dev_acc > best_dev_acc:
-            best_dev_acc = dev_acc
-            save_model(model, optimizer, args, config, args.filepath)
+        # if dev_acc > best_dev_acc:
+        #     best_dev_acc = dev_acc
+        save_model(model, optimizer, args, config, args.filepath)
 
 
 def test_model(args):
@@ -746,7 +746,6 @@ def etpc_split(args):
 
 if __name__ == "__main__":
     args = get_args()
-    args.use_gpu = False
     args.filepath = f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
     # etpc_split(args)
