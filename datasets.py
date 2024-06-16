@@ -31,8 +31,12 @@ class SentenceClassificationDataset(Dataset):
     def __init__(self, dataset, args):
         self.dataset = dataset
         self.p = args
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        print("Saving tokenizer to ./models/bert-base-uncased")
+        self.tokenizer.save_pretrained("./models/bert-base-uncased")
+        print("Saved tokenizer is done!")
         self.tokenizer = BertTokenizer.from_pretrained(
-            "bert-base-uncased", local_files_only=args.local_files_only
+            "./models/bert-base-uncased", local_files_only=args.local_files_only
         )
 
     def __len__(self):
@@ -46,7 +50,9 @@ class SentenceClassificationDataset(Dataset):
         labels = [x[1] for x in data]
         sent_ids = [x[2] for x in data]
 
-        encoding = self.tokenizer(sents, return_tensors="pt", padding=True, truncation=True)
+        encoding = self.tokenizer(
+            sents, return_tensors="pt", padding=True, truncation=True
+        )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
         labels = torch.LongTensor(labels)
@@ -85,7 +91,9 @@ class SentenceClassificationTestDataset(Dataset):
         sents = [x[0] for x in data]
         sent_ids = [x[1] for x in data]
 
-        encoding = self.tokenizer(sents, return_tensors="pt", padding=True, truncation=True)
+        encoding = self.tokenizer(
+            sents, return_tensors="pt", padding=True, truncation=True
+        )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
 
@@ -125,8 +133,12 @@ class SentencePairDataset(Dataset):
         labels = [x[2] for x in data]
         sent_ids = [x[3] for x in data]
 
-        encoding1 = self.tokenizer(sent1, return_tensors="pt", padding=True, truncation=True)
-        encoding2 = self.tokenizer(sent2, return_tensors="pt", padding=True, truncation=True)
+        encoding1 = self.tokenizer(
+            sent1, return_tensors="pt", padding=True, truncation=True
+        )
+        encoding2 = self.tokenizer(
+            sent2, return_tensors="pt", padding=True, truncation=True
+        )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
         attention_mask = torch.LongTensor(encoding1["attention_mask"])
@@ -196,8 +208,12 @@ class SentencePairTestDataset(Dataset):
         sent2 = [x[1] for x in data]
         sent_ids = [x[2] for x in data]
 
-        encoding1 = self.tokenizer(sent1, return_tensors="pt", padding=True, truncation=True)
-        encoding2 = self.tokenizer(sent2, return_tensors="pt", padding=True, truncation=True)
+        encoding1 = self.tokenizer(
+            sent1, return_tensors="pt", padding=True, truncation=True
+        )
+        encoding2 = self.tokenizer(
+            sent2, return_tensors="pt", padding=True, truncation=True
+        )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
         attention_mask = torch.LongTensor(encoding1["attention_mask"])
@@ -241,7 +257,9 @@ class SentencePairTestDataset(Dataset):
         return batched_data
 
 
-def load_multitask_data(sst_filename, quora_filename, sts_filename, etpc_filename, split="train"):
+def load_multitask_data(
+    sst_filename, quora_filename, sts_filename, etpc_filename, split="train"
+):
     sst_data = []
     num_labels = {}
     if split == "test":
@@ -342,7 +360,12 @@ def load_multitask_data(sst_filename, quora_filename, sts_filename, etpc_filenam
                         (
                             preprocess_string(record["sentence1"]),
                             preprocess_string(record["sentence2"]),
-                            list(map(int, record["paraphrase_types"].strip("][").split(", "))),
+                            list(
+                                map(
+                                    int,
+                                    record["paraphrase_types"].strip("][").split(", "),
+                                )
+                            ),
                             sent_id,
                         )
                     )

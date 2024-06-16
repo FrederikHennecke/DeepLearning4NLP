@@ -22,7 +22,6 @@ class BartWithClassifier(nn.Module):
         self.bart = BartModel.from_pretrained("facebook/bart-large")
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
-        self.args = args
 
     def forward(self, input_ids, attention_mask=None):
         # Use the BartModel to obtain the last hidden state
@@ -268,43 +267,31 @@ def get_args():
     return args
 
 
-def prepare_etpc_data(
-    filename: str, sep: str, idx: list, column_names: list
-) -> pd.DataFrame:
-    df = pd.read_csv(filename, sep=sep)
-    df = df.iloc[:, idx]
-    df.columns = column_names
-    return df
-
-
 def finetune_paraphrase_detection(args):
     model = BartWithClassifier()
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     model.to(device)
 
-    train_dataset = prepare_etpc_data(
+    train_dataset = pd.read_csv(
         args.etpc_train_filename,
-        sep=",",
-        idx=[0, 1, 2],
-        column_names=["sentence1", "sentence2", "paraphrase_types"],
+        sep="\t",
+        usecols=["sentence1", "sentence2", "paraphrase_types"],
     )
     print(f"train_dataset shape: {train_dataset.shape}")
     print(f"train_dataset: {train_dataset.head()}\n")
 
-    dev_dataset = prepare_etpc_data(
+    dev_dataset = pd.read_csv(
         args.etpc_dev_filename,
-        sep=",",
-        idx=[0, 1, 2],
-        column_names=["sentence1", "sentence2", "paraphrase_types"],
+        sep="\t",
+        usecols=["sentence1", "sentence2", "paraphrase_types"],
     )
     print(f"dev_dataset shape: {dev_dataset.shape}")
     print(f"dev_dataset: {dev_dataset.head()}\n")
 
-    test_dataset = prepare_etpc_data(
+    test_dataset = pd.read_csv(
         args.etpc_test_filename,
         sep="\t",
-        idx=[0, 1, 2],
-        column_names=["id", "sentence1", "sentence2"],
+        usecols=["id", "sentence1", "sentence2"],
     )
 
     print(f"test_dataset shape: {test_dataset.shape}")
@@ -341,7 +328,6 @@ if __name__ == "__main__":
     args = get_args()
 
     # For code testing
-    args.use_gpu = False
     args.epoch = 1
     args.lr = 10
     args.batch_size = 256

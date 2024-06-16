@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, BartForConditionalGeneration
 
 from optimizer import AdamW
-from bart_detection import get_args, seed_everything, prepare_etpc_data
+from bart_detection import get_args, seed_everything
 
 TQDM_DISABLE = False
 
@@ -212,36 +212,27 @@ def finetune_paraphrase_generation(args):
     model.to(device)
     tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large")
 
-    train_dataset = prepare_etpc_data(
+    train_dataset = pd.read_csv(
         args.etpc_train_filename,
-        ",",
-        [0, 3, 2],
-        ["sentence1", "sentence1_segment_location", "paraphrase_types"],
+        sep="\t",
+        usecols=["sentence1", "sentence1_segment_location", "paraphrase_types"],
     )
     print(f"train_dataset shape: {train_dataset.shape}")
     print(f"train_dataset: {train_dataset.head()}\n")
 
-    dev_dataset = prepare_etpc_data(
+    dev_dataset = pd.read_csv(
         args.etpc_dev_filename,
-        ",",
-        [0, 3, 2],
-        ["sentence1", "sentence1_segment_location", "paraphrase_types"],
+        sep="\t",
+        usecols=["sentence1", "sentence1_segment_location", "paraphrase_types"],
     )
     print(f"dev_dataset shape: {dev_dataset.shape}")
     print(f"dev_dataset: {dev_dataset.head()}\n")
 
-    test_dataset = prepare_etpc_data(
+    test_dataset = pd.read_csv(
         args.etpc_test_filename,
-        "\t",
-        idx=[0, 1, 3, 2],
-        column_names=[
-            "id",
-            "sentence1",
-            "sentence1_segment_location",
-            "paraphrase_types",
-        ],
+        sep="\t",
+        usecols=["id", "sentence1", "sentence1_segment_location", "paraphrase_types"],
     )
-
     print(f"test_dataset shape: {test_dataset.shape}")
     print(f"test_dataset: {test_dataset.head()}")
 
@@ -275,7 +266,6 @@ if __name__ == "__main__":
     args.etpc_test_filename = "data/etpc-paraphrase-generation-test-student.csv"
 
     # For code testing
-    args.use_gpu = False
     args.epoch = 1
     args.lr = 10
     args.batch_size = 256

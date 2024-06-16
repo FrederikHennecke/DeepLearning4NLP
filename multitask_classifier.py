@@ -22,9 +22,9 @@ from datasets import (
 )
 from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW
-from datasets import preprocess_string
-import random
 import csv
+import pandas as pd
+
 
 TQDM_DISABLE = True
 
@@ -532,7 +532,7 @@ def get_args():
         choices=("pretrain", "finetune"),
         default="pretrain",
     )
-    parser.add_argument("--use_gpu", action="store_false")
+    parser.add_argument("--use_gpu", action="store_true")
 
     args, _ = parser.parse_known_args()
 
@@ -666,23 +666,43 @@ def get_args():
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=1e-3 if args.option == "pretrain" else 1e-5,
     )
-    parser.add_argument("--local_files_only", action="store_true")
+    parser.add_argument(
+        "--local_files_only", default="models/bert-base-uncased", action="store_true"
+    )
 
     args = parser.parse_args()
     return args
 
 
 def etpc_split(args):
-    sst_data, num_labels, quora_data, sts_data, etpc_data = load_multitask_data(
-        args.sst_train, args.quora_train, args.sts_train, args.etpc_train, split="train"
-    )
-    random.shuffle(etpc_data)
+    etpc_path = "./etpc-paraphrase-train-original.csv"
+    etpc_data = []
+    with open(etpc_path, "r", encoding="utf-8") as fp:
+        for record in csv.DictReader(fp, delimiter="\t"):
+            try:
+                etpc_data.append(
+                    (
+                        record["sentence1"],
+                        record["sentence2"],
+                        record["paraphrase_types"],
+                        record["sentence1_segment_location"],
+                        record["sentence2_segment_location"],
+                        record["sentence1_tokenized"],
+                        record["sentence2_tokenized"],
+                        record["id"],
+                    )
+                )
+            except Exception as e:
+                print(f"Error: {e}")
+
     train_size = int(len(etpc_data) * 0.75)
     etpc_data_train = etpc_data[:train_size]
     etpc_data_dev = etpc_data[train_size:]
+    print(f"etpc_data_train: {len(etpc_data_train)}")
+    print(f"etpc_data_dev: {len(etpc_data_dev)}")
 
-    with open(args.etpc_train, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
+    with open(args.etpc_train, mode="w") as file:
+        writer = csv.writer(file, delimiter="\t")
         writer.writerow(
             [
                 "sentence1",
@@ -698,12 +718,8 @@ def etpc_split(args):
         for item in etpc_data_train:
             writer.writerow(item)
 
-    print(
-        f"Shuffled etpcs_data_train is saved to {args.etpc_train} with size {len(etpc_data_train)} and ratio {len(etpc_data_train)/len(etpc_data)}"
-    )
-
-    with open(args.etpc_dev, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
+    with open(args.etpc_dev, mode="w") as file:
+        writer = csv.writer(file, delimiter="\t")
         writer.writerow(
             [
                 "sentence1",
@@ -719,21 +735,18 @@ def etpc_split(args):
         for item in etpc_data_dev:
             writer.writerow(item)
 
-    print(
-        f"Shuffled etpcs_data_train is saved to {args.etpc_dev} with size {len(etpc_data_dev)} and ratio {len(etpc_data_dev)/len(etpc_data)}"
-    )
+    print("Data split into train and dev sets.")
 
-    # print(f"etpc_dev: {etpc_dev[0]}\n")
-    # print(f"etpc_dev: {len(etpc_dev)}\n")
-
-    # print(f"sst: {sst_data[0]}\n")
-    # print(f"quora: {quora_data[0]}\n")
-    # print(f"sts: {sts_data[0]}\n")
-    # print(f"etpc: {etpc_data[0]}\n")
+    df_train = pd.read_csv(args.etpc_train, sep="\t")
+    df_dev = pd.read_csv(args.etpc_dev, sep="\t")
+    print("train size", df_train.shape)
+    print("dev size", df_dev.shape)
+    # print("dev head", df_dev.iloc[:, 2:5])
 
 
 if __name__ == "__main__":
     args = get_args()
+    args.use_gpu = False
     args.filepath = f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
     # etpc_split(args)
