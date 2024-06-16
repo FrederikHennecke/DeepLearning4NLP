@@ -326,5 +326,10 @@ def finetune_paraphrase_detection(args):
 
 if __name__ == "__main__":
     args = get_args()
+
+    # For code testing
+    args.epoch = 1
+    args.lr = 10
+    args.batch_size = 256
     seed_everything(args.seed)
     finetune_paraphrase_detection(args)
