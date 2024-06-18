@@ -666,9 +666,7 @@ def get_args():
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=1e-3 if args.option == "pretrain" else 1e-5,
     )
-    parser.add_argument(
-        "--local_files_only", default="models/bert-base-uncased", action="store_true"
-    )
+    parser.add_argument("--local_files_only", action="store_true")
 
     args = parser.parse_args()
     return args
