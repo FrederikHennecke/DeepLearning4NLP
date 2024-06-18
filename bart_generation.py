@@ -27,10 +27,6 @@ def transform_data(dataset, shuffle, max_length=256):
     # raise NotImplementedError
 
     tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
-    # sentences1= dataset["sentence1"].tolist()
-    # sentences1_segment_location = dataset["sentence1_segment_location"].tolist()
-    # paraphrase_types = dataset["paraphrase_types"].tolist()
-
     combined_sentences = []
     for i in range(len(dataset)):
         # paraphrase_types = dataset["paraphrase_types"].tolist()
