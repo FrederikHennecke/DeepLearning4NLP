@@ -2,6 +2,7 @@ import sys
 
 import torch
 
+sys.path.append("C:/Users/arnet/Documents/Uni/SoSe24/DL NLP/DeepLearning4NLP/")
 sys.path.append("../")
 from bert import BertModel
 
