@@ -19,7 +19,7 @@ class BartWithClassifier(nn.Module):
     def __init__(self, num_labels=7):
         super(BartWithClassifier, self).__init__()
 
-        self.bart = BartModel.from_pretrained("facebook/bart-large")
+        self.bart = BartModel.from_pretrained("models/bart-large")
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
 
@@ -61,7 +61,7 @@ def transform_data(
     choice.
     """
     # raise NotImplementedError
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large")
+    tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
     sentences1 = dataset["sentence1"].tolist()
     sentences2 = dataset["sentence2"].tolist()
     has_labels = "paraphrase_types" in dataset.columns
@@ -249,9 +249,9 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument(
         "--etpc_train_filename", type=str, default="data/etpc-paraphrase-train.csv"
     )
@@ -304,7 +304,7 @@ def finetune_paraphrase_detection(args):
 
     train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
     dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
-    test_data = transform_data(test_dataset, args.batch_size, shuffle=True)
+    test_data = transform_data(test_dataset, args.batch_size, shuffle=False)
 
     print(f"Loaded {len(train_dataset)} training samples.")
 
@@ -326,10 +326,5 @@ def finetune_paraphrase_detection(args):
 
 if __name__ == "__main__":
     args = get_args()
-
-    # For code testing
-    args.epoch = 1
-    args.lr = 10
-    args.batch_size = 256
     seed_everything(args.seed)
     finetune_paraphrase_detection(args)

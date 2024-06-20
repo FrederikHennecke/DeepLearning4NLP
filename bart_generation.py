@@ -15,7 +15,7 @@ from bart_detection import get_args, seed_everything
 TQDM_DISABLE = False
 
 
-def transform_data(dataset, batch_size, shuffle, max_length=256):
+def transform_data(dataset, shuffle, max_length=256):
     """
     Turn the data to the format you want to use.
     Use AutoTokenizer to obtain encoding (input_ids and attention_mask).
@@ -26,32 +26,63 @@ def transform_data(dataset, batch_size, shuffle, max_length=256):
     ### TODO
     # raise NotImplementedError
 
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large")
+    tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
+    # sentences1= dataset["sentence1"].tolist()
+    # sentences1_segment_location = dataset["sentence1_segment_location"].tolist()
+    # paraphrase_types = dataset["paraphrase_types"].tolist()
+
     combined_sentences = []
     for i in range(len(dataset)):
+        # paraphrase_types = dataset["paraphrase_types"].tolist()
+        # paraphrase_types = ", ".join(map(str, paraphrase_types))
         combined_sentence = (
             dataset.loc[i, "sentence1"]
-            + " [SEP] "
+            + " <location> "
             + dataset.loc[i, "sentence1_segment_location"]
-            + " [SEP] "
+            + " <type> "
             + dataset.loc[i, "paraphrase_types"]
         )
+
         combined_sentences.append(combined_sentence)
 
-    encodings = tokenizer(
+    has_target = "sentence2" in dataset.columns
+
+    if has_target:
+        target = dataset["sentence2"].tolist()
+    else:
+        target = None
+
+    # print(f"combined_sentences: {combined_sentences[:5]}")
+
+    input_encodings = tokenizer(
         combined_sentences,
-        truncation=True,
-        padding=True,
         max_length=max_length,
+        padding="max_length",
+        truncation=True,
         return_tensors="pt",
     )
-    input_ids = torch.tensor(encodings["input_ids"])
-    attention_mask = torch.tensor(encodings["attention_mask"])
 
-    dataset = TensorDataset(input_ids, attention_mask)
-    dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=shuffle
-    )  # WARN: change batch size to 32
+    input_ids = torch.tensor(input_encodings["input_ids"])
+    attention_mask = torch.tensor(input_encodings["attention_mask"])
+    # print(f"input_ids: {input_ids.shape}")
+    # print(f"attention_mask: {attention_mask.shape}")
+
+    if target:
+        target_encodings = tokenizer(
+            target,
+            max_length=max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        target_ids = torch.tensor(target_encodings["input_ids"])
+        dataset = TensorDataset(input_ids, attention_mask, target_ids)
+
+    else:
+        dataset = TensorDataset(input_ids, attention_mask)
+
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle)
+
     return dataloader
 
 
@@ -74,14 +105,15 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         correct_preds = 0
 
         for batch in tqdm(train_data, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE):
-            # print(f"batch: {batch}")
-            # break
-            b_ids, b_mask = batch
-            b_ids = b_ids.to(device)
-            b_mask = b_mask.to(device)
+            input_ids, attention_mask, target_ids = batch
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+            target_ids = target_ids.to(device)
 
             optimizer.zero_grad()
-            logits = model(b_ids, b_mask)
+            logits = model(
+                input_ids=input_ids, attention_mask=attention_mask, labels=target_ids
+            )
             loss = logits.loss
             loss.backward()
             optimizer.step()
@@ -93,22 +125,30 @@ def train_model(model, train_data, dev_data, device, tokenizer):
 
         model.eval()  # switch to eval model, will turn off randomness like dropout
         dev_loss = 0
+        num_batches = 0
         with torch.no_grad():
             for batch in dev_data:
-                input_ids = batch["input_ids"].to(device)
-                attention_mask = batch["attention_mask"].to(device)
-                # labels = batch["input_ids"].to(device)
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                dev_loss += outputs.loss.item()
+                input_ids, attention_mask, target_ids = batch
+                input_ids = input_ids.to(device)
+                attention_mask = attention_mask.to(device)
+                target_ids = target_ids.to(device)
 
-        avg_dev_loss = dev_loss / len(dev_data)
+                outputs = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    labels=target_ids,
+                )
+                dev_loss += outputs.loss.item()
+                num_batches += 1
+
+        avg_dev_loss = dev_loss / num_batches
         print(
             f"Epoch {epoch+1:02} | Average Train Loss: {avg_train_loss:.4f} | Average Dev Loss: {avg_dev_loss:.4f}"
         )
         model.train()
 
-    model.save_pretrained("models/bart_generation.pt")
-    tokenizer.save_pretrained("models/bart_generation.pt")
+    model.save_pretrained("models/bart_generation")
+    tokenizer.save_pretrained("models/bart_generation")
 
     return model
 
@@ -156,7 +196,7 @@ def test_model(test_data, test_ids, device, model, tokenizer):
     return df_gen_results
 
 
-def evaluate_model(model, test_data, device, tokenizer):
+def evaluate_model(model, dev_data, device, tokenizer):
     """
     You can use your train/validation set to evaluate models performance with the BLEU score.
     """
@@ -166,13 +206,13 @@ def evaluate_model(model, test_data, device, tokenizer):
     references = []
 
     with torch.no_grad():
-        for batch in test_data:
-            input_ids, attention_mask, labels = (
-                batch  # WARN! paraphrase type is inseted in the encoder in the transform_data function above, but how to extract them as labels to use here??
+        for batch in dev_data:
+            input_ids, attention_mask, target_ids = (
+                batch  # WARN! paraphrase type is inseted in the encoder in the transform_data function above, but how to extract them as target_ids to use here??
             )
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
-            labels = labels.to(device)
+            target_ids = target_ids.to(device)
 
             # Generate paraphrases
             outputs = model.generate(
@@ -193,7 +233,7 @@ def evaluate_model(model, test_data, device, tokenizer):
                 tokenizer.decode(
                     g, skip_special_tokens=True, clean_up_tokenization_spaces=True
                 )
-                for g in labels
+                for g in target_ids
             ]
 
             predictions.extend(pred_text)
@@ -208,14 +248,20 @@ def evaluate_model(model, test_data, device, tokenizer):
 
 def finetune_paraphrase_generation(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
-    model = BartForConditionalGeneration.from_pretrained("facebook/bart-large")
+    model = BartForConditionalGeneration.from_pretrained("models/bart-large")
     model.to(device)
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large")
+    tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
 
     train_dataset = pd.read_csv(
         args.etpc_train_filename,
         sep="\t",
-        usecols=["sentence1", "sentence1_segment_location", "paraphrase_types"],
+        usecols=[
+            "sentence1",
+            "sentence1_segment_location",
+            "paraphrase_types",
+            "sentence2",
+            "sentence2_segment_location",
+        ],
     )
     print(f"train_dataset shape: {train_dataset.shape}")
     print(f"train_dataset: {train_dataset.head()}\n")
@@ -223,7 +269,13 @@ def finetune_paraphrase_generation(args):
     dev_dataset = pd.read_csv(
         args.etpc_dev_filename,
         sep="\t",
-        usecols=["sentence1", "sentence1_segment_location", "paraphrase_types"],
+        usecols=[
+            "sentence1",
+            "sentence1_segment_location",
+            "paraphrase_types",
+            "sentence2",
+            "sentence2_segment_location",
+        ],
     )
     print(f"dev_dataset shape: {dev_dataset.shape}")
     print(f"dev_dataset: {dev_dataset.head()}\n")
@@ -239,9 +291,9 @@ def finetune_paraphrase_generation(args):
     # You might do a split of the train data into train/validation set here
     # ...
 
-    train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
-    dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
-    test_data = transform_data(test_dataset, args.batch_size, shuffle=True)
+    train_data = transform_data(train_dataset, shuffle=True)
+    dev_data = transform_data(dev_dataset, shuffle=False)
+    test_data = transform_data(test_dataset, shuffle=False)
 
     print(f"Loaded {len(train_dataset)} training samples.")
 
@@ -264,10 +316,7 @@ def finetune_paraphrase_generation(args):
 if __name__ == "__main__":
     args = get_args()
     args.etpc_test_filename = "data/etpc-paraphrase-generation-test-student.csv"
-
-    # For code testing
-    args.epoch = 1
-    args.lr = 10
-    args.batch_size = 256
+    # args.batch_size = 32
+    # args.lr = 1e-5
     seed_everything(args.seed)
     finetune_paraphrase_generation(args)
