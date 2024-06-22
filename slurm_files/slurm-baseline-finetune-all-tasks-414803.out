@@ -1,0 +1,397 @@
+================================================================================
+JobID = 414803
+User = u11448, Account = nhr_dnlpss24_g04
+Partition = grete:shared, Nodelist = ggpu199
+================================================================================
+Submitting job with sbatch from directory: /home/mohamed.aly/u11448/DeepLearning4NLP
+Home directory: /user/mohamed.aly/u11448
+Working directory: /home/mohamed.aly/u11448/DeepLearning4NLP
+Current node: ggpu199
+Python 3.10.14
+Collecting environment information...
+PyTorch version: 2.2.0
+Is debug build: False
+CUDA used to build PyTorch: 12.1
+ROCM used to build PyTorch: N/A
+
+OS: Rocky Linux 8.8 (Green Obsidian) (x86_64)
+GCC version: (GCC) 8.5.0 20210514 (Red Hat 8.5.0-18)
+Clang version: Could not collect
+CMake version: version 3.27.4
+Libc version: glibc-2.28
+
+Python version: 3.10.14 (main, May  6 2024, 19:42:50) [GCC 11.2.0] (64-bit runtime)
+Python platform: Linux-4.18.0-477.21.1.el8_8.x86_64-x86_64-with-glibc2.28
+Is CUDA available: True
+CUDA runtime version: Could not collect
+CUDA_MODULE_LOADING set to: LAZY
+GPU models and configuration: 
+GPU 0: NVIDIA A100-SXM4-80GB
+GPU 1: NVIDIA A100-SXM4-80GB
+
+Nvidia driver version: 535.104.12
+cuDNN version: Probably one of the following:
+/usr/lib64/libcudnn.so.8.9.5
+/usr/lib64/libcudnn_adv_infer.so.8.9.5
+/usr/lib64/libcudnn_adv_train.so.8.9.5
+/usr/lib64/libcudnn_cnn_infer.so.8.9.5
+/usr/lib64/libcudnn_cnn_train.so.8.9.5
+/usr/lib64/libcudnn_ops_infer.so.8.9.5
+/usr/lib64/libcudnn_ops_train.so.8.9.5
+HIP runtime version: N/A
+MIOpen runtime version: N/A
+Is XNNPACK available: True
+
+CPU:
+Architecture:        x86_64
+CPU op-mode(s):      32-bit, 64-bit
+Byte Order:          Little Endian
+CPU(s):              128
+On-line CPU(s) list: 0-127
+Thread(s) per core:  2
+Core(s) per socket:  32
+Socket(s):           2
+NUMA node(s):        8
+Vendor ID:           AuthenticAMD
+CPU family:          25
+Model:               1
+Model name:          AMD EPYC 7513 32-Core Processor
+Stepping:            1
+CPU MHz:             1500.000
+CPU max MHz:         3681.6399
+CPU min MHz:         1500.0000
+BogoMIPS:            5200.52
+Virtualization:      AMD-V
+L1d cache:           32K
+L1i cache:           32K
+L2 cache:            512K
+L3 cache:            32768K
+NUMA node0 CPU(s):   0-7,64-71
+NUMA node1 CPU(s):   8-15,72-79
+NUMA node2 CPU(s):   16-23,80-87
+NUMA node3 CPU(s):   24-31,88-95
+NUMA node4 CPU(s):   32-39,96-103
+NUMA node5 CPU(s):   40-47,104-111
+NUMA node6 CPU(s):   48-55,112-119
+NUMA node7 CPU(s):   56-63,120-127
+Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local clzero irperf xsaveerptr wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm
+
+Versions of relevant libraries:
+[pip3] numpy==1.26.4
+[pip3] torch==2.2.0
+[pip3] torchaudio==2.2.0
+[pip3] torchvision==0.17.0
+[pip3] triton==2.2.0
+[conda] blas                      1.0                         mkl  
+[conda] ffmpeg                    4.3                  hf484d3e_0    pytorch
+[conda] libjpeg-turbo             2.0.0                h9bf148f_0    pytorch
+[conda] mkl                       2023.1.0         h213fc3f_46344  
+[conda] mkl-fft                   1.3.8                    pypi_0    pypi
+[conda] mkl-random                1.2.4                    pypi_0    pypi
+[conda] mkl-service               2.4.0                    pypi_0    pypi
+[conda] mkl_fft                   1.3.8           py310h5eee18b_0  
+[conda] mkl_random                1.2.4           py310hdb19cb5_0  
+[conda] numpy                     1.26.4                   pypi_0    pypi
+[conda] numpy-base                1.26.4          py310hb5e798b_0  
+[conda] pytorch                   2.2.0           py3.10_cuda12.1_cudnn8.9.2_0    pytorch
+[conda] pytorch-cuda              12.1                 ha16c6d3_5    pytorch
+[conda] pytorch-mutex             1.0                        cuda    pytorch
+[conda] torch                     2.2.0                    pypi_0    pypi
+[conda] torchaudio                2.2.0                    pypi_0    pypi
+[conda] torchtriton               2.2.0                     py310    pytorch
+[conda] torchvision               0.17.0                   pypi_0    pypi
+[conda] triton                    2.2.0                    pypi_0    pypi
+
+Current Branch: maly-part1
+Latest Commit: 4837fb4
+Uncommitted Changes: 9
+
+Running task: sst
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 1893 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 631 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    BERT Model Configuration
+------------------------------
+{'batch_size': 64,
+ 'epochs': 10,
+ 'filepath': 'models/finetune-10-1e-05-sst.pt',
+ 'hidden_dropout_prob': 0.3,
+ 'local_files_only': True,
+ 'lr': 1e-05,
+ 'option': 'finetune',
+ 'seed': 11711,
+ 'task': 'sst',
+ 'use_gpu': True}
+------------------------------
+Sentiment classification accuracy: 0.507
+Sentiment classification accuracy: 0.454
+Epoch 01 (sst): train loss :: 1.480, train :: 0.507, dev :: 0.454
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.589
+Sentiment classification accuracy: 0.500
+Epoch 02 (sst): train loss :: 1.148, train :: 0.589, dev :: 0.500
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.671
+Sentiment classification accuracy: 0.501
+Epoch 03 (sst): train loss :: 0.996, train :: 0.671, dev :: 0.501
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.748
+Sentiment classification accuracy: 0.511
+Epoch 04 (sst): train loss :: 0.855, train :: 0.748, dev :: 0.511
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.833
+Sentiment classification accuracy: 0.508
+Epoch 05 (sst): train loss :: 0.726, train :: 0.833, dev :: 0.508
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.882
+Sentiment classification accuracy: 0.506
+Epoch 06 (sst): train loss :: 0.603, train :: 0.882, dev :: 0.506
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.864
+Sentiment classification accuracy: 0.483
+Epoch 07 (sst): train loss :: 0.504, train :: 0.864, dev :: 0.483
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.956
+Sentiment classification accuracy: 0.492
+Epoch 08 (sst): train loss :: 0.381, train :: 0.956, dev :: 0.492
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.963
+Sentiment classification accuracy: 0.496
+Epoch 09 (sst): train loss :: 0.283, train :: 0.963, dev :: 0.496
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.959
+Sentiment classification accuracy: 0.498
+Epoch 10 (sst): train loss :: 0.228, train :: 0.959, dev :: 0.498
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Loaded model to test from models/finetune-10-1e-05-sst.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 631 dev examples from data/etpc-paraphrase-dev.csv
+Sentiment classification accuracy: 0.498
+dev sentiment acc :: 0.498
+Running task: sts
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 1893 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 631 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    BERT Model Configuration
+------------------------------
+{'batch_size': 64,
+ 'epochs': 10,
+ 'filepath': 'models/finetune-10-1e-05-sts.pt',
+ 'hidden_dropout_prob': 0.3,
+ 'local_files_only': True,
+ 'lr': 1e-05,
+ 'option': 'finetune',
+ 'seed': 11711,
+ 'task': 'sts',
+ 'use_gpu': True}
+------------------------------
+Semantic Textual Similarity correlation: 0.315
+Semantic Textual Similarity correlation: 0.284
+Epoch 01 (sts): train loss :: 2.205, train :: 0.315, dev :: 0.284
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.439
+Semantic Textual Similarity correlation: 0.345
+Epoch 02 (sts): train loss :: 2.047, train :: 0.439, dev :: 0.345
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.532
+Semantic Textual Similarity correlation: 0.373
+Epoch 03 (sts): train loss :: 1.893, train :: 0.532, dev :: 0.373
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.630
+Semantic Textual Similarity correlation: 0.388
+Epoch 04 (sts): train loss :: 1.734, train :: 0.630, dev :: 0.388
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.727
+Semantic Textual Similarity correlation: 0.379
+Epoch 05 (sts): train loss :: 1.506, train :: 0.727, dev :: 0.379
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.788
+Semantic Textual Similarity correlation: 0.375
+Epoch 06 (sts): train loss :: 1.269, train :: 0.788, dev :: 0.375
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.847
+Semantic Textual Similarity correlation: 0.376
+Epoch 07 (sts): train loss :: 1.026, train :: 0.847, dev :: 0.376
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.889
+Semantic Textual Similarity correlation: 0.381
+Epoch 08 (sts): train loss :: 0.850, train :: 0.889, dev :: 0.381
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.910
+Semantic Textual Similarity correlation: 0.369
+Epoch 09 (sts): train loss :: 0.683, train :: 0.910, dev :: 0.369
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.922
+Semantic Textual Similarity correlation: 0.381
+Epoch 10 (sts): train loss :: 0.598, train :: 0.922, dev :: 0.381
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Loaded model to test from models/finetune-10-1e-05-sts.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 631 dev examples from data/etpc-paraphrase-dev.csv
+Semantic Textual Similarity correlation: 0.388
+dev sts corr :: 0.388
+Running task: qqp
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 1893 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 631 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    BERT Model Configuration
+------------------------------
+{'batch_size': 64,
+ 'epochs': 2,
+ 'filepath': 'models/finetune-2-1e-05-qqp.pt',
+ 'hidden_dropout_prob': 0.3,
+ 'local_files_only': True,
+ 'lr': 1e-05,
+ 'option': 'finetune',
+ 'seed': 11711,
+ 'task': 'qqp',
+ 'use_gpu': True}
+------------------------------
+Paraphrase detection accuracy: 0.782
+Paraphrase detection accuracy: 0.753
+Epoch 01 (qqp): train loss :: 0.521, train :: 0.782, dev :: 0.753
+Saving the model to models/finetune-2-1e-05-qqp.pt.
+Paraphrase detection accuracy: 0.830
+Paraphrase detection accuracy: 0.766
+Epoch 02 (qqp): train loss :: 0.427, train :: 0.830, dev :: 0.766
+Saving the model to models/finetune-2-1e-05-qqp.pt.
+Loaded model to test from models/finetune-2-1e-05-qqp.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 631 dev examples from data/etpc-paraphrase-dev.csv
+Paraphrase detection accuracy: 0.766
+dev paraphrase acc :: 0.766
+Running file: bart_detection.py for etpc tasks
+train_dataset shape: (1893, 3)
+train_dataset:                                            sentence1  ...       paraphrase_types
+0  Amrozi accused his brother, whom he called "th...  ...  [2, 6, 7, 0, 0, 0, 0]
+1  They had published an advertisement on the Int...  ...  [2, 6, 7, 0, 0, 0, 0]
+2  The stock rose $2.11, or about 11 percent, to ...  ...  [2, 3, 5, 6, 7, 0, 0]
+3  Revenue in the first quarter of the year dropp...  ...  [3, 6, 7, 0, 0, 0, 0]
+4  The DVD-CCA then appealed to the state Supreme...  ...  [2, 6, 7, 0, 0, 0, 0]
+
+[5 rows x 3 columns]
+
+dev_dataset shape: (631, 3)
+dev_dataset:                                            sentence1  ...       paraphrase_types
+0  But I would rather be talking about high stand...  ...  [2, 4, 5, 6, 7, 0, 0]
+1  Launched from the space shuttle Atlantis in 19...  ...  [2, 3, 6, 7, 0, 0, 0]
+2  The search was concentrated in northeast Penns...  ...  [2, 6, 7, 0, 0, 0, 0]
+3  Available in June, Bare Metal Restore 4.6 cost...  ...  [1, 2, 4, 6, 7, 0, 0]
+4  The Democratic primary results have a margin o...  ...  [2, 3, 6, 0, 0, 0, 0]
+
+[5 rows x 3 columns]
+
+test_dataset shape: (574, 3)
+test_dataset:                                  id  ...                                          sentence2
+0  72acb671df7a437da972d3c89480a8f1  ...  "Qualcomm has enjoyed many years of selling......
+1  18960c761d5c45efb9f95b37bf17e3e5  ...  A Global Crossing representative had no immedi...
+2  5516c677226a476796b87382005f61ba  ...  "Martha Stewart is not being prosecuted for wh...
+3  2aa9b0e83bc84dcaa828470cf4405c49  ...  Leading Democratic candidates are former state...
+4  83f7ae71274649e8aa1ade98aa0c8d29  ...  The three men charged with terrorism have been...
+
+[5 rows x 3 columns]
+Loaded 1893 training samples.
+Epoch 01 | Train Loss: 0.5860 | Train Accuracy: 0.8162 | Dev Accuracy: 0.8311
+Epoch 02 | Train Loss: 0.5575 | Train Accuracy: 0.8528 | Dev Accuracy: 0.8311
+Epoch 03 | Train Loss: 0.5572 | Train Accuracy: 0.8528 | Dev Accuracy: 0.8311
+Epoch 04 | Train Loss: 0.5572 | Train Accuracy: 0.8528 | Dev Accuracy: 0.8311
+Epoch 05 | Train Loss: 0.5573 | Train Accuracy: 0.8528 | Dev Accuracy: 0.8311
+Training finished.
+The accuracy of the model is: 0.831
+pred_paraphrase_types: [[1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1], [1, 0, 1, 0, 0, 0, 1]]
+df_test_results:                                    id Predicted_Paraphrase_Types
+0    72acb671df7a437da972d3c89480a8f1      [1, 0, 1, 0, 0, 0, 1]
+1    18960c761d5c45efb9f95b37bf17e3e5      [1, 0, 1, 0, 0, 0, 1]
+2    5516c677226a476796b87382005f61ba      [1, 0, 1, 0, 0, 0, 1]
+3    2aa9b0e83bc84dcaa828470cf4405c49      [1, 0, 1, 0, 0, 0, 1]
+4    83f7ae71274649e8aa1ade98aa0c8d29      [1, 0, 1, 0, 0, 0, 1]
+..                                ...                        ...
+569  7b6e11a4c408407a8fe326a4adecd9f2      [1, 0, 1, 0, 0, 0, 1]
+570  f9bb4786ef414985876624ed3f76326d      [1, 0, 1, 0, 0, 0, 1]
+571  871ad44bcd664f9cbf2d6042d4ca87f7      [1, 0, 1, 0, 0, 0, 1]
+572  ff6930a9e0194287b25c07f5f616a275      [1, 0, 1, 0, 0, 0, 1]
+573  0def24ff812b42e788b7380e7f827c5e      [1, 0, 1, 0, 0, 0, 1]
+
+[574 rows x 2 columns]
+Running file: bart_generation.py for etpc tasks
+train_dataset shape: (1893, 5)
+train_dataset:                                            sentence1  ...                         sentence2_segment_location
+0  Amrozi accused his brother, whom he called "th...  ...  [2, 2, 2, 0, 7, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, ...
+1  They had published an advertisement on the Int...  ...  [7, 7, 7, 7, 2, 2, 2, 2, 7, 7, 7, 7, 7, 7, 7, ...
+2  The stock rose $2.11, or about 11 percent, to ...  ...  [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, ...
+3  Revenue in the first quarter of the year dropp...  ...  [7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 3, 3, 3, 3, 3, ...
+4  The DVD-CCA then appealed to the state Supreme...  ...               [7, 2, 2, 7, 7, 7, 7, 7, 2, 7, 7, 7]
+
+[5 rows x 5 columns]
+
+dev_dataset shape: (631, 5)
+dev_dataset:                                            sentence1  ...                         sentence2_segment_location
+0  But I would rather be talking about high stand...  ...            [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6]
+1  Launched from the space shuttle Atlantis in 19...  ...  [0, 0, 3, 3, 3, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, ...
+2  The search was concentrated in northeast Penns...  ...  [7, 7, 7, 7, 7, 7, 7, 7, 7, 2, 7, 2, 7, 7, 7, ...
+3  Available in June, Bare Metal Restore 4.6 cost...  ...  [7, 7, 7, 7, 4, 4, 4, 4, 4, 7, 7, 7, 7, 4, 4, ...
+4  The Democratic primary results have a margin o...  ...         [6, 6, 2, 0, 3, 3, 3, 6, 6, 6, 6, 6, 2, 6]
+
+[5 rows x 5 columns]
+
+test_dataset shape: (702, 4)
+test_dataset:                                  id  ...                         sentence1_segment_location
+0  651c1a6b2027492894ad3fb23df2fe16  ...                  [7, 7, 7, 0, 7, 7, 7, 4, 4, 4, 7]
+1  5da6c5da37834d97ad9f2c2ff0de578e  ...  [7, 5, 5, 5, 5, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, ...
+2  3ef6cfec03b64617a4f3196821661dac  ...  [7, 7, 7, 7, 4, 1, 7, 7, 7, 2, 2, 7, 3, 3, 3, ...
+3  58ba92ddcd6a419abb2cca1b373e4b13  ...  [7, 7, 6, 4, 4, 4, 6, 2, 6, 6, 5, 6, 6, 6, 2, ...
+4  1dc4222b30dc4d9e9f321a0bacd649e0  ...  [2, 2, 6, 6, 6, 6, 6, 1, 6, 6, 6, 4, 6, 6, 6, ...
+
+[5 rows x 4 columns]
+Loaded 1893 training samples.
+Epoch 01 | Average Train Loss: 11.6272 | Average Dev Loss: 9.7542
+Epoch 02 | Average Train Loss: 7.8596 | Average Dev Loss: 5.8622
+Epoch 03 | Average Train Loss: 5.9853 | Average Dev Loss: 5.1250
+Epoch 04 | Average Train Loss: 5.3195 | Average Dev Loss: 4.5716
+Epoch 05 | Average Train Loss: 4.7042 | Average Dev Loss: 3.9701
+Training finished.
+The BLEU-score of the model is: 86.485
+============ Job Information ===================================================
+Submitted: 2024-06-21T23:33:48
+Started: 2024-06-21T23:34:22
+Ended: 2024-06-22T00:25:12
+Elapsed: 51 min, Limit: 300 min, Difference: 249 min
+CPUs: 64, Nodes: 1
+Estimated Consumption: 510.00 core-hours
+================================================================================
