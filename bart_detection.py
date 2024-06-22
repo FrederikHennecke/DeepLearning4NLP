@@ -182,11 +182,13 @@ def test_model(model, test_data, test_ids, device):
             preds = logits.round().cpu().numpy()
             all_preds.extend(preds)
 
-    pred_paraphrase_types = ["".join(map(str, map(int, pred))) for pred in all_preds]
+    # print(f"all_preds: {all_preds}")
+    pred_paraphrase_types = [[int(x) for x in pred] for pred in all_preds]
+    print(f"pred_paraphrase_types: {pred_paraphrase_types}")
     df_test_results = pd.DataFrame(
         {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types}
     )
-
+    print(f"df_test_results: {df_test_results}")
     return df_test_results
 
 
@@ -250,7 +252,7 @@ def get_args():
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--use_gpu", action="store_true")
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument(
         "--etpc_train_filename", type=str, default="data/etpc-paraphrase-train.csv"

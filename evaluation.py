@@ -468,47 +468,47 @@ def test_model_multitask(args, model, device):
     if task == "sst" or task == "multitask":
         with open(args.sst_dev_out, "w+") as f:
             print(f"dev sentiment acc :: {dev_sst_accuracy :.3f}")
-            f.write("id,Predicted_Sentiment\n")
+            f.write("id\tPredicted_Sentiment\n")
             for p, s in zip(dev_sst_sent_ids, dev_sst_y_pred):
                 f.write(f"{p}\t{s}\n")
 
         with open(args.sst_test_out, "w+") as f:
-            f.write("id,Predicted_Sentiment\n")
+            f.write("id\tPredicted_Sentiment\n")
             for p, s in zip(test_sst_sent_ids, test_sst_y_pred):
                 f.write(f"{p}\t{s}\n")
 
     if task == "qqp" or task == "multitask":
         with open(args.quora_dev_out, "w+") as f:
             print(f"dev paraphrase acc :: {dev_quora_accuracy :.3f}")
-            f.write("id,Predicted_Is_Paraphrase\n")
+            f.write("id\tPredicted_Is_Paraphrase\n")
             for p, s in zip(dev_quora_sent_ids, dev_quora_y_pred):
                 f.write(f"{p}\t{s}\n")
 
         with open(args.quora_test_out, "w+") as f:
-            f.write("id,Predicted_Is_Paraphrase\n")
+            f.write("id\tPredicted_Is_Paraphrase\n")
             for p, s in zip(test_quora_sent_ids, test_quora_y_pred):
                 f.write(f"{p}\t{s}\n")
 
     if task == "sts" or task == "multitask":
         with open(args.sts_dev_out, "w+") as f:
             print(f"dev sts corr :: {dev_sts_corr :.3f}")
-            f.write("id,Predicted_Similarity\n")
+            f.write("id\tPredicted_Similarity\n")
             for p, s in zip(dev_sts_sent_ids, dev_sts_y_pred):
-                f.write(f"{p}\t{s}\n")
+                f.write(f"{p}\t{np.round(s, 5)}\n")
 
         with open(args.sts_test_out, "w+") as f:
-            f.write("id,Predicted_Similarity\n")
+            f.write("id\tPredicted_Similarity\n")
             for p, s in zip(test_sts_sent_ids, test_sts_y_pred):
-                f.write(f"{p}\t{s}\n")
+                f.write(f"{p}\t{np.round(s, 5)}\n")
 
     if task == "etpc" or task == "multitask":
         with open(args.etpc_dev_out, "w+") as f:
             print(f"dev etpc acc :: {dev_etpc_accuracy :.3f}")
-            f.write("id,Predicted_Paraphrase_Types\n")
+            f.write("id\tPredicted_Paraphrase_Types\n")
             for p, s in zip(dev_etpc_sent_ids, dev_etpc_y_pred):
                 f.write(f"{p}\t{s}\n")
 
         with open(args.etpc_test_out, "w+") as f:
-            f.write("id,Predicted_Paraphrase_Types\n")
+            f.write("id\tPredicted_Paraphrase_Types\n")
             for p, s in zip(test_etpc_sent_ids, test_etpc_y_pred):
                 f.write(f"{p}\t{s}\n")

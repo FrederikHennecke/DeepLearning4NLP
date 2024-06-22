@@ -316,7 +316,5 @@ def finetune_paraphrase_generation(args):
 if __name__ == "__main__":
     args = get_args()
     args.etpc_test_filename = "data/etpc-paraphrase-generation-test-student.csv"
-    # args.batch_size = 32
-    # args.lr = 1e-5
     seed_everything(args.seed)
     finetune_paraphrase_generation(args)

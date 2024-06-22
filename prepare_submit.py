@@ -6,7 +6,14 @@ import zipfile
 # Collect predictions
 required_files = []
 for root, dirs, files in os.walk("predictions"):
-    required_files += [os.path.join(root, file) for file in files if not file.endswith(".gitkeep")]
+    # print(f"root: {root}, dirs: {dirs}, files: {files}")
+    required_file = [
+        os.path.join(root, file) for file in files if not file.endswith(".gitkeep")
+    ]
+    required_files += required_file
+
+print(f"required_files: {required_files}")
+print(f"len(required_files): {len(required_files)}")
 
 
 def main():

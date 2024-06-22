@@ -68,7 +68,9 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
-        self.paraphrase_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
+        self.paraphrase_classifier = nn.Linear(
+            3 * BERT_HIDDEN_SIZE, 1
+        )  # WARN Not needed anymore
         self.similarity_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
         self.paraphrase_type_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 7)
 
@@ -106,7 +108,7 @@ class MultitaskBERT(nn.Module):
 
     def predict_paraphrase(
         self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2
-    ):
+    ):  # WARN This function is not needed anymore since is mentioned in paraphrase_types
         """
         Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
         Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
@@ -414,17 +416,28 @@ def train_multitask(args):
                     batch["labels"],
                 )
 
+                binary_labels = [
+                    [1 if i in label else 0 for i in range(7)] for label in b_labels
+                ]
+                binary_labels = torch.tensor(binary_labels)
+
+                # print("labels", torch.tensor(binary_labels))
+                # break
+
                 b_ids_1 = b_ids_1.to(device)
                 b_mask_1 = b_mask_1.to(device)
                 b_ids_2 = b_ids_2.to(device)
                 b_mask_2 = b_mask_2.to(device)
-                b_labels = b_labels.to(device).float()
+                binary_labels = binary_labels.to(device).float()
 
                 optimizer.zero_grad()
                 logits = model.predict_paraphrase_types(
                     b_ids_1, b_mask_1, b_ids_2, b_mask_2
                 )
-                loss = F.binary_cross_entropy_with_logits(logits.float(), b_labels)
+                loss = F.binary_cross_entropy_with_logits(
+                    logits.float().flatten(),
+                    binary_labels.flatten(),
+                )
                 loss.backward()
                 optimizer.step()
 
