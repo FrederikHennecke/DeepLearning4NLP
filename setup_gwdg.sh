@@ -64,3 +64,6 @@ from transformers import AutoTokenizer, AutoModel, BartModel
 tokenizer = AutoTokenizer.from_pretrained('facebook/bart-base')
 model = BartModel.from_pretrained('facebook/bart-base')
 EOF
+
+python -c "from tokenizer import BertTokenizer; from bert import BertModel; BertTokenizer.from_pretrained('bert-base-uncased'); BertModel.from_pretrained('bert-base-uncased')"
+python -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('facebook/bart-base'); from transformers import BartModel; BartModel.from_pretrained('facebook/bart-base')"
