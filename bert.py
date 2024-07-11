@@ -47,11 +47,29 @@ class BertSelfAttention(nn.Module):
         # adding tokens with a large negative number.
 
         ### TODO
+        # 1. Linearly project the queries, keys, and values with their corresponding linear layers
+        
+
+        # 2. Split the vectors for multi-head attention
+        # 3. Follow the equation to compute the attended output of each head
+        # 4. Concatenate multi-head attention outputs to recover the original shape
+        
+        concat(attention_scores, dim=-1) @ 
+        np.matmul(query, key.transpose(-1, -2))
+        print("query", query.shape)
+        print( "key", key.shape)
+        print("value", value.shape)
+        print("attention_mask", attention_mask.shape)
         raise NotImplementedError
         # Normalize the scores.
+        print("query", query.shape)
+        print( "key", key.shape)
+        print("value", value.shape)
+        print("attention_mask", attention_mask.shape)
         # Multiply the attention scores to the value and get back V'.
         # Next, we need to concat multi-heads and recover the original shape
         # [bs, seq_len, num_attention_heads * attention_head_size = hidden_size].
+
 
     def forward(self, hidden_states, attention_mask):
         """

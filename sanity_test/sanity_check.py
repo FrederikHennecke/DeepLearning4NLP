@@ -3,6 +3,7 @@ import sys
 import torch
 
 sys.path.append("C:/Users/arnet/Documents/Uni/SoSe24/DL NLP/DeepLearning4NLP/")
+sys.path.append("C:/Users/arnet/Documents/Uni/SoSe24/DL NLP/DeepLearning4NLP/sanity_test/")
 sys.path.append("../")
 from bert import BertModel
 
@@ -15,7 +16,7 @@ Can only be called from same directory as the file.
 The test is successful if the output of the forward pass is close to the reference.
 """
 
-sanity_data = torch.load("sanity_check.data")
+sanity_data = torch.load("C:/Users/arnet/Documents/Uni/SoSe24/DL NLP/DeepLearning4NLP/sanity_test/sanity_check.data")
 
 # text_batch = ["hello world", "hello neural network for NLP"]
 # Tokenizer here
