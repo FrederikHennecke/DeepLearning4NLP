@@ -48,7 +48,16 @@ class BertSelfAttention(nn.Module):
 
         ### TODO
         # 1. Linearly project the queries, keys, and values with their corresponding linear layers
+        score = torch.matmul(query, key.transpose(-1, -2))
+
+        normalized_score = F.softmax(score / math.sqrt(self.attention_head_size))
+        normalized_score = self.view(bs, self.num_attention_heads, seq_len, seq_len)
+
         
+        # 2. Apply the attention mask to the normalized scores
+
+
+        normalized_score = normalized_score + attention_mask
 
         # 2. Split the vectors for multi-head attention
         # 3. Follow the equation to compute the attended output of each head
