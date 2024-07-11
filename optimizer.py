@@ -50,8 +50,26 @@ class AdamW(Optimizer):
                 # State should be stored in this dictionary
                 state = self.state[p]
 
+                m = 0
+                v = 0
+                t = 0
+
                 # Access hyperparameters from the `group` dictionary
                 alpha = group["lr"]
+                beta1, beta2 = group["betas"]
+                epsilon = group["eps"]
+                weight_decay = group["weight_decay"]
+                correct_bias = group["correct_bias"]
+                
+                grad = state
+                while(grad not converged):
+                    t += 1
+                    m = beta1 * m + (1 - beta1) * grad
+                    v = beta2 * v + (1 - beta2) * grad**2
+                    a = alpha * math.sqrt(1 - beta2**t) / (1 - beta1**t)
+                    theta = theta - a * m / (v.sqrt() + epsilon) + weight_decay * theta
+                    grad -= alpha * m_hat / (v_hat.sqrt() + epsilon)
+
 
                 # Complete the implementation of AdamW here, reading and saving
                 # your state in the `state` dictionary above.
@@ -67,7 +85,6 @@ class AdamW(Optimizer):
                 # 4- After that main gradient-based update, update again using weight decay
                 #    (incorporating the learning rate again).
 
-                ### TODO
-                raise NotImplementedError
+
 
         return loss
