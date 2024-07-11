@@ -136,16 +136,16 @@ class BertLayer(nn.Module):
         4. a add-norm that takes the input and output of the feed forward layer
         """
         ### TODO
-        output = self.self_attention(hidden_states, attention_mask)
+        output_attention = self.self_attention(hidden_states, attention_mask)
 
 
-        output = self.add_norm(hidden_states, output, self.attention_dense, self.attention_dropout, self.attention_layer_norm)
+        output_attention = self.add_norm(hidden_states, output_attention, self.attention_dense, self.attention_dropout, self.attention_layer_norm)
 
 
-        output = self.interm_dense(output_self_attention_norm)
-        output_first_dense = self.interm_af(outputrm)
+        output_first_dense = self.interm_dense(output_attention)
+        output_first_dense = self.interm_af(output_first_dense)
 
-        output = self.add_norm(output_self_attention_norm, output, self.out_dense, self.out_dropout, self.out_layer_norm)
+        output = self.add_norm(output_attention, output_first_dense, self.out_dense, self.out_dropout, self.out_layer_norm)
 
         return output
 
@@ -196,25 +196,25 @@ class BertModel(BertPreTrainedModel):
         seq_length = input_shape[1]
 
         # Get word embedding from self.word_embedding into input_embeds.
-        inputs_embeds = None
+        inputs_embeds = self.word_embedding(input_ids)
         ### TODO
-        raise NotImplementedError
 
         # Get position index and position embedding from self.pos_embedding into pos_embeds.
         pos_ids = self.position_ids[:, :seq_length]
 
-        pos_embeds = None
+        pos_embeds = self.pos_embedding(pos_ids)
         ### TODO
-        raise NotImplementedError
         # Get token type ids, since we are not considering token type,
         # this is just a placeholder.
         tk_type_ids = torch.zeros(input_shape, dtype=torch.long, device=input_ids.device)
         tk_type_embeds = self.tk_type_embedding(tk_type_ids)
 
         ### TODO
-        raise NotImplementedError
         # Add three embeddings together; then apply embed_layer_norm and dropout and
         # return the hidden states.
+        output = self.embed_layer_norm(inputs_embeds + pos_embeds + tk_type_embeds)
+        output = self.embed_dropout(output)
+        return output
 
     def encode(self, hidden_states, attention_mask):
         """
