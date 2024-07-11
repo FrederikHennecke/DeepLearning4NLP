@@ -137,13 +137,16 @@ class BertLayer(nn.Module):
         """
         ### TODO
         output = self.self_attention(hidden_states, attention_mask)
-        output = self.attention_dense(output)
-        output_self_attention_norm = self.attention_layer_norm(output + hidden_states)
+
+
+        output = self.add_norm(hidden_states, output, self.attention_dense, self.attention_dropout, self.attention_layer_norm)
+
+
         output = self.interm_dense(output_self_attention_norm)
-        output_first_dense = self.interm_af(output + output_self_attention_norm)
-        output = self.out_dense(output)
-        output = self.out_layer_norm(output + output_first_dense)
-        output = self.out_dropout(output)
+        output_first_dense = self.interm_af(outputrm)
+
+        output = self.add_norm(output_self_attention_norm, output, self.out_dense, self.out_dropout, self.out_layer_norm)
+
         return output
 
         
