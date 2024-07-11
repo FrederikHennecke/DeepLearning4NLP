@@ -82,6 +82,6 @@ class AdamW(Optimizer):
                 state["alpha"] = (group["lr"] * math.sqrt(1 - beta2 ** state["t"])) / (1 - beta1 ** state["t"])
 
                 p.data = p.data.sub(state["mt"].div(torch.sqrt(state["vt"]).add_(group["eps"])).mul(state["alpha"]))
-                p.data = p.data.sub(p.data.mul(group["lr"]).mul(group["weight_decay"]))
+                p.data = p.data.sub(p.data.mul(group["weight_decay"]))
 
         return loss
