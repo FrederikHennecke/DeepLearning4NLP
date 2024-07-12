@@ -24,6 +24,7 @@ from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW
 import csv
 import pandas as pd
+from pathlib import Path
 
 
 TQDM_DISABLE = True
@@ -523,6 +524,38 @@ def test_model(args):
         return test_model_multitask(args, model, device)
 
 
+def etpc_split():
+    file_path = "data/etpc-paraphrase-dev.csv"
+    file = Path(file_path)
+    if file.exists():
+        pass
+    with open("data/etpc-paraphrase-original.csv", "r", encoding="utf-8") as f:
+        reader = csv.reader(f, delimiter="\t")
+        data = list(reader)
+
+    header, rows = data[0], data[1:]
+
+    split_idx = int(0.80 * len(rows))  # 80/20 split like in description
+
+    train = [header] + rows[:split_idx]
+    dev = [header] + rows[split_idx:]
+
+    with open("data/etpc-paraphrase-train.csv", "w", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter="\t")
+        writer.writerows(train)
+
+    with open("data/etpc-paraphrase-dev.csv", "w", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter="\t")
+        writer.writerows(dev)
+
+    print("Data split into train and dev sets.")
+
+    df_train = pd.read_csv(args.etpc_train, sep="\t")
+    df_dev = pd.read_csv(args.etpc_dev, sep="\t")
+    print("train size", df_train.shape)
+    print("dev size", df_dev.shape)
+
+
 def get_args():
     parser = argparse.ArgumentParser()
 
@@ -577,8 +610,7 @@ def get_args():
     # TODO
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
-
-    ## Done down in a function
+    etpc_split()
 
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
@@ -685,80 +717,9 @@ def get_args():
     return args
 
 
-def etpc_split(args):
-    etpc_path = "./etpc-paraphrase-train-original.csv"
-    etpc_data = []
-    with open(etpc_path, "r", encoding="utf-8") as fp:
-        for record in csv.DictReader(fp, delimiter="\t"):
-            try:
-                etpc_data.append(
-                    (
-                        record["sentence1"],
-                        record["sentence2"],
-                        record["paraphrase_types"],
-                        record["sentence1_segment_location"],
-                        record["sentence2_segment_location"],
-                        record["sentence1_tokenized"],
-                        record["sentence2_tokenized"],
-                        record["id"],
-                    )
-                )
-            except Exception as e:
-                print(f"Error: {e}")
-
-    train_size = int(len(etpc_data) * 0.75)
-    etpc_data_train = etpc_data[:train_size]
-    etpc_data_dev = etpc_data[train_size:]
-    print(f"etpc_data_train: {len(etpc_data_train)}")
-    print(f"etpc_data_dev: {len(etpc_data_dev)}")
-
-    with open(args.etpc_train, mode="w") as file:
-        writer = csv.writer(file, delimiter="\t")
-        writer.writerow(
-            [
-                "sentence1",
-                "sentence2",
-                "paraphrase_types",
-                "sentence1_segment_location",
-                "sentence2_segment_location",
-                "sentence1_tokenized",
-                "sentence2_tokenized",
-                "id",
-            ]
-        )
-        for item in etpc_data_train:
-            writer.writerow(item)
-
-    with open(args.etpc_dev, mode="w") as file:
-        writer = csv.writer(file, delimiter="\t")
-        writer.writerow(
-            [
-                "sentence1",
-                "sentence2",
-                "paraphrase_types",
-                "sentence1_segment_location",
-                "sentence2_segment_location",
-                "sentence1_tokenized",
-                "sentence2_tokenized",
-                "id",
-            ]
-        )
-        for item in etpc_data_dev:
-            writer.writerow(item)
-
-    print("Data split into train and dev sets.")
-
-    df_train = pd.read_csv(args.etpc_train, sep="\t")
-    df_dev = pd.read_csv(args.etpc_dev, sep="\t")
-    print("train size", df_train.shape)
-    print("dev size", df_dev.shape)
-    # print("dev head", df_dev.iloc[:, 2:5])
-
-
 if __name__ == "__main__":
     args = get_args()
     args.filepath = f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
-    # etpc_split(args)
     train_multitask(args)
     test_model(args)
