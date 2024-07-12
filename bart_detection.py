@@ -19,7 +19,9 @@ class BartWithClassifier(nn.Module):
     def __init__(self, num_labels=7):
         super(BartWithClassifier, self).__init__()
 
-        self.bart = BartModel.from_pretrained("models/bart-large")
+        self.bart = BartModel.from_pretrained(
+            "facebook/bart-large", local_files_only=True
+        )
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
 
@@ -61,7 +63,9 @@ def transform_data(
     choice.
     """
     # raise NotImplementedError
-    tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
     sentences1 = dataset["sentence1"].tolist()
     sentences2 = dataset["sentence2"].tolist()
     has_labels = "paraphrase_types" in dataset.columns

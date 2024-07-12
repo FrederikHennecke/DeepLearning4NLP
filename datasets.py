@@ -31,7 +31,9 @@ class SentenceClassificationDataset(Dataset):
     def __init__(self, dataset, args):
         self.dataset = dataset
         self.p = args
-        self.tokenizer = BertTokenizer.from_pretrained("./models/bert-base-uncased")
+        self.tokenizer = BertTokenizer.from_pretrained(
+            "bert-base-uncased", local_files_only=args.local_files_only
+        )
 
     def __len__(self):
         return len(self.dataset)
@@ -72,7 +74,7 @@ class SentenceClassificationTestDataset(Dataset):
         self.dataset = dataset
         self.p = args
         self.tokenizer = BertTokenizer.from_pretrained(
-            "./models/bert-base-uncased"
+            "bert-base-uncased", local_files_only=args.local_files_only
         )
 
     def __len__(self):
@@ -112,7 +114,7 @@ class SentencePairDataset(Dataset):
         self.p = args
         self.isRegression = isRegression
         self.tokenizer = BertTokenizer.from_pretrained(
-            "./models/bert-base-uncased"
+            "bert-base-uncased", local_files_only=args.local_files_only
         )
 
     def __len__(self):
@@ -188,7 +190,7 @@ class SentencePairTestDataset(Dataset):
         self.dataset = dataset
         self.p = args
         self.tokenizer = BertTokenizer.from_pretrained(
-            "./models/bert-base-uncased"
+            "bert-base-uncased", local_files_only=args.local_files_only
         )
 
     def __len__(self):

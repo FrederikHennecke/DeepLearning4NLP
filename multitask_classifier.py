@@ -60,7 +60,9 @@ class MultitaskBERT(nn.Module):
 
         # You will want to add layers here to perform the downstream tasks.
         # Pretrain mode does not require updating bert parameters.
-        self.bert = BertModel.from_pretrained("./models/bert-base-uncased")
+        self.bert = BertModel.from_pretrained(
+            "bert-base-uncased", local_files_only=config.local_files_only
+        )
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
@@ -719,7 +721,7 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    args.filepath = f"models/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
+    args.filepath = f"models1/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
     train_multitask(args)
     test_model(args)

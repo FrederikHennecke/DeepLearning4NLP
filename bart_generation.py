@@ -26,7 +26,9 @@ def transform_data(dataset, shuffle, max_length=256):
     ### TODO
     # raise NotImplementedError
 
-    tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
     # sentences1= dataset["sentence1"].tolist()
     # sentences1_segment_location = dataset["sentence1_segment_location"].tolist()
     # paraphrase_types = dataset["paraphrase_types"].tolist()
@@ -37,9 +39,9 @@ def transform_data(dataset, shuffle, max_length=256):
         # paraphrase_types = ", ".join(map(str, paraphrase_types))
         combined_sentence = (
             dataset.loc[i, "sentence1"]
-            + " <location> "
+            + " SEP "
             + dataset.loc[i, "sentence1_segment_location"]
-            + " <type> "
+            + " SEP "
             + dataset.loc[i, "paraphrase_types"]
         )
 
@@ -101,8 +103,6 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         model.train()
         train_loss = 0
         num_batches = 0
-        total_examples = 0
-        correct_preds = 0
 
         for batch in tqdm(train_data, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE):
             input_ids, attention_mask, target_ids = batch
@@ -147,8 +147,8 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         )
         model.train()
 
-    model.save_pretrained("models/bart_generation")
-    tokenizer.save_pretrained("models/bart_generation")
+    model.save_pretrained("models1/bart_generation")
+    tokenizer.save_pretrained("models1/bart_generation")
 
     return model
 
@@ -248,9 +248,13 @@ def evaluate_model(model, dev_data, device, tokenizer):
 
 def finetune_paraphrase_generation(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
-    model = BartForConditionalGeneration.from_pretrained("models/bart-large")
+    model = BartForConditionalGeneration.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
     model.to(device)
-    tokenizer = AutoTokenizer.from_pretrained("models/bart-large")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
 
     train_dataset = pd.read_csv(
         args.etpc_train_filename,

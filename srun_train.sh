@@ -22,7 +22,8 @@ echo -e "\nCurrent Branch: $(git rev-parse --abbrev-ref HEAD)"
 echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
-multitasks=("sst" "sts" "qqp")
+# multitasks=("sst" "sts" "qqp")
+multitasks=("sst")
 bart_files=("bart_detection.py" "bart_generation.py")
 
 # Run the script for all baseline tasks:
@@ -30,13 +31,15 @@ for task in "${multitasks[@]}"
 do
     echo "Running task: $task"
     python -u multitask_classifier.py --task "$task" --option finetune --use_gpu --local_files_only
+    echo
 done
 
-for file in "${bart_files[@]}"
-do
-    echo "Running file: $file for etpc tasks"
-    python -u "$bart_file" --use_gpu
-done
+# for file in "${bart_files[@]}"
+# do
+#     echo "Running file: $file for etpc tasks"
+#     python -u "$bart_file" --use_gpu
+#     echo
+# done
 
 
 # Run tasks individually:
