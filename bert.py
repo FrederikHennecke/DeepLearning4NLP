@@ -57,18 +57,22 @@ class BertSelfAttention(nn.Module):
 
         # bs, seq_len = query.shape[:2]
         # d_k = query.size(-1)
-        bs, num_att_heads, seq_len, att_head_size = key.size()
-        scores = torch.matmul(query, key.transpose(-1, -2)) / torch.sqrt(
-            torch.tensor(att_head_size, dtype=torch.float32)
-        )
-        scores += attention_mask
-        attention_weights = F.softmax(scores, dim=-1)
-        attention_output = (
-            torch.matmul(attention_weights, value).transpose(1, 2).contiguous()
-        )
-        attention_output = attention_output.view(bs, seq_len, -1)
-        # print(f"attention_output_shape: {attention_output.shape}")
-        return attention_output
+        attention_scores = torch.matmul(query, key.transpose(-1, -2))
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        attention_scores = attention_scores + attention_mask
+
+        # Normalize the scores
+        attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        attention_probs = self.dropout(attention_probs)
+
+        # ultiply the attention scores to the value and get back V'.
+        context_layer = torch.matmul(attention_probs, value)
+
+        # Next, we need to concat multi-heads and recover the original shape
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        context_layer = context_layer.view(*new_context_layer_shape)
+        return context_layer
 
     def forward(self, hidden_states, attention_mask):
         """

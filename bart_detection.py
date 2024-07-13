@@ -20,7 +20,7 @@ class BartWithClassifier(nn.Module):
         super(BartWithClassifier, self).__init__()
 
         self.bart = BartModel.from_pretrained(
-            "facebook/bart-large", local_files_only=True
+            "facebook/bart-base", local_files_only=True
         )
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
@@ -64,7 +64,7 @@ def transform_data(
     """
     # raise NotImplementedError
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-large", local_files_only=True
+        "facebook/bart-base", local_files_only=True
     )
     sentences1 = dataset["sentence1"].tolist()
     sentences2 = dataset["sentence2"].tolist()
@@ -98,9 +98,7 @@ def transform_data(
     else:
         dataset = TensorDataset(input_ids, attention_mask)
 
-    dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=shuffle
-    )  # WARN: change batch size to 32
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
     return dataloader
 
 
@@ -186,13 +184,10 @@ def test_model(model, test_data, test_ids, device):
             preds = logits.round().cpu().numpy()
             all_preds.extend(preds)
 
-    # print(f"all_preds: {all_preds}")
     pred_paraphrase_types = [[int(x) for x in pred] for pred in all_preds]
-    print(f"pred_paraphrase_types: {pred_paraphrase_types}")
     df_test_results = pd.DataFrame(
         {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types}
     )
-    print(f"df_test_results: {df_test_results}")
     return df_test_results
 
 
@@ -256,16 +251,14 @@ def get_args():
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--use_gpu", action="store_true")
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument(
-        "--etpc_train_filename", type=str, default="data/etpc-paraphrase-train.csv"
+        "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
     )
+    parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
     parser.add_argument(
-        "--etpc_dev_filename", type=str, default="data/etpc-paraphrase-dev.csv"
-    )
-    parser.add_argument(
-        "--etpc_test_filename",
+        "--etpc_test",
         type=str,
         default="data/etpc-paraphrase-detection-test-student.csv",
     )
@@ -279,29 +272,22 @@ def finetune_paraphrase_detection(args):
     model.to(device)
 
     train_dataset = pd.read_csv(
-        args.etpc_train_filename,
+        args.etpc_train,
         sep="\t",
         usecols=["sentence1", "sentence2", "paraphrase_types"],
     )
-    print(f"train_dataset shape: {train_dataset.shape}")
-    print(f"train_dataset: {train_dataset.head()}\n")
 
     dev_dataset = pd.read_csv(
-        args.etpc_dev_filename,
+        args.etpc_dev,
         sep="\t",
         usecols=["sentence1", "sentence2", "paraphrase_types"],
     )
-    print(f"dev_dataset shape: {dev_dataset.shape}")
-    print(f"dev_dataset: {dev_dataset.head()}\n")
 
     test_dataset = pd.read_csv(
-        args.etpc_test_filename,
+        args.etpc_test,
         sep="\t",
         usecols=["id", "sentence1", "sentence2"],
     )
-
-    print(f"test_dataset shape: {test_dataset.shape}")
-    print(f"test_dataset: {test_dataset.head()}")
 
     # TODO You might do a split of the train data into train/validation set here
     # (or in the csv files directly)
@@ -311,8 +297,6 @@ def finetune_paraphrase_detection(args):
     train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
     dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
     test_data = transform_data(test_dataset, args.batch_size, shuffle=False)
-
-    print(f"Loaded {len(train_dataset)} training samples.")
 
     model = train_model(model, train_data, dev_data, device)
 

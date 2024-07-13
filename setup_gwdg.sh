@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Function to check if conda is installed
 check_conda_installed() {
@@ -37,6 +36,8 @@ check_conda_env() {
 check_conda_installed
 check_conda_env
 
+set -e
+
 # Initialize Conda for the current shell
 eval "$(conda shell.bash hook)"
 
@@ -60,7 +61,6 @@ EOF
 
 python - <<EOF
 from transformers import AutoTokenizer, AutoModel, BartModel
-
 tokenizer = AutoTokenizer.from_pretrained('facebook/bart-base')
 model = BartModel.from_pretrained('facebook/bart-base')
 EOF

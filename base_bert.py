@@ -63,7 +63,9 @@ class BertPreTrainedModel(nn.Module):
 
         # Load config if we don't provide a configuration
         if not isinstance(config, PretrainedConfig):
-            config_path = config if config is not None else pretrained_model_name_or_path
+            config_path = (
+                config if config is not None else pretrained_model_name_or_path
+            )
             config, model_kwargs = cls.config_class.from_pretrained(
                 config_path,
                 *model_args,
@@ -215,7 +217,9 @@ class BertPreTrainedModel(nn.Module):
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
         model_to_load = model
-        has_prefix_module = any(s.startswith(cls.base_model_prefix) for s in state_dict.keys())
+        has_prefix_module = any(
+            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
+        )
         if not hasattr(model, cls.base_model_prefix) and has_prefix_module:
             start_prefix = cls.base_model_prefix + "."
         if hasattr(model, cls.base_model_prefix) and not has_prefix_module:
@@ -225,9 +229,12 @@ class BertPreTrainedModel(nn.Module):
         if model.__class__.__name__ != model_to_load.__class__.__name__:
             base_model_state_dict = model_to_load.state_dict().keys()
             head_model_state_dict_without_base_prefix = [
-                key.split(cls.base_model_prefix + ".")[-1] for key in model.state_dict().keys()
+                key.split(cls.base_model_prefix + ".")[-1]
+                for key in model.state_dict().keys()
             ]
-            missing_keys.extend(head_model_state_dict_without_base_prefix - base_model_state_dict)
+            missing_keys.extend(
+                head_model_state_dict_without_base_prefix - base_model_state_dict
+            )
 
         # Some models may have keys that are not in the state by design, removing them before needlessly warning
         # the user.
@@ -237,7 +244,9 @@ class BertPreTrainedModel(nn.Module):
 
         if cls._keys_to_ignore_on_load_unexpected is not None:
             for pat in cls._keys_to_ignore_on_load_unexpected:
-                unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
+                unexpected_keys = [
+                    k for k in unexpected_keys if re.search(pat, k) is None
+                ]
 
         if len(error_msgs) > 0:
             raise RuntimeError(

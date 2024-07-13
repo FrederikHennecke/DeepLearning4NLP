@@ -1,6 +1,6 @@
 #!/bin/bash
 # Allocate the resources
-# srun -p grete:shared --pty -n 1 -C inet -c 32 -G A100:2 bash
+srun -p grete:shared --pty -n 1 -C inet -c 32 -G A100:2 bash
 # srun --pty -p grete:interactive -C inet -G 2g.10gb:2 /bin/bash
 
 # # Load anaconda
@@ -22,8 +22,7 @@ echo -e "\nCurrent Branch: $(git rev-parse --abbrev-ref HEAD)"
 echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
-# multitasks=("sst" "sts" "qqp")
-multitasks=("sst")
+multitasks=("sst" "sts" "qqp")
 bart_files=("bart_detection.py" "bart_generation.py")
 
 # Run the script for all baseline tasks:
@@ -34,12 +33,12 @@ do
     echo
 done
 
-# for file in "${bart_files[@]}"
-# do
-#     echo "Running file: $file for etpc tasks"
-#     python -u "$bart_file" --use_gpu
-#     echo
-# done
+for file in "${bart_files[@]}"
+do
+    echo "Running file: $file for etpc tasks"
+    python -u "$bart_file" --use_gpu
+    echo
+done
 
 
 # Run tasks individually:

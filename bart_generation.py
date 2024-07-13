@@ -27,16 +27,10 @@ def transform_data(dataset, shuffle, max_length=256):
     # raise NotImplementedError
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-large", local_files_only=True
+        "facebook/bart-base", local_files_only=True
     )
-    # sentences1= dataset["sentence1"].tolist()
-    # sentences1_segment_location = dataset["sentence1_segment_location"].tolist()
-    # paraphrase_types = dataset["paraphrase_types"].tolist()
-
     combined_sentences = []
     for i in range(len(dataset)):
-        # paraphrase_types = dataset["paraphrase_types"].tolist()
-        # paraphrase_types = ", ".join(map(str, paraphrase_types))
         combined_sentence = (
             dataset.loc[i, "sentence1"]
             + " SEP "
@@ -54,8 +48,6 @@ def transform_data(dataset, shuffle, max_length=256):
     else:
         target = None
 
-    # print(f"combined_sentences: {combined_sentences[:5]}")
-
     input_encodings = tokenizer(
         combined_sentences,
         max_length=max_length,
@@ -66,8 +58,6 @@ def transform_data(dataset, shuffle, max_length=256):
 
     input_ids = torch.tensor(input_encodings["input_ids"])
     attention_mask = torch.tensor(input_encodings["attention_mask"])
-    # print(f"input_ids: {input_ids.shape}")
-    # print(f"attention_mask: {attention_mask.shape}")
 
     if target:
         target_encodings = tokenizer(
@@ -147,8 +137,8 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         )
         model.train()
 
-    model.save_pretrained("models1/bart_generation")
-    tokenizer.save_pretrained("models1/bart_generation")
+    model.save_pretrained("models1/bart_generation_model")
+    tokenizer.save_pretrained("models1/bart_generation_tokenizer")
 
     return model
 
@@ -249,11 +239,11 @@ def evaluate_model(model, dev_data, device, tokenizer):
 def finetune_paraphrase_generation(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     model = BartForConditionalGeneration.from_pretrained(
-        "facebook/bart-large", local_files_only=True
+        "facebook/bart-base", local_files_only=True
     )
     model.to(device)
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-large", local_files_only=True
+        "facebook/bart-base", local_files_only=True
     )
 
     train_dataset = pd.read_csv(
@@ -267,8 +257,6 @@ def finetune_paraphrase_generation(args):
             "sentence2_segment_location",
         ],
     )
-    print(f"train_dataset shape: {train_dataset.shape}")
-    print(f"train_dataset: {train_dataset.head()}\n")
 
     dev_dataset = pd.read_csv(
         args.etpc_dev_filename,
@@ -281,16 +269,12 @@ def finetune_paraphrase_generation(args):
             "sentence2_segment_location",
         ],
     )
-    print(f"dev_dataset shape: {dev_dataset.shape}")
-    print(f"dev_dataset: {dev_dataset.head()}\n")
 
     test_dataset = pd.read_csv(
         args.etpc_test_filename,
         sep="\t",
         usecols=["id", "sentence1", "sentence1_segment_location", "paraphrase_types"],
     )
-    print(f"test_dataset shape: {test_dataset.shape}")
-    print(f"test_dataset: {test_dataset.head()}")
 
     # You might do a split of the train data into train/validation set here
     # in the Main function
@@ -298,8 +282,6 @@ def finetune_paraphrase_generation(args):
     train_data = transform_data(train_dataset, shuffle=True)
     dev_data = transform_data(dev_dataset, shuffle=False)
     test_data = transform_data(test_dataset, shuffle=False)
-
-    print(f"Loaded {len(train_dataset)} training samples.")
 
     model = train_model(model, train_data, dev_data, device, tokenizer)
 
