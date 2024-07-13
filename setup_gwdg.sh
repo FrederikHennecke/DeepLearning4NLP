@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 #!/bin/bash
 
+=======
+#!/bin/bash -i
+>>>>>>> a88d80c68d4bb34072e841c344a0fccdcf6c2f2a
 # Function to check if conda is installed
 check_conda_installed() {
     if command -v conda &> /dev/null; then
