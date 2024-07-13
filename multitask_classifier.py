@@ -530,14 +530,16 @@ def etpc_split():
     file_path = "data/etpc-paraphrase-dev.csv"
     file = Path(file_path)
     if file.exists():
-        pass
+        # pass
+        return None
+
     with open("data/etpc-paraphrase-original.csv", "r", encoding="utf-8") as f:
         reader = csv.reader(f, delimiter="\t")
         data = list(reader)
 
     header, rows = data[0], data[1:]
 
-    split_idx = int(0.80 * len(rows))  # 80/20 split like in description
+    split_idx = int(0.75 * len(rows))  # 80/20 split like in description
 
     train = [header] + rows[:split_idx]
     dev = [header] + rows[split_idx:]
