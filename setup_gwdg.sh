@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Function to check if conda is installed
 check_conda_installed() {
@@ -29,13 +28,15 @@ check_conda_env() {
         echo "Conda environment 'dnlp' already exists."
     else
         echo "Conda environment 'dnlp' does not exist. Creating environment..."
-        conda create -n dnlp python=3.8 -y
+        conda create -n dnlp python=3.10 -y
     fi
 }
 
 # Main script execution
 check_conda_installed
 check_conda_env
+
+set -e
 
 # Initialize Conda for the current shell
 eval "$(conda shell.bash hook)"
@@ -61,6 +62,9 @@ EOF
 python - <<EOF
 from transformers import AutoTokenizer, AutoModel, BartModel
 
-tokenizer = AutoTokenizer.from_pretrained('facebook/bart-base')
-model = BartModel.from_pretrained('facebook/bart-base')
+tokenizer = AutoTokenizer.from_pretrained('facebook/bart-large')
+model = BartModel.from_pretrained('facebook/bart-large')
 EOF
+
+python -c "from tokenizer import BertTokenizer; from bert import BertModel; BertTokenizer.from_pretrained('bert-base-uncased'); BertModel.from_pretrained('bert-base-uncased')"
+python -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('facebook/bart-large'); from transformers import BartModel; BartModel.from_pretrained('facebook/bart-large')"

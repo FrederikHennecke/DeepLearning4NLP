@@ -1,8 +1,8 @@
 import argparse
 import random
-
 import numpy as np
 import pandas as pd
+import csv
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, BartModel
 
 from optimizer import AdamW
-
+from datasets import preprocess_string
 
 TQDM_DISABLE = False
 
@@ -19,7 +19,9 @@ class BartWithClassifier(nn.Module):
     def __init__(self, num_labels=7):
         super(BartWithClassifier, self).__init__()
 
-        self.bart = BartModel.from_pretrained("facebook/bart-large", local_files_only=True)
+        self.bart = BartModel.from_pretrained(
+            "facebook/bart-base", local_files_only=True
+        )
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
 
@@ -37,7 +39,12 @@ class BartWithClassifier(nn.Module):
         return probabilities
 
 
-def transform_data(dataset, max_length=512):
+def transform_data(
+    dataset,
+    batch_size,
+    shuffle,
+    max_length=512,
+):
     """
     dataset: pd.DataFrame
 
@@ -55,7 +62,44 @@ def transform_data(dataset, max_length=512):
     Return a DataLoader with the TensorDataset. You can choose a batch size of your
     choice.
     """
-    raise NotImplementedError
+    # raise NotImplementedError
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/bart-base", local_files_only=True
+    )
+    sentences1 = dataset["sentence1"].tolist()
+    sentences2 = dataset["sentence2"].tolist()
+    has_labels = "paraphrase_types" in dataset.columns
+
+    if has_labels:
+        labels = (
+            dataset["paraphrase_types"]
+            .apply(lambda x: list(map(int, x.strip("[]").split(", "))))
+            .tolist()
+        )
+        binary_labels = [
+            [1 if i in label else 0 for i in range(7)] for label in labels
+        ]  # number of labels = 7
+    else:
+        binary_labels = None
+
+    encodings = tokenizer(
+        sentences1,
+        sentences2,
+        truncation=True,
+        padding=True,
+        max_length=max_length,
+    )
+    input_ids = torch.tensor(encodings["input_ids"])
+    attention_mask = torch.tensor(encodings["attention_mask"])
+
+    if binary_labels:
+        labels_tensors = torch.tensor(binary_labels)
+        dataset = TensorDataset(input_ids, attention_mask, labels_tensors)
+    else:
+        dataset = TensorDataset(input_ids, attention_mask)
+
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+    return dataloader
 
 
 def train_model(model, train_data, dev_data, device):
@@ -70,8 +114,50 @@ def train_model(model, train_data, dev_data, device):
     Return the trained model.
     """
     ### TODO
-    raise NotImplementedError
+    # raise NotImplementedError
 
+    model = model.to(device)
+    optimizer = AdamW(model.parameters(), lr=args.lr)
+    loss_fun = nn.BCEWithLogitsLoss()
+
+    # Run for the specified number of epochs
+    for epoch in range(args.epochs):
+        model.train()
+        train_loss = 0
+        num_batches = 0
+        total_examples = 0
+        correct_preds = 0
+
+        for batch in tqdm(train_data, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE):
+            # print(f"batch: {batch}")
+            b_ids, b_mask, b_labels = batch
+
+            b_ids = b_ids.to(device)
+            b_mask = b_mask.to(device)
+            b_labels = b_labels.to(device)
+
+            optimizer.zero_grad()
+            logits = model(b_ids, b_mask)
+            loss = loss_fun(logits, b_labels.float())
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+            num_batches += 1
+            total_examples += b_labels.size(0) * b_labels.size(
+                1
+            )  # total number of examples per batch
+            preds = logits.round()
+            correct_preds += (preds == b_labels).sum().item()
+
+        avg_train_loss = train_loss / num_batches
+        train_accuracy = correct_preds / total_examples
+        dev_accuracy = evaluate_model(model, dev_data, device)
+        print(
+            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f}"
+        )
+
+    return model
 
 
 def test_model(model, test_data, test_ids, device):
@@ -83,7 +169,26 @@ def test_model(model, test_data, test_ids, device):
     """
     ### TODO
 
-    raise NotImplementedError
+    # raise NotImplementedError
+    model.to(device)
+    model.eval()
+    all_preds = []
+
+    with torch.no_grad():
+        for batch in tqdm(test_data, desc="test", disable=TQDM_DISABLE):
+            b_ids, b_mask = batch
+            b_ids = b_ids.to(device)
+            b_mask = b_mask.to(device)
+
+            logits = model(b_ids, b_mask)
+            preds = logits.round().cpu().numpy()
+            all_preds.extend(preds)
+
+    pred_paraphrase_types = [[int(x) for x in pred] for pred in all_preds]
+    df_test_results = pd.DataFrame(
+        {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types}
+    )
+    return df_test_results
 
 
 def evaluate_model(model, test_data, device):
@@ -95,7 +200,7 @@ def evaluate_model(model, test_data, device):
     """
     all_pred = []
     all_labels = []
-    model.eval()
+    model.eval()  # switch to eval model, will turn off randomness like dropout
 
     with torch.no_grad():
         for batch in test_data:
@@ -145,6 +250,18 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument(
+        "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
+    )
+    parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
+    parser.add_argument(
+        "--etpc_test",
+        type=str,
+        default="data/etpc-paraphrase-detection-test-student.csv",
+    )
     args = parser.parse_args()
     return args
 
@@ -154,15 +271,32 @@ def finetune_paraphrase_detection(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     model.to(device)
 
-    train_dataset = pd.read_csv("data/etpc-paraphrase-train.csv", sep="\t")
-    test_dataset = pd.read_csv("data/etpc-paraphrase-detection-test-student.csv", sep="\t")
+    train_dataset = pd.read_csv(
+        args.etpc_train,
+        sep="\t",
+        usecols=["sentence1", "sentence2", "paraphrase_types"],
+    )
+
+    dev_dataset = pd.read_csv(
+        args.etpc_dev,
+        sep="\t",
+        usecols=["sentence1", "sentence2", "paraphrase_types"],
+    )
+
+    test_dataset = pd.read_csv(
+        args.etpc_test,
+        sep="\t",
+        usecols=["id", "sentence1", "sentence2"],
+    )
 
     # TODO You might do a split of the train data into train/validation set here
     # (or in the csv files directly)
-    train_data = transform_data(train_dataset)
-    test_data = transform_data(test_dataset)
 
-    print(f"Loaded {len(train_dataset)} training samples.")
+    # Already Done before!
+
+    train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
+    dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
+    test_data = transform_data(test_dataset, args.batch_size, shuffle=False)
 
     model = train_model(model, train_data, dev_data, device)
 
@@ -174,7 +308,9 @@ def finetune_paraphrase_detection(args):
     test_ids = test_dataset["id"]
     test_results = test_model(model, test_data, test_ids, device)
     test_results.to_csv(
-        "predictions/bart/etpc-paraphrase-detection-test-output.csv", index=False, sep="\t"
+        "predictions/bart/etpc-paraphrase-detection-test-output.csv",
+        index=False,
+        sep="\t",
     )
 
 

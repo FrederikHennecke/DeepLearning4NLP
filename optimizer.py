@@ -67,7 +67,21 @@ class AdamW(Optimizer):
                 # 4- After that main gradient-based update, update again using weight decay
                 #    (incorporating the learning rate again).
 
-                ### TODO
-                raise NotImplementedError
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+
+                if "t" not in state.keys():
+                    state["t"] = 0
+                    state["mt"] = torch.zeros(p.data.shape).to(device)
+                    state["vt"] = torch.zeros(p.data.shape).to(device)
+                beta1, beta2 = group["betas"]
+
+                state["t"] = state["t"] + 1
+                state["mt"] = state["mt"].mul(beta1) + grad.mul(1 - beta1)
+                state["vt"] = state["vt"].mul(beta2) + torch.mul(grad, grad).mul(1 - beta2)
+
+                state["alpha"] = (group["lr"] * math.sqrt(1 - beta2 ** state["t"])) / (1 - beta1 ** state["t"])
+
+                p.data = p.data.sub(state["mt"].div(torch.sqrt(state["vt"]).add_(group["eps"])).mul(state["alpha"]))
+                p.data = p.data.sub(p.data.mul(group["weight_decay"]))
 
         return loss
