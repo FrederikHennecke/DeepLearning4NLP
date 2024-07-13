@@ -20,7 +20,7 @@ class BartWithClassifier(nn.Module):
         super(BartWithClassifier, self).__init__()
 
         self.bart = BartModel.from_pretrained(
-            "facebook/bart-base", local_files_only=True
+            "facebook/bart-large", local_files_only=True
         )
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
@@ -64,7 +64,7 @@ def transform_data(
     """
     # raise NotImplementedError
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
     sentences1 = dataset["sentence1"].tolist()
     sentences2 = dataset["sentence2"].tolist()

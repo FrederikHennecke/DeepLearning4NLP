@@ -27,7 +27,7 @@ def transform_data(dataset, shuffle, max_length=256):
     # raise NotImplementedError
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
     combined_sentences = []
     for i in range(len(dataset)):
@@ -227,23 +227,23 @@ def evaluate_model(model, dev_data, device, tokenizer):
             ]
 
             predictions.extend(pred_text)
-            references.extend([[r] for r in ref_text])
+            references.extend(ref_text)
 
     model.train()
 
     # Calculate BLEU score
-    bleu_score = bleu.corpus_score(predictions, references)
+    bleu_score = bleu.corpus_score(predictions, [references])
     return bleu_score.score
 
 
 def finetune_paraphrase_generation(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     model = BartForConditionalGeneration.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
     model.to(device)
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
 
     train_dataset = pd.read_csv(
