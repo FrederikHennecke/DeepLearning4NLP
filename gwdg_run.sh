@@ -37,5 +37,11 @@ do
     python -u multitask_classifier.py --use_gpu --local_files_only --option finetune --task "$task" --hidden_dropout_prob 0.1
 done
 
-# Run the script:
-#python -u multitask_classifier.py --use_gpu --local_files_only --option finetune --task sst --hidden_dropout_prob 0.1
+bart_files=("bart_detection.py" "bart_generation.py")
+for file in "${bart_files[@]}"
+do
+    echo "Running file: $file for etpc tasks"
+    python -u "$file" --use_gpu
+    echo
+done
+
