@@ -526,13 +526,15 @@ def test_model(args):
         return test_model_multitask(args, model, device)
 
 
-def etpc_split():
-    file_path = "data/etpc-paraphrase-dev.csv"
+def etpc_split(args):
+    file_path = args.etpc_dev
     file = Path(file_path)
     if file.exists():
         # pass
+        print("etpc data already split into train and dev sets.")
         return None
 
+    print("Splitting etpc data into train and dev sets...")
     with open("data/etpc-paraphrase-original.csv", "r", encoding="utf-8") as f:
         reader = csv.reader(f, delimiter="\t")
         data = list(reader)
@@ -544,15 +546,13 @@ def etpc_split():
     train = [header] + rows[:split_idx]
     dev = [header] + rows[split_idx:]
 
-    with open("data/etpc-paraphrase-train.csv", "w", encoding="utf-8") as f:
+    with open(args.etpc_train, "w", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="\t")
         writer.writerows(train)
 
-    with open("data/etpc-paraphrase-dev.csv", "w", encoding="utf-8") as f:
+    with open(args.etpc_dev, "w", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="\t")
         writer.writerows(dev)
-
-    print("Data split into train and dev sets.")
 
     df_train = pd.read_csv(args.etpc_train, sep="\t")
     df_dev = pd.read_csv(args.etpc_dev, sep="\t")
@@ -614,7 +614,6 @@ def get_args():
     # TODO
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
-    etpc_split()
 
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
@@ -725,5 +724,6 @@ if __name__ == "__main__":
     args = get_args()
     args.filepath = f"models1/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
+    etpc_split(args)
     train_multitask(args)
     test_model(args)
