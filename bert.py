@@ -68,7 +68,6 @@ class BertSelfAttention(nn.Module):
         context_layer = context_layer.view(*new_context_layer_shape)
         return context_layer
 
-
     def forward(self, hidden_states, attention_mask):
         """
         hidden_states: [bs, seq_len, hidden_state]
@@ -113,13 +112,11 @@ class BertLayer(nn.Module):
         dropout: the dropout to be applied
         ln_layer: the layer norm to be applied
         """
-        ### TODO
         # Hint: Remember that BERT applies dropout to the output of each sub-layer,
         # before it is added to the sub-layer input and normalized.
-        output = dense_layer(output)
-        output = dropout(output)
-        output = ln_layer(input + output)
-        return output
+        out = input + dropout(dense_layer(output))
+        out = ln_layer(out)
+        return out
 
     def forward(self, hidden_states, attention_mask):
         """
@@ -135,24 +132,31 @@ class BertLayer(nn.Module):
         3. a feed forward layer
         4. a add-norm that takes the input and output of the feed forward layer
         """
-        ### TODO
-        output_attention = self.self_attention(hidden_states, attention_mask)
+        # 1.
+        attention_output = self.self_attention(hidden_states, attention_mask)
 
+        # 2.
+        norm_output = self.add_norm(
+            input=hidden_states,
+            output=attention_output,
+            dense_layer=self.attention_dense,
+            dropout=self.attention_dropout,
+            ln_layer=self.attention_layer_norm,
+        )
 
-        output_attention = self.add_norm(hidden_states, output_attention, self.attention_dense, self.attention_dropout, self.attention_layer_norm)
+        # 3.
+        interm_output = self.interm_dense(norm_output)
+        interm_output = self.interm_af(interm_output)
 
-
-        output_first_dense = self.interm_dense(output_attention)
-        output_first_dense = self.interm_af(output_first_dense)
-
-        output = self.add_norm(output_attention, output_first_dense, self.out_dense, self.out_dropout, self.out_layer_norm)
-
-        return output
-
-        
-
-
-
+        # 4.
+        layer_output = self.add_norm(
+            input=norm_output,
+            output=interm_output,
+            dense_layer=self.out_dense,
+            dropout=self.out_dropout,
+            ln_layer=self.out_layer_norm,
+        )
+        return layer_output
 
 
 class BertModel(BertPreTrainedModel):
@@ -197,24 +201,22 @@ class BertModel(BertPreTrainedModel):
 
         # Get word embedding from self.word_embedding into input_embeds.
         inputs_embeds = self.word_embedding(input_ids)
-        ### TODO
 
         # Get position index and position embedding from self.pos_embedding into pos_embeds.
         pos_ids = self.position_ids[:, :seq_length]
 
         pos_embeds = self.pos_embedding(pos_ids)
-        ### TODO
         # Get token type ids, since we are not considering token type,
         # this is just a placeholder.
         tk_type_ids = torch.zeros(input_shape, dtype=torch.long, device=input_ids.device)
         tk_type_embeds = self.tk_type_embedding(tk_type_ids)
 
-        ### TODO
         # Add three embeddings together; then apply embed_layer_norm and dropout and
         # return the hidden states.
-        output = self.embed_layer_norm(inputs_embeds + pos_embeds + tk_type_embeds)
-        output = self.embed_dropout(output)
-        return output
+        out = inputs_embeds + pos_embeds + tk_type_embeds
+        out = self.embed_layer_norm(out)
+        out = self.embed_dropout(out)
+        return out
 
     def encode(self, hidden_states, attention_mask):
         """
