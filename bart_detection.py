@@ -306,7 +306,7 @@ def finetune_paraphrase_detection(args):
     # TODO You might do a split of the train data into train/validation set here
     # (or in the csv files directly)
 
-    # Already Done!
+    # Already Done before!
 
     train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
     dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)

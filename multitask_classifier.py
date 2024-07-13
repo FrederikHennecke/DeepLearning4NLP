@@ -539,7 +539,7 @@ def etpc_split():
 
     header, rows = data[0], data[1:]
 
-    split_idx = int(0.75 * len(rows))  # 80/20 split like in description
+    split_idx = int(0.75 * len(rows))  # 75/25 split like in description
 
     train = [header] + rows[:split_idx]
     dev = [header] + rows[split_idx:]
