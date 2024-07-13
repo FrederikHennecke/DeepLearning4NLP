@@ -3,8 +3,7 @@ import sys
 import numpy as np
 import torch
 
-sys.path.append("C:/Users/arnet/Documents/Uni/SoSe24/DL NLP/DeepLearning4NLP/")
-sys.path.append("C:/Users/arnet/Documents/Uni/SoSe24/DL NLP/DeepLearning4NLP/sanity_test/")
+sys.path.append("../")
 from optimizer import AdamW
 
 seed = 0
