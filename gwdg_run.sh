@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=train-multitask_classifier
-#SBATCH -t 04:00:00                  # estimated time # TODO: adapt to your needs
+#SBATCH -t 12:00:00                  # estimated time # TODO: adapt to your needs
 #SBATCH -p grete                     # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
 #SBATCH -G A100:1                    # take 1 GPU, see https://docs.hpc.gwdg.de/compute_partitions/gpu_partitions/index.html for more options
-#SBATCH --mem-per-gpu=8G             # setting the right constraints for the splitted gpu partitions
+#SBATCH --mem-per-gpu=12G            # setting the right constraints for the splitted gpu partitions
 #SBATCH --nodes=1                    # total number of nodes
 #SBATCH --ntasks=1                   # total number of tasks
 #SBATCH --cpus-per-task=8            # number cores per task
@@ -41,7 +41,7 @@ bart_files=("bart_detection.py" "bart_generation.py")
 for file in "${bart_files[@]}"
 do
     echo "Running file: $file for etpc tasks"
-    python -u "$file" --use_gpu
+    python -u "$file" --use_gpu --epochs 5 --lr 1e-5
     echo
 done
 

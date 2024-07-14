@@ -302,5 +302,7 @@ def finetune_paraphrase_generation(args):
 if __name__ == "__main__":
     args = get_args()
     args.etpc_test_filename = "data/etpc-paraphrase-generation-test-student.csv"
+    args.etpc_train_filename = "data/etpc-paraphrase-train.csv"
+    args.etpc_dev_filename = "data/etpc-paraphrase-dev.csv"
     seed_everything(args.seed)
     finetune_paraphrase_generation(args)
