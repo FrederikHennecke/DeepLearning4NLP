@@ -24,6 +24,8 @@ echo "Current node: ${SLURM_NODELIST}"
 python --version
 python -m torch.utils.collect_env 2> /dev/null
 
+mkdir -p models
+
 # Print out some git info.
 module load git
 echo -e "\nCurrent Branch: $(git rev-parse --abbrev-ref HEAD)"
