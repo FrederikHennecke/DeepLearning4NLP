@@ -22,7 +22,8 @@ echo -e "\nCurrent Branch: $(git rev-parse --abbrev-ref HEAD)"
 echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
-multitasks=("sst" "sts" "qqp")
+# multitasks=("sst" "sts" "qqp")
+multitasks=("sst")
 bart_files=("bart_detection.py" "bart_generation.py")
 
 # Run the script for all baseline tasks:

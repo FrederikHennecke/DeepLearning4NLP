@@ -27,8 +27,9 @@ def transform_data(dataset, shuffle, max_length=256):
     # raise NotImplementedError
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
+
     combined_sentences = []
     for i in range(len(dataset)):
         combined_sentence = (
@@ -137,8 +138,8 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         )
         model.train()
 
-    model.save_pretrained("models1/bart_generation_model")
-    tokenizer.save_pretrained("models1/bart_generation_tokenizer")
+    model.save_pretrained("models1/bart_generation")
+    tokenizer.save_pretrained("models1/bart_generation")
 
     return model
 
@@ -239,11 +240,11 @@ def evaluate_model(model, dev_data, device, tokenizer):
 def finetune_paraphrase_generation(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
     model = BartForConditionalGeneration.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
     model.to(device)
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-base", local_files_only=True
+        "facebook/bart-large", local_files_only=True
     )
 
     train_dataset = pd.read_csv(
