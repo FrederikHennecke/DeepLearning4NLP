@@ -11,6 +11,7 @@ from transformers import AutoTokenizer, BartForConditionalGeneration
 
 from optimizer import AdamW
 from bart_detection import get_args, seed_everything
+from multitask_classifier import etpc_split
 
 TQDM_DISABLE = False
 
@@ -138,8 +139,8 @@ def train_model(model, train_data, dev_data, device, tokenizer):
         )
         model.train()
 
-    model.save_pretrained("models1/bart_generation")
-    tokenizer.save_pretrained("models1/bart_generation")
+    model.save_pretrained("models1/bart_generation_model")
+    tokenizer.save_pretrained("models1/bart_generation_tokenizer")
 
     return model
 
@@ -228,12 +229,12 @@ def evaluate_model(model, dev_data, device, tokenizer):
             ]
 
             predictions.extend(pred_text)
-            references.extend([[r] for r in ref_text])
+            references.extend(ref_text)
 
     model.train()
 
     # Calculate BLEU score
-    bleu_score = bleu.corpus_score(predictions, references)
+    bleu_score = bleu.corpus_score(predictions, [references])
     return bleu_score.score
 
 
@@ -248,7 +249,7 @@ def finetune_paraphrase_generation(args):
     )
 
     train_dataset = pd.read_csv(
-        args.etpc_train_filename,
+        args.etpc_train,
         sep="\t",
         usecols=[
             "sentence1",
@@ -260,7 +261,7 @@ def finetune_paraphrase_generation(args):
     )
 
     dev_dataset = pd.read_csv(
-        args.etpc_dev_filename,
+        args.etpc_dev,
         sep="\t",
         usecols=[
             "sentence1",
@@ -272,7 +273,7 @@ def finetune_paraphrase_generation(args):
     )
 
     test_dataset = pd.read_csv(
-        args.etpc_test_filename,
+        args.etpc_test,
         sep="\t",
         usecols=["id", "sentence1", "sentence1_segment_location", "paraphrase_types"],
     )
@@ -302,6 +303,7 @@ def finetune_paraphrase_generation(args):
 
 if __name__ == "__main__":
     args = get_args()
-    args.etpc_test_filename = "data/etpc-paraphrase-generation-test-student.csv"
+    args.etpc_test = "data/etpc-paraphrase-generation-test-student.csv"
+    etpc_split(args)
     seed_everything(args.seed)
     finetune_paraphrase_generation(args)

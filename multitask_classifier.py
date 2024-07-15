@@ -530,9 +530,9 @@ def etpc_split(args):
     file_path = args.etpc_dev
     file = Path(file_path)
     if file.exists():
-        # pass
-        print("etpc data already split into train and dev sets.")
-        return None
+        pass
+        # print("etpc data already split into train and dev sets.")
+        # return None
 
     print("Splitting etpc data into train and dev sets...")
     with open("data/etpc-paraphrase-original.csv", "r", encoding="utf-8") as f:
@@ -725,5 +725,5 @@ if __name__ == "__main__":
     args.filepath = f"models1/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
     etpc_split(args)
-    train_multitask(args)
-    test_model(args)
+    # train_multitask(args)
+    # test_model(args)
