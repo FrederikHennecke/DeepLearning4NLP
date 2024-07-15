@@ -1,6 +1,6 @@
 import os
 import re
-
+from typing import Union, Tuple, Dict
 import torch
 from torch import dtype, nn
 
@@ -47,7 +47,10 @@ class BertPreTrainedModel(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path: str | os.PathLike, *model_args, **kwargs
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        *model_args,
+        **kwargs,
     ):
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)

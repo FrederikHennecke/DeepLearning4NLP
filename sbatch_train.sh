@@ -36,17 +36,17 @@ multitasks=("sst" "sts" "qqp")
 bart_files=("bart_detection.py" "bart_generation.py")
 
 # Run the script for bert multitask baseline:
-for task in "${multitasks[@]}"
-do
-  echo "Running task: $task"
-  if [ "$task" == "qqp" ]; then
-      python -u multitask_classifier.py --task "$task" --option finetune --use_gpu --local_files_only --epochs 2
-      echo
-  else
-      python -u multitask_classifier.py --task "$task" --option finetune --use_gpu --local_files_only
-      echo
-  fi
-done
+# for task in "${multitasks[@]}"
+# do
+#   echo "Running task: $task"
+#   if [ "$task" == "qqp" ]; then
+#       python -u multitask_classifier.py --task "$task" --option finetune --use_gpu --local_files_only --epochs 2
+#       echo
+#   else
+#       python -u multitask_classifier.py --task "$task" --option finetune --use_gpu --local_files_only
+#       echo
+#   fi
+# done
 
 # Run the script for bart detection and generation baseline:
 for file in "${bart_files[@]}"
