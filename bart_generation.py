@@ -10,12 +10,12 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, BartForConditionalGeneration
 
 from optimizer import AdamW
-
+from bart_detection import get_args, seed_everything
 
 TQDM_DISABLE = False
 
 
-def transform_data(dataset, max_length=256):
+def transform_data(dataset, shuffle, max_length=256):
     """
     Turn the data to the format you want to use.
     Use AutoTokenizer to obtain encoding (input_ids and attention_mask).
@@ -24,7 +24,58 @@ def transform_data(dataset, max_length=256):
     Return Data Loader.
     """
     ### TODO
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
+    combined_sentences = []
+    for i in range(len(dataset)):
+        combined_sentence = (
+            dataset.loc[i, "sentence1"]
+            + " SEP "
+            + dataset.loc[i, "sentence1_segment_location"]
+            + " SEP "
+            + dataset.loc[i, "paraphrase_types"]
+        )
+
+        combined_sentences.append(combined_sentence)
+
+    has_target = "sentence2" in dataset.columns
+
+    if has_target:
+        target = dataset["sentence2"].tolist()
+    else:
+        target = None
+
+    input_encodings = tokenizer(
+        combined_sentences,
+        max_length=max_length,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+    )
+
+    input_ids = torch.tensor(input_encodings["input_ids"])
+    attention_mask = torch.tensor(input_encodings["attention_mask"])
+
+    if target:
+        target_encodings = tokenizer(
+            target,
+            max_length=max_length,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        target_ids = torch.tensor(target_encodings["input_ids"])
+        dataset = TensorDataset(input_ids, attention_mask, target_ids)
+
+    else:
+        dataset = TensorDataset(input_ids, attention_mask)
+
+    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle)
+
+    return dataloader
 
 
 def train_model(model, train_data, dev_data, device, tokenizer):
@@ -32,7 +83,64 @@ def train_model(model, train_data, dev_data, device, tokenizer):
     Train the model. Return and save the model.
     """
     ### TODO
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    model = model.to(device)
+    optimizer = AdamW(model.parameters(), lr=args.lr)
+
+    # Run for the specified number of epochs
+    for epoch in range(args.epochs):
+        model.train()
+        train_loss = 0
+        num_batches = 0
+
+        for batch in tqdm(train_data, desc=f"train-{epoch+1:02}", disable=TQDM_DISABLE):
+            input_ids, attention_mask, target_ids = batch
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+            target_ids = target_ids.to(device)
+
+            optimizer.zero_grad()
+            logits = model(
+                input_ids=input_ids, attention_mask=attention_mask, labels=target_ids
+            )
+            loss = logits.loss
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+            num_batches += 1
+
+        avg_train_loss = train_loss / num_batches
+
+        model.eval()  # switch to eval model, will turn off randomness like dropout
+        dev_loss = 0
+        num_batches = 0
+        with torch.no_grad():
+            for batch in dev_data:
+                input_ids, attention_mask, target_ids = batch
+                input_ids = input_ids.to(device)
+                attention_mask = attention_mask.to(device)
+                target_ids = target_ids.to(device)
+
+                outputs = model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    labels=target_ids,
+                )
+                dev_loss += outputs.loss.item()
+                num_batches += 1
+
+        avg_dev_loss = dev_loss / num_batches
+        print(
+            f"Epoch {epoch+1:02} | Average Train Loss: {avg_train_loss:.4f} | Average Dev Loss: {avg_dev_loss:.4f}"
+        )
+        model.train()
+
+    model.save_pretrained("models1/bart_generation_model")
+    tokenizer.save_pretrained("models1/bart_generation_tokenizer")
+
+    return model
 
 
 def test_model(test_data, test_ids, device, model, tokenizer):
@@ -43,10 +151,42 @@ def test_model(test_data, test_ids, device, model, tokenizer):
     Return this dataframe.
     """
     ### TODO
-    raise NotImplementedError
+    # raise NotImplementedError
+
+    model.to(device)
+    model.eval()
+
+    generated_sentences = []
+    with torch.no_grad():
+        for batch in tqdm(test_data, desc="test", disable=TQDM_DISABLE):
+            input_ids, attention_mask = batch
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+
+            outputs = model.generate(
+                input_ids,
+                attention_mask=attention_mask,
+                max_length=50,  # WARN: tune max_length parameter
+                num_beams=5,  # WARN: tune num_beams parameter
+                early_stopping=True,
+            )
+
+            pred_text = [
+                tokenizer.decode(
+                    g, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                )
+                for g in outputs
+            ]
+            generated_sentences.extend(pred_text)
+
+    df_gen_results = pd.DataFrame(
+        {"id": test_ids, "Generated_sentence2": generated_sentences}
+    )
+
+    return df_gen_results
 
 
-def evaluate_model(model, test_data, device, tokenizer):
+def evaluate_model(model, dev_data, device, tokenizer):
     """
     You can use your train/validation set to evaluate models performance with the BLEU score.
     """
@@ -56,11 +196,13 @@ def evaluate_model(model, test_data, device, tokenizer):
     references = []
 
     with torch.no_grad():
-        for batch in test_data:
-            input_ids, attention_mask, labels = batch
+        for batch in dev_data:
+            input_ids, attention_mask, target_ids = (
+                batch  # WARN! paraphrase type is inseted in the encoder in the transform_data function above, but how to extract them as target_ids to use here??
+            )
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
-            labels = labels.to(device)
+            target_ids = target_ids.to(device)
 
             # Generate paraphrases
             outputs = model.generate(
@@ -72,12 +214,16 @@ def evaluate_model(model, test_data, device, tokenizer):
             )
 
             pred_text = [
-                tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+                tokenizer.decode(
+                    g, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                )
                 for g in outputs
             ]
             ref_text = [
-                tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-                for g in labels
+                tokenizer.decode(
+                    g, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                )
+                for g in target_ids
             ]
 
             predictions.extend(pred_text)
@@ -90,42 +236,52 @@ def evaluate_model(model, test_data, device, tokenizer):
     return bleu_score.score
 
 
-def seed_everything(seed=11711):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--use_gpu", action="store_true")
-    args = parser.parse_args()
-    return args
-
-
 def finetune_paraphrase_generation(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
-    model = BartForConditionalGeneration.from_pretrained("facebook/bart-large", local_files_only=True)
+    model = BartForConditionalGeneration.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
     model.to(device)
-    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large", local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        "facebook/bart-large", local_files_only=True
+    )
 
-    train_dataset = pd.read_csv("data/etpc-paraphrase-train.csv", sep="\t")
-    dev_dataset = pd.read_csv("data/etpc-paraphrase-dev.csv", sep="\t")
-    test_dataset = pd.read_csv("data/etpc-paraphrase-generation-test-student.csv", sep="\t")
+    train_dataset = pd.read_csv(
+        args.etpc_train_filename,
+        sep="\t",
+        usecols=[
+            "sentence1",
+            "sentence1_segment_location",
+            "paraphrase_types",
+            "sentence2",
+            "sentence2_segment_location",
+        ],
+    )
+
+    dev_dataset = pd.read_csv(
+        args.etpc_dev_filename,
+        sep="\t",
+        usecols=[
+            "sentence1",
+            "sentence1_segment_location",
+            "paraphrase_types",
+            "sentence2",
+            "sentence2_segment_location",
+        ],
+    )
+
+    test_dataset = pd.read_csv(
+        args.etpc_test_filename,
+        sep="\t",
+        usecols=["id", "sentence1", "sentence1_segment_location", "paraphrase_types"],
+    )
 
     # You might do a split of the train data into train/validation set here
-    # ...
+    # in the Main function
 
-    train_data = transform_data(train_dataset)
-    dev_data = transform_data(dev_dataset)
-    test_data = transform_data(test_dataset)
-
-    print(f"Loaded {len(train_dataset)} training samples.")
+    train_data = transform_data(train_dataset, shuffle=True)
+    dev_data = transform_data(dev_dataset, shuffle=False)
+    test_data = transform_data(test_dataset, shuffle=False)
 
     model = train_model(model, train_data, dev_data, device, tokenizer)
 
@@ -137,11 +293,16 @@ def finetune_paraphrase_generation(args):
     test_ids = test_dataset["id"]
     test_results = test_model(test_data, test_ids, device, model, tokenizer)
     test_results.to_csv(
-        "predictions/bart/etpc-paraphrase-generation-test-output.csv", index=False, sep="\t"
+        "predictions/bart/etpc-paraphrase-generation-test-output.csv",
+        index=False,
+        sep="\t",
     )
 
 
 if __name__ == "__main__":
     args = get_args()
+    args.etpc_test_filename = "data/etpc-paraphrase-generation-test-student.csv"
+    args.etpc_train_filename = "data/etpc-paraphrase-train.csv"
+    args.etpc_dev_filename = "data/etpc-paraphrase-dev.csv"
     seed_everything(args.seed)
     finetune_paraphrase_generation(args)
