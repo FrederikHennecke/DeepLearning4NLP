@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=baseline-finetune-all-tasks
-#SBATCH -t 4:00:00                  # estimated time # TODO: adapt to your needs
-#SBATCH -p grete              # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
+#SBATCH -t 2:00:00                  # estimated time # TODO: adapt to your needs
+#SBATCH -p grete:shared              # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
 #SBATCH -G A100:1                   # requesting GPU slices, see https://docs.hpc.gwdg.de/usage_guide/slurm/gpu_usage/index.html for more options
+#SBATCH -C 80gb                      # requesting memory
 #SBATCH --mem-per-gpu=8G             # setting the right constraints for the splitted gpu partitions
 #SBATCH --nodes=1                    # total number of nodes
 #SBATCH --ntasks=1                   # total number of tasks
