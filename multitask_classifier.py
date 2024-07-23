@@ -462,7 +462,7 @@ def test_model(args):
         return test_model_multitask(args, model, device)
 
 
-def split_csv():
+def split_csv(split=0.8):
     file_path = "data/etpc-paraphrase-dev.csv"
     file = Path(file_path)
     if file.exists():
@@ -473,7 +473,7 @@ def split_csv():
 
     header, rows = data[0], data[1:]
 
-    split_idx = int(0.80 * len(rows))  # 80/20 split like in description
+    split_idx = int(split * len(rows))  # 80/20 split like in description
 
     train = [header] + rows[:split_idx]
     dev = [header] + rows[split_idx:]

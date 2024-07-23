@@ -8,6 +8,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, BartModel
+from multitask_classifier import split_csv
 
 from optimizer import AdamW
 from datasets import preprocess_string
@@ -76,11 +77,9 @@ def transform_data(
             .apply(lambda x: list(map(int, x.strip("[]").split(", "))))
             .tolist()
         )
-        print(labels)
         binary_labels = [
             [1 if i in label else 0 for i in range(1, 8)] for label in labels
         ]  # number of labels = 7
-        print(binary_labels)
     else:
         binary_labels = None
 
@@ -319,6 +318,5 @@ def finetune_paraphrase_detection(args):
 
 if __name__ == "__main__":
     args = get_args()
-    args.use_gpu = True
     seed_everything(args.seed)
     finetune_paraphrase_detection(args)
