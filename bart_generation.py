@@ -15,65 +15,38 @@ from bart_detection import get_args, seed_everything
 TQDM_DISABLE = False
 
 
-def transform_data(dataset, shuffle, max_length=256):
+def transform_data(dataset, shuffle, max_length=256, target_encoding=True):
     """
     Turn the data to the format you want to use.
     Use AutoTokenizer to obtain encoding (input_ids and attention_mask).
     Tokenize the sentence pair in the following format:
-    sentence_1 + SEP + sentence_1 segment location + SEP + paraphrase types.
-    Return Data Loader.
+    sentence_1 + SEP + sentence_2 segment location + SEP + paraphrase types.
+    Return DataLoader.
     """
-    ### TODO
-    # raise NotImplementedError
-
     tokenizer = AutoTokenizer.from_pretrained(
         "facebook/bart-large", local_files_only=True
     )
-    combined_sentences = []
-    for i in range(len(dataset)):
-        combined_sentence = (
-            dataset.loc[i, "sentence1"]
-            + " SEP "
-            + dataset.loc[i, "sentence1_segment_location"]
-            + " SEP "
-            + dataset.loc[i, "paraphrase_types"]
-        )
+    inputs = []
+    targets = []
 
-        combined_sentences.append(combined_sentence)
+    for idx, row in dataset.iterrows():
+        if target_encoding:
+            input_text = row['sentence1']
+            target_text = row['sentence2']
+            inputs.append(input_text)
+            targets.append(target_text)
+        else:
+            input_text = row['sentence1']
+            inputs.append(input_text)
 
-    has_target = "sentence2" in dataset.columns
-
-    if has_target:
-        target = dataset["sentence2"].tolist()
+    encodings = tokenizer(inputs, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
+    if target_encoding:
+        target_encodings = tokenizer(targets, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
+        dataset = TensorDataset(encodings.input_ids, encodings.attention_mask, target_encodings.input_ids)
     else:
-        target = None
+        dataset = TensorDataset(encodings.input_ids, encodings.attention_mask)
 
-    input_encodings = tokenizer(
-        combined_sentences,
-        max_length=max_length,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    )
-
-    input_ids = torch.tensor(input_encodings["input_ids"])
-    attention_mask = torch.tensor(input_encodings["attention_mask"])
-
-    if target:
-        target_encodings = tokenizer(
-            target,
-            max_length=max_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
-        target_ids = torch.tensor(target_encodings["input_ids"])
-        dataset = TensorDataset(input_ids, attention_mask, target_ids)
-
-    else:
-        dataset = TensorDataset(input_ids, attention_mask)
-
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle)
+    dataloader = DataLoader(dataset, shuffle=shuffle)
 
     return dataloader
 
@@ -279,9 +252,9 @@ def finetune_paraphrase_generation(args):
     # You might do a split of the train data into train/validation set here
     # in the Main function
 
-    train_data = transform_data(train_dataset, shuffle=True)
-    dev_data = transform_data(dev_dataset, shuffle=False)
-    test_data = transform_data(test_dataset, shuffle=False)
+    train_data = transform_data(train_dataset, shuffle=True, target_encoding=True)
+    dev_data = transform_data(dev_dataset, shuffle=False, target_encoding=True)
+    test_data = transform_data(test_dataset, shuffle=False, target_encoding=False)
 
     model = train_model(model, train_data, dev_data, device, tokenizer)
 
