@@ -76,9 +76,11 @@ def transform_data(
             .apply(lambda x: list(map(int, x.strip("[]").split(", "))))
             .tolist()
         )
+        print(labels)
         binary_labels = [
-            [1 if i in label else 0 for i in range(7)] for label in labels
+            [1 if i in label else 0 for i in range(1, 8)] for label in labels
         ]  # number of labels = 7
+        print(binary_labels)
     else:
         binary_labels = None
 
@@ -209,6 +211,7 @@ def evaluate_model(model, test_data, device):
             attention_mask = attention_mask.to(device)
 
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+
             predicted_labels = (outputs > 0.5).int()
 
             all_pred.append(predicted_labels)
@@ -251,7 +254,7 @@ def get_args():
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument("--use_gpu", action="store_true")
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
@@ -316,5 +319,6 @@ def finetune_paraphrase_detection(args):
 
 if __name__ == "__main__":
     args = get_args()
+    args.use_gpu = True
     seed_everything(args.seed)
     finetune_paraphrase_detection(args)
