@@ -77,7 +77,7 @@ def transform_data(
             .tolist()
         )
         binary_labels = [
-            [1 if i in label else 0 for i in range(7)] for label in labels
+            [1 if i in label else 0 for i in range(1, 8)] for label in labels
         ]  # number of labels = 7
     else:
         binary_labels = None
