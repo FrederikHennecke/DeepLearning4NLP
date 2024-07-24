@@ -31,12 +31,12 @@ def transform_data(dataset, shuffle, max_length=256, target_encoding=True):
 
     for idx, row in dataset.iterrows():
         if target_encoding:
-            input_text = row['sentence1']
+            input_text = row['sentence1'] + " SEP " + row['sentence1_segment_location'] + " SEP " + row['paraphrase_types']
             target_text = row['sentence2']
             inputs.append(input_text)
             targets.append(target_text)
         else:
-            input_text = row['sentence1']
+            input_text = row['sentence1'] + " SEP " + row['sentence1_segment_location'] + " SEP " + row['paraphrase_types']
             inputs.append(input_text)
 
     encodings = tokenizer(inputs, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
