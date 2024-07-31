@@ -1,8 +1,11 @@
+### ressources
+- ACL (NAACL)
+- use [elicit](https://elicit.com/)
+
 ## general idea:
 - pooling layers nach jedem layer
-- lr scheduler verwenden
+- lr scheduler verwenden (sofia)
 - habt ihr Lust RLHF zu implementieren
-- 
 
 ## task specific improvements
 ### sentiment specific
