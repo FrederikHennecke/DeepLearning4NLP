@@ -24,68 +24,41 @@ class BertSelfAttention(nn.Module):
         # although it is a bit unusual, we empirically observe that it yields better performance
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
-    def transform(self, x, linear_layer):
-        # the corresponding linear_layer of k, v, q are used to project the hidden_state (x)
-        bs, seq_len = x.shape[:2]
-        proj = linear_layer(x)
-        # next, we need to produce multiple heads for the proj
-        # this is done by spliting the hidden state to self.num_attention_heads, each of size self.attention_head_size
-        proj = proj.view(
-            bs, seq_len, self.num_attention_heads, self.attention_head_size
+    def transpose_for_scores(self, x):
+        new_x_shape = x.size()[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
         )
-        # by proper transpose, we have proj of [bs, num_attention_heads, seq_len, attention_head_size]
-        proj = proj.transpose(1, 2)
-        return proj
-
-    def attention(self, key, query, value, attention_mask):
-        # each attention is calculated following eq (1) of https://arxiv.org/pdf/1706.03762.pdf.
-        # attention scores are calculated by multiplying queries and keys
-        # and get back a score matrix S of [bs, num_attention_heads, seq_len, seq_len]
-        # S[*, i, j, k] represents the (unnormalized) attention score between the j-th
-        # and k-th token, given by i-th attention head before normalizing the scores,
-        # use the attention mask to mask out the padding token scores.
-
-        # Note again: in the attention_mask non-padding tokens are marked with 0 and
-        # adding tokens with a large negative number.
-
-        ### TODO
-        # raise NotImplementedError
-        # Normalize the scores.
-        # Multiply the attention scores to the value and get back V'.
-        # Next, we need to concat multi-heads and recover the original shape
-        # [bs, seq_len, num_attention_heads * attention_head_size = hidden_size].
-
-        # bs, seq_len = query.shape[:2]
-        # d_k = key.size(-1)
-        bs, num_att_heads, seq_len, att_head_size = key.size()
-        # print(f"key size: {key.size()}")
-        scores = torch.matmul(query, key.transpose(-1, -2)) / torch.sqrt(
-            torch.tensor(att_head_size, dtype=torch.float32)
-        )
-
-        scores += attention_mask
-        attention_weights = F.softmax(scores, dim=-1)
-        attention_output = (
-            torch.matmul(attention_weights, value).transpose(1, 2).contiguous()
-        )
-        attention_output = attention_output.view(bs, seq_len, -1)
-        # print(f"attention_output_shape: {attention_output.shape}")
-        return attention_output
+        x = x.view(*new_x_shape)
+        return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states, attention_mask):
-        """
-        hidden_states: [bs, seq_len, hidden_state]
-        attention_mask: [bs, 1, 1, seq_len]
-        output: [bs, seq_len, hidden_state]
-        """
-        # first, we have to generate the key, value, query for each token for multi-head attention w/ transform (more details inside the function)
-        # of *_layers are of [bs, num_attention_heads, seq_len, attention_head_size]
-        key_layer = self.transform(hidden_states, self.key)
-        value_layer = self.transform(hidden_states, self.value)
-        query_layer = self.transform(hidden_states, self.query)
-        # calculate the multi-head attention
-        attn_value = self.attention(key_layer, query_layer, value_layer, attention_mask)
-        return attn_value
+        mixed_query_layer = self.query(hidden_states)
+        mixed_key_layer = self.key(hidden_states)
+        mixed_value_layer = self.value(hidden_states)
+
+        query_layer = self.transpose_for_scores(mixed_query_layer)
+        key_layer = self.transpose_for_scores(mixed_key_layer)
+        value_layer = self.transpose_for_scores(mixed_value_layer)
+
+        # Take the dot product between "query" and "key" to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+        attention_scores = attention_scores + attention_mask
+
+        # Normalize the attention scores to probabilities.
+        attention_probs = nn.Softmax(dim=-1)(attention_scores)
+
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        attention_probs = self.dropout(attention_probs)
+
+        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        context_layer = context_layer.view(*new_context_layer_shape)
+        return context_layer
 
 
 class BertLayer(nn.Module):
@@ -188,7 +161,7 @@ class BertModel(BertPreTrainedModel):
         self.word_embedding = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
         )
-        self.pos_embedding = nn.Embedding(
+        self.position_embedding = nn.Embedding(
             config.max_position_embeddings, config.hidden_size
         )
         self.tk_type_embedding = nn.Embedding(
@@ -218,17 +191,15 @@ class BertModel(BertPreTrainedModel):
         seq_length = input_shape[1]
 
         # Get word embedding from self.word_embedding into input_embeds.
-        input_embeds = self.word_embedding(input_ids)
-        # print(f"input_embeds_shape: {input_embeds.shape}")
+        word_embeds = self.word_embedding(input_ids)
 
         ### TODO
         # raise NotImplementedError
-
         # Get position index and position embedding from self.pos_embedding into pos_embeds.
-        pos_ids = self.position_ids[:, :seq_length]
 
+        pos_ids = self.position_ids[:, :seq_length]
         pos_embeds = self.pos_embedding(pos_ids)
-        # print(f"pos_embeds_shape: {pos_embeds.shape}")
+
         ### TODO
         # raise NotImplementedError
         # Get token type ids, since we are not considering token type,
@@ -237,16 +208,15 @@ class BertModel(BertPreTrainedModel):
             input_shape, dtype=torch.long, device=input_ids.device
         )
         tk_type_embeds = self.tk_type_embedding(tk_type_ids)
-        # print(f"tk_type_embeds_shape: {tk_type_embeds.shape}")
 
         ### TODO
         # raise NotImplementedError
         # Add three embeddings together; then apply embed_layer_norm and dropout and
         # return the hidden states.
-        embeds = input_embeds + pos_embeds + tk_type_embeds
+
+        embeds = word_embeds + pos_embeds + tk_type_embeds
         embeds = self.embed_layer_norm(embeds)
         embeds = self.embed_dropout(embeds)
-        # print(f"embeds_shape: {embeds.shape}")
         return embeds
 
     def encode(self, hidden_states, attention_mask):
@@ -262,12 +232,20 @@ class BertModel(BertPreTrainedModel):
         )
 
         # pass the hidden states through the encoder layers
+        all_hidden_states = []
         for i, layer_module in enumerate(self.bert_layers):
             # feed the encoding from the last bert_layer to the next
             hidden_states = layer_module(hidden_states, extended_attention_mask)
-        # print(f"hidden_states_shape: {hidden_states.shape}")
+            all_hidden_states.append(hidden_states)
+        return all_hidden_states
 
-        return hidden_states
+    def first_token(self, input_sequence):
+        # get cls token hidden state
+
+        first_tk = input_sequence[:, 0]
+        pooled_output = self.pooler_dense(first_tk)
+        pooled_output = self.pooler_af(pooled_output)
+        return pooled_output
 
     def forward(self, input_ids, attention_mask):
         """
@@ -278,12 +256,46 @@ class BertModel(BertPreTrainedModel):
         embedding_output = self.embed(input_ids=input_ids)
 
         # feed to a transformer (a stack of BertLayers)
-        sequence_output = self.encode(embedding_output, attention_mask=attention_mask)
-
-        # get cls token hidden state
-        first_tk = sequence_output[:, 0]
-        first_tk = self.pooler_dense(first_tk)
-        first_tk = self.pooler_af(first_tk)
-        # print(f"first_tk_shape: {first_tk.shape}")
-
-        return {"last_hidden_state": sequence_output, "pooler_output": first_tk}
+        all_encoded_layers = self.encode(
+            embedding_output, attention_mask=attention_mask
+        )
+        last_hidden_state = all_encoded_layers[-1]
+        pooler_output = self.first_token(last_hidden_state)
+        sequence_output2 = all_encoded_layers[-2]
+        pooled_output2 = self.first_token(sequence_output2)
+        sequence_output3 = all_encoded_layers[-3]
+        pooled_output3 = self.first_token(sequence_output3)
+        sequence_output4 = all_encoded_layers[-4]
+        pooled_output4 = self.first_token(sequence_output4)
+        sequence_output5 = all_encoded_layers[-5]
+        pooled_output5 = self.first_token(sequence_output5)
+        sequence_output6 = all_encoded_layers[-6]
+        pooled_output6 = self.first_token(sequence_output6)
+        sequence_output7 = all_encoded_layers[-7]
+        pooled_output7 = self.first_token(sequence_output7)
+        sequence_output8 = all_encoded_layers[-8]
+        pooled_output8 = self.first_token(sequence_output8)
+        sequence_output9 = all_encoded_layers[-9]
+        pooled_output9 = self.first_token(sequence_output9)
+        sequence_output10 = all_encoded_layers[-10]
+        pooled_output10 = self.first_token(sequence_output10)
+        sequence_output11 = all_encoded_layers[-11]
+        pooled_output11 = self.first_token(sequence_output11)
+        sequence_output12 = all_encoded_layers[-12]
+        pooled_output12 = self.first_token(sequence_output12)
+        return {
+            "all_encoded_layers": all_encoded_layers,
+            "last_hidden_state": last_hidden_state,
+            "pooler_output": pooler_output,
+            "pooled_output2": pooled_output2,
+            "pooled_output3": pooled_output3,
+            "pooled_output4": pooled_output4,
+            "pooled_output5": pooled_output5,
+            "pooled_output6": pooled_output6,
+            "pooled_output7": pooled_output7,
+            "pooled_output8": pooled_output8,
+            "pooled_output9": pooled_output9,
+            "pooled_output10": pooled_output10,
+            "pooled_output11": pooled_output11,
+            "pooled_output12": pooled_output12,
+        }

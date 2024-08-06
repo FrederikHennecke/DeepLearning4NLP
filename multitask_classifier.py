@@ -26,7 +26,6 @@ import csv
 import pandas as pd
 from pathlib import Path
 
-
 TQDM_DISABLE = True
 
 
@@ -43,6 +42,7 @@ def seed_everything(seed=11711):
 
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
+N_PARAPHRASE_TYPES = 7
 
 
 class MultitaskBERT(nn.Module):
@@ -55,7 +55,7 @@ class MultitaskBERT(nn.Module):
     (- Paraphrase type detection (predict_paraphrase_types))
     """
 
-    def __init__(self, config):
+    def __init__(self, config, train_mode=None, layers=None, pooling=None):
         super(MultitaskBERT, self).__init__()
 
         # You will want to add layers here to perform the downstream tasks.
@@ -68,17 +68,44 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = False
             elif config.option == "finetune":
                 param.requires_grad = True
+
         ### TODO
         # raise NotImplementedError
-        self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        if layers is None or layers[0] == -2:
+            self.layers = []
+        elif layers[0] == -1:
+            self.layers = [i for i in range(config.num_hidden_layers)]
+        else:
+            self.layers = layers
+        self.sentiment_classifier = nn.Linear(
+            config.hidden_size
+            * max(1, len(self.layers) if self.pooling is None else 1),
+            N_SENTIMENT_CLASSES,
+        )
+
+        # self.sentiment_classifier = nn.Linear(config.hidden_size, N_SENTIMENT_CLASSES)
+
         self.paraphrase_classifier = nn.Linear(
-            3 * BERT_HIDDEN_SIZE, 1
+            3 * config.hidden_size, 1
         )  # WARN Not needed anymore
-        self.similarity_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
-        self.paraphrase_type_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 7)
+        self.similarity_classifier = nn.Linear(3 * config.hidden_size, 1)
+        self.paraphrase_type_classifier = nn.Linear(
+            3 * config.hidden_size, N_PARAPHRASE_TYPES
+        )
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.pooling = pooling
+        self.train_mode = train_mode
+
+        # add more layers before the classifier
+        self.hidden_dim = 128
+        self.attn_heads = 1
+
+        self.linear_first = torch.nn.Linear(config.hidden_size, self.hidden_dim)
+        self.linear_first.bias.data.fill_(0)
+        self.linear_second = torch.nn.Linear(self.hidden_dim, self.attn_heads)
+        self.linear_second.bias.data.fill_(0)
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
@@ -91,8 +118,85 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         output = self.bert(input_ids, attention_mask)
-        # print(output)
-        pooled_output = self.dropout(output["pooler_output"])
+
+        if self.train_mode == "all_layers":
+            pooled_output = self.dropout(output["pooler_output"]).unsqueeze(0)
+            pooled_output2 = self.dropout(output["pooler_output2"]).unsqueeze(0)
+            pooled_output3 = self.dropout(output["pooler_output3"]).unsqueeze(0)
+            pooled_output4 = self.dropout(output["pooler_output4"]).unsqueeze(0)
+            pooled_output5 = self.dropout(output["pooler_output5"]).unsqueeze(0)
+            pooled_output6 = self.dropout(output["pooler_output6"]).unsqueeze(0)
+            pooled_output7 = self.dropout(output["pooler_output7"]).unsqueeze(0)
+            pooled_output8 = self.dropout(output["pooler_output8"]).unsqueeze(0)
+            pooled_output9 = self.dropout(output["pooler_output9"]).unsqueeze(0)
+            pooled_output10 = self.dropout(output["pooler_output10"]).unsqueeze(0)
+            pooled_output11 = self.dropout(output["pooler_output11"]).unsqueeze(0)
+            pooled_output12 = self.dropout(output["pooler_output12"]).unsqueeze(
+                0
+            )  # 12, batchsize, hidden_dim
+            pooled_output = torch.cat(
+                (
+                    pooled_output,
+                    pooled_output2,
+                    pooled_output3,
+                    pooled_output4,
+                    pooled_output5,
+                    pooled_output6,
+                    pooled_output7,
+                    pooled_output8,
+                    pooled_output9,
+                    pooled_output10,
+                    pooled_output11,
+                    pooled_output12,
+                ),
+                0,
+            )
+
+            seq_len, batch_size, hidden_dim = pooled_output.size()
+            add_layer = self.linear_first(
+                pooled_output
+            )  # seq_len. batchsize. hidden_dim
+            add_layer = F.tanh(add_layer)
+            add_layer = self.linear_second(add_layer)
+            add_layer = F.softmax(add_layer, dim=0)
+
+            b = []
+            y = []
+            for i in range(self.attn_heads):
+                b.append(add_layer[:, :, i])
+                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
+                y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
+            pooled_output = torch.cat(y, 1)  # batchsize, hidden_dim*heads
+
+        elif self.train_mode == "last_layer":
+            pooled_output = output["pooler_output"]
+            pooled_output = self.dropout(pooled_output)
+
+        elif self.train_mode == "single_layer":
+            all_encoded_layers = output["all_encoded_layers"]
+            pooled_output = output["pooler_output"]
+
+            if len(self.layers) > 0:
+                hidden_state = []
+                for l in self.layers:
+                    hidden_state.append(all_encoded_layers[l][:, 0].unsqueeze(1))
+                hidden_state = torch.cat(hidden_state, dim=1)
+
+                if self.pooling == "max":
+                    hidden_state, _ = torch.max(hidden_state, dim=1)
+                elif self.pooling == "mean":
+                    hidden_state = torch.mean(hidden_state, dim=1)
+                else:
+                    hidden_state = hidden_state.view(hidden_state.size(0), -1)
+
+                pooled_output = self.dropout(hidden_state)
+
+            else:
+                pooled_output = self.dropout(pooled_output)
+
+        else:
+            raise ValueError("Invalid train mode")
+
         return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
@@ -105,8 +209,8 @@ class MultitaskBERT(nn.Module):
         """
         ### TODO
         # raise NotImplementedError
-        embeddings = self.forward(input_ids, attention_mask)
-        sentiment_logits = self.sentiment_classifier(embeddings)
+        pooled_output = self.forward(input_ids, attention_mask)
+        sentiment_logits = self.sentiment_classifier(pooled_output)
         return sentiment_logits
 
     def predict_paraphrase(
@@ -530,7 +634,6 @@ def etpc_split(args):
     file_path = args.etpc_dev
     file = Path(file_path)
     if file.exists():
-        # pass
         print("etpc data already split into train and dev sets.")
         return None
 
