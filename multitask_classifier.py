@@ -408,7 +408,7 @@ def train_multitask(args):
     print(pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)}))
     print(separator)
 
-    model = MultitaskBERT(config)
+    model = MultitaskBERT(config, args.train_mode, args.layers, args.pooling_type)
     model = model.to(device)
 
     lr = args.lr
@@ -818,6 +818,29 @@ def get_args():
         default=1e-3 if args.option == "pretrain" else 1e-5,
     )
     parser.add_argument("--local_files_only", action="store_true")
+
+    parser.add_argument(
+        "--layers",
+        type=int,
+        nargs="+",
+        default=[-2],
+        help="choose the layers that used for downstream tasks, "
+        "-2 means use pooled output, -1 means all layer,"
+        "else means the detail layers. default is -2",
+    )
+
+    parser.add_argument(
+        "--pooling_type", default=None, type=str, choices=[None, "mean", "max"]
+    )
+
+    parser.add_argument(
+        "--train_mode",
+        default="last_layer",
+        type=str,
+        choices=["last_layer", "all_layers", "single_layer"],
+        help="choose the training mode, last_layer: only train the last layer,"
+        "all_layers: train all layers, single_layer: train the specified layers",
+    )
 
     args = parser.parse_args()
     return args
