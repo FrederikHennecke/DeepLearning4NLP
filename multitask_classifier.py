@@ -41,6 +41,7 @@ def seed_everything(seed=11711):
 
 
 BERT_HIDDEN_SIZE = 768
+N_HIDDEN_LAYERS = 12
 N_SENTIMENT_CLASSES = 5
 N_PARAPHRASE_TYPES = 7
 
@@ -63,6 +64,11 @@ class MultitaskBERT(nn.Module):
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
+        # Dropout for regularization
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.pooling = pooling
+        self.train_mode = train_mode
+
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
@@ -71,9 +77,9 @@ class MultitaskBERT(nn.Module):
 
         ### TODO
         # raise NotImplementedError
-        if layers is None or layers[0] == -2:
+        if layers is None or layers[0] == -2 or self.train_mode == "last_layer":
             self.layers = []
-        elif layers[0] == -1:
+        elif layers[0] == -1 or self.train_mode == "all_layers":
             self.layers = [i for i in range(config.num_hidden_layers)]
         else:
             self.layers = layers
@@ -121,20 +127,20 @@ class MultitaskBERT(nn.Module):
 
         if self.train_mode == "all_layers":
             pooled_output = self.dropout(output["pooler_output"]).unsqueeze(0)
-            pooled_output2 = self.dropout(output["pooler_output2"]).unsqueeze(0)
-            pooled_output3 = self.dropout(output["pooler_output3"]).unsqueeze(0)
-            pooled_output4 = self.dropout(output["pooler_output4"]).unsqueeze(0)
-            pooled_output5 = self.dropout(output["pooler_output5"]).unsqueeze(0)
-            pooled_output6 = self.dropout(output["pooler_output6"]).unsqueeze(0)
-            pooled_output7 = self.dropout(output["pooler_output7"]).unsqueeze(0)
-            pooled_output8 = self.dropout(output["pooler_output8"]).unsqueeze(0)
-            pooled_output9 = self.dropout(output["pooler_output9"]).unsqueeze(0)
-            pooled_output10 = self.dropout(output["pooler_output10"]).unsqueeze(0)
-            pooled_output11 = self.dropout(output["pooler_output11"]).unsqueeze(0)
-            pooled_output12 = self.dropout(output["pooler_output12"]).unsqueeze(
+            pooled_output2 = self.dropout(output["pooled_output2"]).unsqueeze(0)
+            pooled_output3 = self.dropout(output["pooled_output3"]).unsqueeze(0)
+            pooled_output4 = self.dropout(output["pooled_output4"]).unsqueeze(0)
+            pooled_output5 = self.dropout(output["pooled_output5"]).unsqueeze(0)
+            pooled_output6 = self.dropout(output["pooled_output6"]).unsqueeze(0)
+            pooled_output7 = self.dropout(output["pooled_output7"]).unsqueeze(0)
+            pooled_output8 = self.dropout(output["pooled_output8"]).unsqueeze(0)
+            pooled_output9 = self.dropout(output["pooled_output9"]).unsqueeze(0)
+            pooled_output10 = self.dropout(output["pooled_output10"]).unsqueeze(0)
+            pooled_output11 = self.dropout(output["pooled_output11"]).unsqueeze(0)
+            pooled_output12 = self.dropout(output["pooled_output12"]).unsqueeze(
                 0
             )  # 12, batchsize, hidden_dim
-            pooled_output = torch.cat(
+            hidden_state = torch.cat(
                 (
                     pooled_output,
                     pooled_output2,
@@ -152,7 +158,9 @@ class MultitaskBERT(nn.Module):
                 0,
             )
 
-            seq_len, batch_size, hidden_dim = pooled_output.size()
+            seq_len, batch_size, hidden_dim = hidden_state.size()
+            pooled_output = self.dropout(hidden_state)
+
             add_layer = self.linear_first(
                 pooled_output
             )  # seq_len. batchsize. hidden_dim
@@ -166,36 +174,26 @@ class MultitaskBERT(nn.Module):
                 b.append(add_layer[:, :, i])
                 b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
                 y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
-            pooled_output = torch.cat(y, 1)  # batchsize, hidden_dim*heads
-
-        elif self.train_mode == "last_layer":
-            pooled_output = output["pooler_output"]
-            pooled_output = self.dropout(pooled_output)
+            hidden_state = torch.cat(y, 1)  # batchsize, hidden_dim*heads
 
         elif self.train_mode == "single_layer":
             all_encoded_layers = output["all_encoded_layers"]
-            pooled_output = output["pooler_output"]
-
-            if len(self.layers) > 0:
+            if len(self.layers) > 0 and ([-1, -2] not in self.layers):
                 hidden_state = []
                 for l in self.layers:
                     hidden_state.append(all_encoded_layers[l][:, 0].unsqueeze(1))
                 hidden_state = torch.cat(hidden_state, dim=1)
 
-                if self.pooling == "max":
-                    hidden_state, _ = torch.max(hidden_state, dim=1)
-                elif self.pooling == "mean":
-                    hidden_state = torch.mean(hidden_state, dim=1)
-                else:
-                    hidden_state = hidden_state.view(hidden_state.size(0), -1)
+        elif self.train_mode == "last_layer":
+            hidden_state = output["pooler_output"]
 
-                pooled_output = self.dropout(hidden_state)
-
-            else:
-                pooled_output = self.dropout(pooled_output)
-
+        if self.pooling == "max":
+            pooled_output, _ = torch.max(hidden_state, dim=1)
+        elif self.pooling == "mean":
+            pooled_output = torch.mean(hidden_state, dim=1)
         else:
-            raise ValueError("Invalid train mode")
+            pooled_output = hidden_state
+            # pooled_output = hidden_state.view(hidden_state.size(0), -1)
 
         return pooled_output
 
@@ -284,6 +282,7 @@ def save_model(model, optimizer, args, config, filepath):
         "numpy_rng": np.random.get_state(),
         "torch_rng": torch.random.get_rng_state(),
     }
+    # print(f'save info: {save_info}')
 
     torch.save(save_info, filepath)
     print(f"Saving the model to {filepath}.")
@@ -397,6 +396,7 @@ def train_multitask(args):
         "data_dir": ".",
         "option": args.option,
         "local_files_only": args.local_files_only,
+        "num_hidden_layers": N_HIDDEN_LAYERS,
     }
 
     config = SimpleNamespace(**config)
@@ -611,8 +611,8 @@ def train_multitask(args):
             f"Epoch {epoch+1:02} ({args.task}): train loss :: {train_loss:.3f}, train :: {train_acc:.3f}, dev :: {dev_acc:.3f}"
         )
 
-        # if dev_acc > best_dev_acc:
-        #     best_dev_acc = dev_acc
+        if dev_acc > best_dev_acc:
+            best_dev_acc = dev_acc
         save_model(model, optimizer, args, config, args.filepath)
 
 
@@ -622,7 +622,7 @@ def test_model(args):
         saved = torch.load(args.filepath)
         config = saved["model_config"]
 
-        model = MultitaskBERT(config)
+        model = MultitaskBERT(config, args.train_mode, args.layers, args.pooling_type)
         model.load_state_dict(saved["model"])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
@@ -810,7 +810,7 @@ def get_args():
     parser.add_argument(
         "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64
     )
-    parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
         "--lr",
         type=float,
@@ -830,7 +830,7 @@ def get_args():
     )
 
     parser.add_argument(
-        "--pooling_type", default=None, type=str, choices=[None, "mean", "max"]
+        "--pooling_type", default=None, type=str, choices=["None", "mean", "max"]
     )
 
     parser.add_argument(
