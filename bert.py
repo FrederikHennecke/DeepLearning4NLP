@@ -161,7 +161,7 @@ class BertModel(BertPreTrainedModel):
         self.word_embedding = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
         )
-        self.position_embedding = nn.Embedding(
+        self.pos_embedding = nn.Embedding(
             config.max_position_embeddings, config.hidden_size
         )
         self.tk_type_embedding = nn.Embedding(

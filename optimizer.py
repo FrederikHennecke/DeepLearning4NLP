@@ -53,7 +53,7 @@ class AdamW(Optimizer):
         schedule="warmup_linear",
         b1=0.9,
         b2=0.999,
-        e=1e-6,
+        e=1e-8,
         weight_decay=0.01,
         max_grad_norm=1.0,
         correct_bias=True,
