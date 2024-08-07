@@ -119,6 +119,7 @@ def train_model(model, train_data, dev_data, device):
 
     model = model.to(device)
     optimizer = AdamW(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.1, epochs=args.epochs) # steps_per_epoch=args.lr_steps
     loss_fun = nn.BCEWithLogitsLoss()
 
     # Run for the specified number of epochs
@@ -142,6 +143,7 @@ def train_model(model, train_data, dev_data, device):
             loss = loss_fun(logits, b_labels.float())
             loss.backward()
             optimizer.step()
+            # scheduler.step() if used with the number of steps in a scheduler like OneCycleLR
 
             train_loss += loss.item()
             num_batches += 1
@@ -157,6 +159,7 @@ def train_model(model, train_data, dev_data, device):
         print(
             f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f}"
         )
+        scheduler.step()
 
     return model
 
@@ -255,6 +258,7 @@ def get_args():
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-5)
+    # parser.add_argument("--lr_steps", type=int, default=10)
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
     )
