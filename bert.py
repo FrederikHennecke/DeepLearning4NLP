@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 from base_bert import BertPreTrainedModel
 from utils import get_extended_attention_mask
+import spacy
+from tokenizer import BertTokenizer
 
 
 class BertSelfAttention(nn.Module):
@@ -156,7 +158,9 @@ class BertModel(BertPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-
+        self.tokenizer = BertTokenizer.from_pretrained(
+            "bert-base-uncased", local_files_only=True
+        )
         # embedding
         self.word_embedding = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
@@ -184,9 +188,17 @@ class BertModel(BertPreTrainedModel):
         self.pooler_dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_af = nn.Tanh()
 
+        # initialize parameters for more input features
+        spacy.prefer_gpu()
+        self.nlp = spacy.load("en_core_web_sm")
+        ner_tags = self.nlp.get_pipe("ner").labels
+        pos_tags = self.nlp.get_pipe("tagger").labels
+        self.ner_tag_embedding = nn.Embedding(len(ner_tags) + 1, config.hidden_size)
+        self.pos_tag_embedding = nn.Embedding(len(pos_tags) + 1, config.hidden_size)
+
         self.init_weights()
 
-    def embed(self, input_ids):
+    def embed(self, input_ids, additional_input=False):
         input_shape = input_ids.size()
         seq_length = input_shape[1]
 
@@ -214,10 +226,47 @@ class BertModel(BertPreTrainedModel):
         # Add three embeddings together; then apply embed_layer_norm and dropout and
         # return the hidden states.
 
-        embeds = word_embeds + pos_embeds + tk_type_embeds
-        embeds = self.embed_layer_norm(embeds)
-        embeds = self.embed_dropout(embeds)
-        return embeds
+        if additional_input:
+            # get the pos and ner tags
+            ids_to_tokens = [
+                self.tokenizer.convert_ids_to_tokens(sequence_id)
+                for sequence_id in input_ids
+            ]
+            ids_to_tokens = [
+                token
+                for token in ids_to_tokens
+                if token not in ["[PAD]", "[CLS]", "[SEP]"]
+            ]
+            input_text = [
+                self.tokenizer.convert_tokens_to_string(id_to_token)
+                for id_to_token in ids_to_tokens
+            ]
+            docs = list(self.nlp.pipe(input_text))
+            pos_tags_ids = torch.tensor(
+                [[token.pos_ for token in doc] for doc in docs],
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+            ner_tags_ids = torch.tensor(
+                [[token.ent_type_ for token in doc] for doc in docs],
+                dtype=torch.long,
+                device=input_ids.device,
+            )
+            pos_tag_embeds = self.pos_tag_embedding(pos_tags_ids)
+            ner_tag_embeds = self.ner_tag_embedding(ner_tags_ids)
+            embeds = (
+                word_embeds
+                + pos_embeds
+                + tk_type_embeds
+                + pos_tag_embeds
+                + ner_tag_embeds
+            )
+        else:
+            embeds = word_embeds + pos_embeds + tk_type_embeds
+
+        output_embeds = self.embed_layer_norm(embeds)
+        output_embeds = self.embed_dropout(output_embeds)
+        return output_embeds
 
     def encode(self, hidden_states, attention_mask):
         """
@@ -247,13 +296,15 @@ class BertModel(BertPreTrainedModel):
         pooled_output = self.pooler_af(pooled_output)
         return pooled_output
 
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, additional_input=False):
         """
         input_ids: [batch_size, seq_len], seq_len is the max length of the batch
         attention_mask: same size as input_ids, 1 represents non-padding tokens, 0 represents padding tokens
         """
         # get the embedding for each input token
-        embedding_output = self.embed(input_ids=input_ids)
+        embedding_output = self.embed(
+            input_ids=input_ids, additional_input=additional_input
+        )
 
         # feed to a transformer (a stack of BertLayers)
         all_encoded_layers = self.encode(

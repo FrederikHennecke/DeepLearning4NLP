@@ -22,6 +22,7 @@ from datasets import (
 )
 from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW
+from transformers import get_linear_schedule_with_warmup
 import csv
 import pandas as pd
 from pathlib import Path
@@ -46,6 +47,35 @@ N_SENTIMENT_CLASSES = 5
 N_PARAPHRASE_TYPES = 7
 
 
+class AttentionLayer(nn.Module):
+    def __init__(self, hidden_size):
+        super(AttentionLayer, self).__init__()
+        self.hidden_size = hidden_size
+        self.attention = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.Tanh(),
+            nn.Linear(hidden_size, 1, bias=False),
+        )
+
+    def forward(self, encoder_outputs):
+        # encoder_outputs: [batch_size, seq_len, hidden_size]
+        seq_len = encoder_outputs.size(1)
+        # repeat the encoder_outputs to match the shape of the attention weights
+        encoder_outputs = encoder_outputs.repeat(1, 1, self.hidden_size).view(
+            -1, self.hidden_size
+        )
+        # calculate the attention weights
+        attention_weights = self.attention(encoder_outputs).view(-1, seq_len)
+        # apply softmax to the attention weights
+        attention_weights = torch.softmax(attention_weights, dim=1)
+        # calculate the context vector
+        context_vector = torch.bmm(
+            attention_weights.unsqueeze(1),
+            encoder_outputs.view(-1, seq_len, self.hidden_size),
+        )
+        return context_vector
+
+
 class MultitaskBERT(nn.Module):
     """
     This module should use BERT for these tasks:
@@ -64,6 +94,7 @@ class MultitaskBERT(nn.Module):
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
+        self.additional_inputs = config.additional_inputs
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.pooling = pooling
@@ -83,11 +114,6 @@ class MultitaskBERT(nn.Module):
             self.layers = [i for i in range(config.num_hidden_layers)]
         else:
             self.layers = layers
-        self.sentiment_classifier = nn.Linear(
-            config.hidden_size
-            * max(1, len(self.layers) if self.pooling is None else 1),
-            N_SENTIMENT_CLASSES,
-        )
 
         # self.sentiment_classifier = nn.Linear(config.hidden_size, N_SENTIMENT_CLASSES)
 
@@ -107,11 +133,16 @@ class MultitaskBERT(nn.Module):
         # add more layers before the classifier
         self.hidden_dim = 128
         self.attn_heads = 1
+        self.attention_layer = AttentionLayer(config.hidden_size)
 
-        self.linear_first = torch.nn.Linear(config.hidden_size, self.hidden_dim)
-        self.linear_first.bias.data.fill_(0)
-        self.linear_second = torch.nn.Linear(self.hidden_dim, self.attn_heads)
-        self.linear_second.bias.data.fill_(0)
+        self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.sentiment_linear1 = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.sentiment_linear2 = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.sentiment_classifier = nn.Linear(
+            config.hidden_size
+            * max(1, len(self.layers) if self.pooling is None else 1),
+            N_SENTIMENT_CLASSES,
+        )
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
@@ -123,7 +154,7 @@ class MultitaskBERT(nn.Module):
         # (e.g., by adding other layers).
         ### TODO
         # raise NotImplementedError
-        output = self.bert(input_ids, attention_mask)
+        output = self.bert(input_ids, attention_mask, self.additional_inputs)
 
         if self.train_mode == "all_layers":
             pooled_output = self.dropout(output["pooler_output"]).unsqueeze(0)
@@ -158,23 +189,23 @@ class MultitaskBERT(nn.Module):
                 0,
             )
 
-            seq_len, batch_size, hidden_dim = hidden_state.size()
-            pooled_output = self.dropout(hidden_state)
+            # seq_len, batch_size, hidden_dim = hidden_state.size()
+            # pooled_output = self.dropout(hidden_state)
 
-            add_layer = self.linear_first(
-                pooled_output
-            )  # seq_len. batchsize. hidden_dim
-            add_layer = F.tanh(add_layer)
-            add_layer = self.linear_second(add_layer)
-            add_layer = F.softmax(add_layer, dim=0)
+            # add_layer = self.linear_first(
+            #     pooled_output
+            # )  # seq_len. batchsize. hidden_dim
+            # add_layer = F.tanh(add_layer)
+            # add_layer = self.linear_second(add_layer)
+            # add_layer = F.softmax(add_layer, dim=0)
 
-            b = []
-            y = []
-            for i in range(self.attn_heads):
-                b.append(add_layer[:, :, i])
-                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
-                y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
-            hidden_state = torch.cat(y, 1)  # batchsize, hidden_dim*heads
+            # b = []
+            # y = []
+            # for i in range(self.attn_heads):
+            #     b.append(add_layer[:, :, i])
+            #     b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
+            #     y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
+            # hidden_state = torch.cat(y, 1)  # batchsize, hidden_dim*heads
 
         elif self.train_mode == "single_layer":
             all_encoded_layers = output["all_encoded_layers"]
@@ -187,15 +218,16 @@ class MultitaskBERT(nn.Module):
         elif self.train_mode == "last_layer":
             hidden_state = output["pooler_output"]
 
+        if self.pooling == None:
+            pooled_output = hidden_state.view(hidden_state.size(0), -1)
         if self.pooling == "max":
             pooled_output, _ = torch.max(hidden_state, dim=1)
         elif self.pooling == "mean":
             pooled_output = torch.mean(hidden_state, dim=1)
-        else:
-            pooled_output = hidden_state
-            # pooled_output = hidden_state.view(hidden_state.size(0), -1)
 
-        return pooled_output
+        attention_results = AttentionLayer(pooled_output)
+        # pooled_output = self.dropout(pooled_output)
+        return attention_results
 
     def predict_sentiment(self, input_ids, attention_mask):
         """
@@ -208,6 +240,9 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         pooled_output = self.forward(input_ids, attention_mask)
+        sentiment_logits = F.relu(self.sentiment_linear(pooled_output))
+        sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
+        sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
         sentiment_logits = self.sentiment_classifier(pooled_output)
         return sentiment_logits
 
@@ -397,6 +432,10 @@ def train_multitask(args):
         "option": args.option,
         "local_files_only": args.local_files_only,
         "num_hidden_layers": N_HIDDEN_LAYERS,
+        "additional_inputs": args.additional_inputs,
+        "train_mode": args.train_mode,
+        "optimizer": args.optimizer,
+        "scheduler": args.scheduler,
     }
 
     config = SimpleNamespace(**config)
@@ -412,7 +451,20 @@ def train_multitask(args):
     model = model.to(device)
 
     lr = args.lr
-    optimizer = AdamW(model.parameters(), lr=lr)
+    if args.optimizer == "AdamW":
+        optimizer = AdamW(model.parameters(), lr=args.lr, eps=1e-8, weight_decay=0.01)
+    else:
+        raise ValueError(f"Optimizer {args.optimizer} not supported")
+
+    if args.scheduler == "linear_warmup":
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=0,
+            num_training_steps=len(sst_train_dataloader) * args.epochs,
+        )
+    else:
+        scheduler = None
+
     best_dev_acc = float("-inf")
 
     # Run for the specified number of epochs
@@ -441,7 +493,12 @@ def train_multitask(args):
                 logits = model.predict_sentiment(b_ids, b_mask)
                 loss = F.cross_entropy(logits, b_labels.view(-1))
                 loss.backward()
+
+                # Clip the norm of the gradients to 1.0 to prevent "exploding gradients"
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
                 optimizer.step()
+                scheduler.step()
 
                 train_loss += loss.item()
                 num_batches += 1
@@ -808,14 +865,14 @@ def get_args():
 
     # Hyperparameters
     parser.add_argument(
-        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64
+        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=32
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
         "--lr",
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
-        default=1e-3 if args.option == "pretrain" else 1e-5,
+        default=1e-3 if args.option == "pretrain" else 2e-5,
     )
     parser.add_argument("--local_files_only", action="store_true")
 
@@ -840,6 +897,26 @@ def get_args():
         choices=["last_layer", "all_layers", "single_layer"],
         help="choose the training mode, last_layer: only train the last layer,"
         "all_layers: train all layers, single_layer: train the specified layers",
+    )
+    parser.add_argument(
+        "--optimizer",
+        default="AdamW",
+        type=str,
+        choices=["AdamW"],
+        help="choose the optimizer",
+    )
+    parser.add_argument(
+        "--scheduler",
+        default="linear_warmup",
+        type=str,
+        choices=["linear_warmup", "None"],
+        help="choose the scheduler",
+    )
+    parser.add_argument(
+        "--additional_inputs",
+        type=bool,
+        default=True,
+        help="feed more features to the model",
     )
 
     args = parser.parse_args()
