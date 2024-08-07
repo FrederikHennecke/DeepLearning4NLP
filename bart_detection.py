@@ -11,6 +11,7 @@ from transformers import AutoTokenizer, BartModel
 from multitask_classifier import split_csv
 
 from optimizer import AdamW
+from sophia import SophiaG
 from datasets import preprocess_string
 
 TQDM_DISABLE = False
@@ -118,8 +119,9 @@ def train_model(model, train_data, dev_data, device):
     # raise NotImplementedError
 
     model = model.to(device)
-    optimizer = AdamW(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.1, epochs=args.epochs) # steps_per_epoch=args.lr_steps
+    optimizer = SophiaG(model.parameters(), lr=args.lr, betas=(0.965, 0.99), rho=0.01, weight_decay=1e-1)
+    k = 10
+    iterm_num = -1
     loss_fun = nn.BCEWithLogitsLoss()
 
     # Run for the specified number of epochs
@@ -138,11 +140,13 @@ def train_model(model, train_data, dev_data, device):
             b_mask = b_mask.to(device)
             b_labels = b_labels.to(device)
 
-            optimizer.zero_grad()
+            
             logits = model(b_ids, b_mask)
             loss = loss_fun(logits, b_labels.float())
             loss.backward()
-            optimizer.step()
+            optimizer.step(bs=args.batch_size)
+            optimizer.zero_grad(set_to_none=True)
+            iterm_num += 1
             # scheduler.step() if used with the number of steps in a scheduler like OneCycleLR
 
             train_loss += loss.item()
@@ -153,13 +157,24 @@ def train_model(model, train_data, dev_data, device):
             preds = logits.round()
             correct_preds += (preds == b_labels).sum().item()
 
+            if iter_num % k != k - 1:
+                continue
+            else:
+                # update hessian EMA
+                samp_dist = torch.distributions.Categorical(logits=logits)
+                y_sample = samp_dist.sample()
+                loss_sampled = loss_fun(logits.view(-1, logits.size(-1)), y_sample.view(-1), ignore_index=-1)
+                loss_sampled.backward()
+                optimizer.update_hessian()
+                optimizer.zero_grad(set_to_none=True)
+                model.zero_grad()
+
         avg_train_loss = train_loss / num_batches
         train_accuracy = correct_preds / total_examples
         dev_accuracy = evaluate_model(model, dev_data, device)
         print(
             f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f}"
         )
-        scheduler.step()
 
     return model
 
