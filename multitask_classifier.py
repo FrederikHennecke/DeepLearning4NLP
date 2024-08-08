@@ -531,7 +531,7 @@ def get_args():
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
     split_csv()
-    
+
     parser.add_argument("--etpc_train", type=str, default="data/etpc-paraphrase-train.csv")
     parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
     parser.add_argument(
@@ -633,7 +633,7 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     # create the folder before starting this script
-    args.filepath = f"models/{args.option}-{args.epochs}-{args.lr}-{args.task}.pt"  # save path
+    args.filepath = f"models1/{args.option}-{args.epochs}-{args.lr}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
     train_multitask(args)
     test_model(args)
