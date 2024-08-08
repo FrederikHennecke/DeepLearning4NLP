@@ -33,7 +33,13 @@ TQDM_DISABLE = True
 
 # Perform model evaluation
 def model_eval_multitask(
-    sst_dataloader, quora_dataloader, sts_dataloader, etpc_dataloader, model, device, task
+    sst_dataloader,
+    quora_dataloader,
+    sts_dataloader,
+    etpc_dataloader,
+    model,
+    device,
+    task,
 ):
     model.eval()  # switch to eval model, will turn off randomness like dropout
 
@@ -44,7 +50,9 @@ def model_eval_multitask(
 
         # Evaluate paraphrase detection.
         if task == "qqp" or task == "multitask":
-            for step, batch in enumerate(tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_labels, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -78,7 +86,9 @@ def model_eval_multitask(
 
         # Evaluate semantic textual similarity.
         if task == "sts" or task == "multitask":
-            for step, batch in enumerate(tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_labels, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -113,7 +123,9 @@ def model_eval_multitask(
 
         # Evaluate sentiment classification.
         if task == "sst" or task == "multitask":
-            for step, batch in enumerate(tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 b_ids, b_mask, b_labels, b_sent_ids = (
                     batch["token_ids"],
                     batch["attention_mask"],
@@ -143,7 +155,9 @@ def model_eval_multitask(
 
         # Evaluate paraphrase type detection.
         if task == "etpc" or task == "multitask":
-            for step, batch in enumerate(tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_labels, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -158,7 +172,9 @@ def model_eval_multitask(
                 b_ids2 = b_ids2.to(device)
                 b_mask2 = b_mask2.to(device)
 
-                logits = model.predict_paraphrase_types(b_ids1, b_mask1, b_ids2, b_mask2)
+                logits = model.predict_paraphrase_types(
+                    b_ids1, b_mask1, b_ids2, b_mask2
+                )
                 y_hat = logits.sigmoid().round().cpu().numpy()
                 b_labels = b_labels.cpu().numpy()
 
@@ -167,9 +183,9 @@ def model_eval_multitask(
                 etpc_sent_ids.extend(b_sent_ids)
 
         if task == "etpc" or task == "multitask":
-            correct_pred = np.all(np.array(etpc_y_pred) == np.array(etpc_y_true), axis=1).astype(
-                int
-            )
+            correct_pred = np.all(
+                np.array(etpc_y_pred) == np.array(etpc_y_true), axis=1
+            ).astype(int)
             etpc_accuracy = np.mean(correct_pred)
             etpc_y_pred = etpc_y_pred.tolist()
         else:
@@ -204,7 +220,13 @@ def model_eval_multitask(
 
 # Perform model evaluation in terms by averaging accuracies across tasks.
 def model_eval_test_multitask(
-    sst_dataloader, quora_dataloader, sts_dataloader, etpc_dataloader, model, device, task
+    sst_dataloader,
+    quora_dataloader,
+    sts_dataloader,
+    etpc_dataloader,
+    model,
+    device,
+    task,
 ):
     model.eval()  # switch to eval model, will turn off randomness like dropout
 
@@ -213,7 +235,9 @@ def model_eval_test_multitask(
         quora_sent_ids = []
         # Evaluate paraphrase detection.
         if task == "qqp" or task == "multitask":
-            for step, batch in enumerate(tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -238,7 +262,9 @@ def model_eval_test_multitask(
 
         # Evaluate semantic textual similarity.
         if task == "sts" or task == "multitask":
-            for step, batch in enumerate(tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -263,7 +289,9 @@ def model_eval_test_multitask(
 
         # Evaluate sentiment classification.
         if task == "sst" or task == "multitask":
-            for step, batch in enumerate(tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 b_ids, b_mask, b_sent_ids = (
                     batch["token_ids"],
                     batch["attention_mask"],
@@ -282,7 +310,9 @@ def model_eval_test_multitask(
         etpc_y_pred = []
         etpc_sent_ids = []
         if task == "etpc" or task == "multitask":
-            for step, batch in enumerate(tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -296,7 +326,9 @@ def model_eval_test_multitask(
                 b_ids2 = b_ids2.to(device)
                 b_mask2 = b_mask2.to(device)
 
-                logits = model.predict_paraphrase_types(b_ids1, b_mask1, b_ids2, b_mask2)
+                logits = model.predict_paraphrase_types(
+                    b_ids1, b_mask1, b_ids2, b_mask2
+                )
                 y_hat = logits.sigmoid().round().cpu().numpy().astype(int).tolist()
 
                 etpc_y_pred.extend(y_hat)
@@ -315,8 +347,10 @@ def model_eval_test_multitask(
 
 
 def test_model_multitask(args, model, device):
-    sst_test_data, _, quora_test_data, sts_test_data, etpc_test_data = load_multitask_data(
-        args.sst_test, args.quora_test, args.sts_test, args.etpc_test, split="test"
+    sst_test_data, _, quora_test_data, sts_test_data, etpc_test_data = (
+        load_multitask_data(
+            args.sst_test, args.quora_test, args.sts_test, args.etpc_test, split="test"
+        )
     )
 
     sst_dev_data, _, quora_dev_data, sts_dev_data, etpc_dev_data = load_multitask_data(
@@ -327,10 +361,16 @@ def test_model_multitask(args, model, device):
     sst_dev_data = SentenceClassificationDataset(sst_dev_data, args)
 
     sst_test_dataloader = DataLoader(
-        sst_test_data, shuffle=True, batch_size=args.batch_size, collate_fn=sst_test_data.collate_fn
+        sst_test_data,
+        shuffle=False,
+        batch_size=args.batch_size,
+        collate_fn=sst_test_data.collate_fn,
     )
     sst_dev_dataloader = DataLoader(
-        sst_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=sst_dev_data.collate_fn
+        sst_dev_data,
+        shuffle=False,
+        batch_size=args.batch_size,
+        collate_fn=sst_dev_data.collate_fn,
     )
 
     quora_test_data = SentencePairTestDataset(quora_test_data, args)
@@ -353,10 +393,16 @@ def test_model_multitask(args, model, device):
     sts_dev_data = SentencePairDataset(sts_dev_data, args, isRegression=True)
 
     sts_test_dataloader = DataLoader(
-        sts_test_data, shuffle=True, batch_size=args.batch_size, collate_fn=sts_test_data.collate_fn
+        sts_test_data,
+        shuffle=True,
+        batch_size=args.batch_size,
+        collate_fn=sts_test_data.collate_fn,
     )
     sts_dev_dataloader = DataLoader(
-        sts_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=sts_dev_data.collate_fn
+        sts_dev_data,
+        shuffle=False,
+        batch_size=args.batch_size,
+        collate_fn=sts_dev_data.collate_fn,
     )
 
     etpc_test_data = SentencePairTestDataset(etpc_test_data, args)

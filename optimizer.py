@@ -11,8 +11,8 @@ class AdamW(Optimizer):
         params: Iterable[torch.nn.parameter.Parameter],
         lr: float = 1e-3,
         betas: Tuple[float, float] = (0.9, 0.999),
-        eps: float = 1e-6,
-        weight_decay: float = 0.0,
+        eps: float = 1e-8,
+        weight_decay: float = 1e-2,
         correct_bias: bool = True,
     ):
         if lr < 0.0:
@@ -28,7 +28,11 @@ class AdamW(Optimizer):
         if not 0.0 <= eps:
             raise ValueError("Invalid epsilon value: {} - should be >= 0.0".format(eps))
         defaults = dict(
-            lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, correct_bias=correct_bias
+            lr=lr,
+            betas=betas,
+            eps=eps,
+            weight_decay=weight_decay,
+            correct_bias=correct_bias,
         )
         super().__init__(params, defaults)
 
@@ -77,11 +81,134 @@ class AdamW(Optimizer):
 
                 state["t"] = state["t"] + 1
                 state["mt"] = state["mt"].mul(beta1) + grad.mul(1 - beta1)
-                state["vt"] = state["vt"].mul(beta2) + torch.mul(grad, grad).mul(1 - beta2)
+                state["vt"] = state["vt"].mul(beta2) + torch.mul(grad, grad).mul(
+                    1 - beta2
+                )
 
-                state["alpha"] = (group["lr"] * math.sqrt(1 - beta2 ** state["t"])) / (1 - beta1 ** state["t"])
+                state["alpha"] = (group["lr"] * math.sqrt(1 - beta2 ** state["t"])) / (
+                    1 - beta1 ** state["t"]
+                )
 
-                p.data = p.data.sub(state["mt"].div(torch.sqrt(state["vt"]).add_(group["eps"])).mul(state["alpha"]))
+                p.data = p.data.sub(
+                    state["mt"]
+                    .div(torch.sqrt(state["vt"]).add_(group["eps"]))
+                    .mul(state["alpha"])
+                )
                 p.data = p.data.sub(p.data.mul(group["lr"]).mul(group["weight_decay"]))
+
+        return loss
+
+
+class SophiaG(Optimizer):
+    """
+    Sophia: Second-order Clipped Stochastic Optimization.
+    Using Sophia with the Gauss-Newton-Bartlett estimate of the Hessian.state["hessian"]
+
+    https://arxiv.org/pdf/2305.14342.pdf
+    """
+
+    def __init__(
+        self,
+        params: Iterable[torch.nn.parameter.Parameter],
+        lr: float = 1e-4,
+        betas: Tuple[float, float] = (0.965, 0.99),
+        rho: float = 0.04,
+        weight_decay: float = 0.1,
+        eps: float = 1e-15,
+    ):
+        if lr < 0.0:
+            raise ValueError("Invalid learning rate: {} - should be >= 0.0".format(lr))
+        if not 0.0 <= betas[0] < 1.0:
+            raise ValueError(
+                "Invalid beta parameter: {} - should be in [0.0, 1.0[".format(betas[0])
+            )
+        if not 0.0 <= betas[1] < 1.0:
+            raise ValueError(
+                "Invalid beta parameter: {} - should be in [0.0, 1.0[".format(betas[1])
+            )
+        if not 0.0 <= rho:
+            raise ValueError("Invalid rho value: {} - should be >= 0.0".format(rho))
+        if not 0.0 <= weight_decay:
+            raise ValueError(
+                "Invalid weight_decay value: {} - should be >= 0.0".format(weight_decay)
+            )
+        if not 0.0 <= eps:
+            raise ValueError("Invalid epsilon value: {} - should be >= 0.0".format(eps))
+        defaults = dict(
+            lr=lr,
+            betas=betas,
+            rho=rho,
+            weight_decay=weight_decay,
+            eps=eps,
+        )
+        super(SophiaG, self).__init__(params, defaults)
+
+    @torch.no_grad()
+    def update_hessian(self, bs: int):
+        for group in self.param_groups:
+            _, beta2 = group["betas"]
+
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                state = self.state[p]
+
+                # B · ^g ⊙ ^g
+                # Update the hessian estimate (moving average)
+                state["hessian"].mul_(beta2).addcmul_(
+                    p.grad, p.grad, value=bs - bs * beta2
+                )
+
+    @torch.no_grad()
+    def step(self, closure: Callable = None):
+        loss = None
+
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            for p in group["params"]:
+                grad = p.grad
+
+                if grad is None:
+                    continue
+
+                if grad.is_sparse:
+                    raise RuntimeError("Sophia does not support sparse gradients")
+
+                # State should be stored in this dictionary
+                state = self.state[p]
+
+                # Init state variables
+                if len(state) == 0:
+                    state["step"] = torch.zeros(
+                        (1,), dtype=torch.float, device=p.device
+                    )
+                    state["exp_avg"] = torch.zeros_like(p)
+                    state["hessian"] = torch.zeros_like(p)
+
+                # Access hyperparameters from the `group` dictionary
+                beta1, _ = group["betas"]
+                rho = group["rho"]
+                lr = group["lr"]
+                eps = group["eps"]
+                weight_decay = group["weight_decay"]
+                exp_avg = state["exp_avg"]
+                hess = state["hessian"]
+
+                # Calculation of new weights
+                state["step"] += 1
+
+                # 1 - Perform stepweight decay
+                p.data.mul_(1 - lr * weight_decay)
+
+                # 2 - Decay the first and second moment running average coefficient
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+
+                # 3 - Decay the hessian running average coefficient
+                # Clipping the hessian.
+                ratio = (exp_avg / (rho * hess + eps)).clamp(-1, 1)
+                p.data.add_(ratio, alpha=-lr)
 
         return loss
