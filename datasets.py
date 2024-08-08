@@ -54,10 +54,13 @@ class SentenceClassificationDataset(Dataset):
         sents = [x[0] for x in data]
         labels = [x[1] for x in data]
         sent_ids = [x[2] for x in data]
-        # sents = [preprocess_sentence(sent) for sent in sents]
+        sents = [preprocess_sentence(sent) for sent in sents]
 
         encoding = self.tokenizer(
-            sents, return_tensors="pt", padding=True, truncation=True
+            sents,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -96,10 +99,13 @@ class SentenceClassificationTestDataset(Dataset):
     def pad_data(self, data):
         sents = [x[0] for x in data]
         sent_ids = [x[1] for x in data]
-        # sents = [preprocess_sentence(sent) for sent in sents]
+        sents = [preprocess_sentence(sent) for sent in sents]
 
         encoding = self.tokenizer(
-            sents, return_tensors="pt", padding=True, truncation=True
+            sents,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -141,10 +147,16 @@ class SentencePairDataset(Dataset):
         sent_ids = [x[3] for x in data]
 
         encoding1 = self.tokenizer(
-            sent1, return_tensors="pt", padding=True, truncation=True
+            sent1,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
         )
         encoding2 = self.tokenizer(
-            sent2, return_tensors="pt", padding=True, truncation=True
+            sent2,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
         )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
@@ -219,7 +231,10 @@ class SentencePairTestDataset(Dataset):
             sent1, return_tensors="pt", padding=True, truncation=True
         )
         encoding2 = self.tokenizer(
-            sent2, return_tensors="pt", padding=True, truncation=True
+            sent2,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
         )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])

@@ -21,7 +21,7 @@ from datasets import (
     load_multitask_data,
 )
 from evaluation import model_eval_multitask, test_model_multitask
-from optimizer import AdamW
+from optimizer import AdamW, SophiaG, SophiaH
 from transformers import get_linear_schedule_with_warmup
 import csv
 import pandas as pd
@@ -73,7 +73,16 @@ class MultitaskBERT(nn.Module):
     (- Paraphrase type detection (predict_paraphrase_types))
     """
 
-    def __init__(self, config, train_mode=None, layers=None, pooling=None):
+    def __init__(
+        self,
+        config,
+        train_mode=None,
+        layers=None,
+        pooling=None,
+        attention=False,
+        add_dropout=False,
+        more_layers=False,
+    ):
         super(MultitaskBERT, self).__init__()
 
         # You will want to add layers here to perform the downstream tasks.
@@ -83,9 +92,11 @@ class MultitaskBERT(nn.Module):
         )
         self.additional_inputs = config.additional_inputs
         # Dropout for regularization
+        self.add_dropout = add_dropout
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.pooling = pooling
         self.train_mode = train_mode
+        self.more_layers = more_layers
 
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -118,11 +129,11 @@ class MultitaskBERT(nn.Module):
         )
 
         # Dropout for regularization
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.pooling = pooling
         self.train_mode = train_mode
 
         # add more layers before the classifier
+        self.attention = attention
         self.attention_layer = AttentionLayer(config.hidden_size)
 
         self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
@@ -206,18 +217,20 @@ class MultitaskBERT(nn.Module):
         else:
             raise ValueError("Invalid train mode")
 
+        if self.attention:
+            hidden_state = self.attention_layer(hidden_state)
+
         if self.pooling == None:
             # pooled_output = hidden_state.view(hidden_state.size(0), -1)
             pooled_output = hidden_state
-
         elif self.pooling == "max":
-            pooled_output, _ = torch.max(hidden_state, dim=1)
+            # pooled_output, _ = torch.max(hidden_state, dim=1)
+            pooled_output = nn.MaxPool1d(1)(hidden_state).squeeze(-1)
         elif self.pooling == "mean":
-            pooled_output = torch.mean(hidden_state, dim=1)
+            # pooled_output = torch.mean(hidden_state, dim=1)
+            pooled_output = nn.AvgPool1d(1)(hidden_state).squeeze(-1)
 
-        attention_results = self.attention_layer(pooled_output)
-        # pooled_output = self.dropout(pooled_output)
-        return attention_results
+        return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
         """
@@ -229,11 +242,14 @@ class MultitaskBERT(nn.Module):
         """
         ### TODO
         # raise NotImplementedError
-        attention_results = self.forward(input_ids, attention_mask)
-        sentiment_logits = F.relu(self.sentiment_linear(attention_results))
-        sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
-        sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
-        sentiment_logits = self.sentiment_classifier(attention_results)
+        sentiment_logits = self.forward(input_ids, attention_mask)
+        if self.more_layers:
+            sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
+            sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
+            sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
+        if self.add_dropout:
+            sentiment_logits = self.dropout(sentiment_logits)
+        sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
     def predict_paraphrase(
@@ -426,6 +442,10 @@ def train_multitask(args):
         "train_mode": args.train_mode,
         "optimizer": args.optimizer,
         "scheduler": args.scheduler,
+        "attention": args.attention,
+        "add_dropout": args.add_dropout,
+        "weight_decay": args.weight_decay,
+        "more_layers": args.more_layers,
     }
 
     config = SimpleNamespace(**config)
@@ -437,12 +457,42 @@ def train_multitask(args):
     print(pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)}))
     print(separator)
 
-    model = MultitaskBERT(config, args.train_mode, args.layers, args.pooling_type)
+    model = MultitaskBERT(
+        config,
+        args.train_mode,
+        args.layers,
+        args.pooling_type,
+        args.attention,
+        args.add_dropout,
+        args.more_layers,
+    )
     model = model.to(device)
 
     lr = args.lr
+    weight_decay = args.weight_decay
     if args.optimizer == "AdamW":
-        optimizer = AdamW(model.parameters(), lr=args.lr, eps=1e-8, weight_decay=0.01)
+        optimizer = AdamW(
+            model.parameters(), lr=lr, eps=1e-8, weight_decay=weight_decay
+        )
+    elif args.optimizer == "SophiaG":
+        optimizer = SophiaG(
+            model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
+            eps=1e-12,
+            betas=(0.985, 0.99),
+            rho=0.03,
+        )
+    elif args.optimizer == "SophiaH":
+        optimizer = SophiaH(
+            model.parameters(),
+            lr=lr,
+            weight_decay=weight_decay,
+            eps=1e-12,
+            betas=(0.985, 0.99),
+            rho=0.05,
+            update_period=10,
+        )
     else:
         raise ValueError(f"Optimizer {args.optimizer} not supported")
 
@@ -488,7 +538,8 @@ def train_multitask(args):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
                 optimizer.step()
-                scheduler.step()
+                if scheduler is not None:
+                    scheduler.step()
 
                 train_loss += loss.item()
                 num_batches += 1
@@ -669,7 +720,15 @@ def test_model(args):
         saved = torch.load(args.filepath)
         config = saved["model_config"]
 
-        model = MultitaskBERT(config, args.train_mode, args.layers, args.pooling_type)
+        model = MultitaskBERT(
+            config,
+            args.train_mode,
+            args.layers,
+            args.pooling_type,
+            args.attention,
+            args.add_dropout,
+            args.more_layers,
+        )
         model.load_state_dict(saved["model"])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
@@ -730,7 +789,7 @@ def get_args():
         type=str,
         help="pretrain: the BERT parameters are frozen; finetune: BERT parameters are updated",
         choices=("pretrain", "finetune"),
-        default="pretrain",
+        default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
 
@@ -855,7 +914,7 @@ def get_args():
 
     # Hyperparameters
     parser.add_argument(
-        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=32
+        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
@@ -870,7 +929,7 @@ def get_args():
         "--layers",
         type=int,
         nargs="+",
-        default=[-2],
+        default=[11],
         help="choose the layers that used for downstream tasks, "
         "-2 means use pooled output, -1 means all layer,"
         "else means the detail layers. default is -2",
@@ -880,7 +939,7 @@ def get_args():
 
     parser.add_argument(
         "--train_mode",
-        default="last_layer",
+        default="single_layer",
         type=str,
         choices=["last_layer", "all_layers", "single_layer"],
         help="choose the training mode, last_layer: only train the last layer,"
@@ -888,23 +947,47 @@ def get_args():
     )
     parser.add_argument(
         "--optimizer",
-        default="AdamW",
+        default="SophiaG",
         type=str,
-        choices=["AdamW"],
+        choices=["AdamW", "SophiaG", "SophiaH"],
         help="choose the optimizer",
     )
     parser.add_argument(
         "--scheduler",
-        default="linear_warmup",
+        default=None,
         type=str,
-        choices=["linear_warmup", "None"],
+        choices=["linear_warmup", None],
         help="choose the scheduler",
     )
     parser.add_argument(
         "--additional_inputs",
         type=bool,
-        default=False,
+        default=True,
         help="feed more features to the model",
+    )
+    parser.add_argument(
+        "--weight_decay",
+        type=float,
+        default=0.05,
+        help="weight decay for the optimizer",
+    )
+    parser.add_argument(
+        "--attention",
+        type=bool,
+        default=True,
+        help="use attention layer for the model",
+    )
+    parser.add_argument(
+        "--add_dropout",
+        type=bool,
+        default=False,
+        help="use dropout layer for the model",
+    )
+    parser.add_argument(
+        "--more_layers",
+        type=bool,
+        default=False,
+        help="add more layers before the classifier",
     )
 
     args = parser.parse_args()
@@ -915,6 +998,6 @@ if __name__ == "__main__":
     args = get_args()
     args.filepath = f"models1/{args.option}-{str(args.epochs)}-{str(args.lr)}-{args.task}.pt"  # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
-    etpc_split(args)
+    # etpc_split(args)
     train_multitask(args)
     test_model(args)

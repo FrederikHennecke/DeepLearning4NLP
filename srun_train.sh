@@ -1,6 +1,6 @@
 #!/bin/bash
 # Allocate the resources
-# srun -p grete --pty -n 1 -C inet -c 80 -G A100:2 /bin/bash
+# srun -p grete --pty -n 1 -C inet -c 80 -G A100:4 /bin/bash
 # srun --pty -p grete:interactive -C inet -G 2g.10gb:2 /bin/bash
 
 # # Load anaconda
@@ -47,5 +47,5 @@ bart_files=("bart_detection.py" "bart_generation.py")
 
 
 # Run tasks individually:
-python -u multitask_classifier.py --task sst --option finetune --use_gpu --local_files_only --epochs 3 --lr 2e-5 --batch_size 32 --train_mode last_layer --layers -2
+python -u multitask_classifier.py --task sst --option finetune --use_gpu --local_files_only
 # python -u bart_detection.py --use_gpu --lr 1e-5 --batch_size 64 --epochs 2
