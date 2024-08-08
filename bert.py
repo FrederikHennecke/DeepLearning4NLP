@@ -191,11 +191,17 @@ class BertModel(BertPreTrainedModel):
         # initialize parameters for more input features
         spacy.prefer_gpu()
         self.nlp = spacy.load("en_core_web_sm")
-        ner_tags = self.nlp.get_pipe("ner").labels
-        pos_tags = self.nlp.get_pipe("tagger").labels
-        self.ner_tag_embedding = nn.Embedding(len(ner_tags) + 1, config.hidden_size)
-        self.pos_tag_embedding = nn.Embedding(len(pos_tags) + 1, config.hidden_size)
-
+        ner_tags_spacy = self.nlp.get_pipe("ner").labels
+        pos_tags_spacy = self.nlp.get_pipe("tagger").labels
+        self.ner_tag_embedding = nn.Embedding(
+            len(ner_tags_spacy) + 1, config.hidden_size
+        )
+        self.pos_tag_embedding = nn.Embedding(
+            len(pos_tags_spacy) + 1, config.hidden_size
+        )
+        self.pos_tag_vocab = {tag: i for i, tag in enumerate(pos_tags_spacy)}
+        self.ner_tag_vocab = {tag: i for i, tag in enumerate(ner_tags_spacy)}
+        self.input_cache = {}
         self.init_weights()
 
     def embed(self, input_ids, additional_input=False):
@@ -228,41 +234,61 @@ class BertModel(BertPreTrainedModel):
 
         if additional_input:
             # get the pos and ner tags
-            ids_to_tokens = [
-                self.tokenizer.convert_ids_to_tokens(sequence_id)
-                for sequence_id in input_ids
-            ]
-            ids_to_tokens = [
-                token
-                for token in ids_to_tokens
-                if token not in ["[PAD]", "[CLS]", "[SEP]"]
-            ]
-            input_text = [
-                self.tokenizer.convert_tokens_to_string(id_to_token)
-                for id_to_token in ids_to_tokens
-            ]
-            docs = list(self.nlp.pipe(input_text))
+
+            all_pos_tags = []
+            all_ner_tags = []
+            for sequence_id in input_ids:
+                sequence_id_tup = tuple(sequence_id.tolist())
+                if sequence_id_tup in self.input_cache:
+                    pos_tags, ner_tags = self.input_cache[sequence_id_tup]
+                else:
+                    tokens = self.tokenizer.convert_ids_to_tokens(sequence_id.tolist())
+                    token_strings = [
+                        token
+                        for token in tokens
+                        if token not in ["[PAD]", "[CLS]", "[SEP]"]
+                    ]
+                    input_string = self.tokenizer.convert_tokens_to_string(
+                        token_strings
+                    )
+                    tokenized = self.nlp(input_string)
+                    pos_tags = [0] * len(tokens)
+                    ner_tags = [0] * len(tokens)
+                    counter = -1
+                    for i in range(len(token_strings)):
+                        if not token_strings[i].startswith("##"):
+                            counter += 1
+                        pos_tags[i + 1] = self.pos_tag_vocab.get(
+                            tokenized[counter].tag_, 0
+                        )
+                        ner_tags[i + 1] = self.ner_tag_vocab.get(
+                            tokenized[counter].ent_type_, 0
+                        )
+
+                    self.input_cache[sequence_id_tup] = (pos_tags, ner_tags)
+
+                all_pos_tags.append(pos_tags)
+                all_ner_tags.append(ner_tags)
+
             pos_tags_ids = torch.tensor(
-                [[token.pos_ for token in doc] for doc in docs],
-                dtype=torch.long,
-                device=input_ids.device,
+                all_pos_tags, dtype=torch.long, device=input_ids.device
             )
             ner_tags_ids = torch.tensor(
-                [[token.ent_type_ for token in doc] for doc in docs],
-                dtype=torch.long,
-                device=input_ids.device,
+                all_ner_tags, dtype=torch.long, device=input_ids.device
             )
-            pos_tag_embeds = self.pos_tag_embedding(pos_tags_ids)
-            ner_tag_embeds = self.ner_tag_embedding(ner_tags_ids)
-            embeds = (
-                word_embeds
-                + pos_embeds
-                + tk_type_embeds
-                + pos_tag_embeds
-                + ner_tag_embeds
-            )
+
         else:
-            embeds = word_embeds + pos_embeds + tk_type_embeds
+            pos_tags_ids = torch.zeros(
+                input_shape, dtype=torch.long, device=input_ids.device
+            )
+            ner_tags_ids = torch.zeros(
+                input_shape, dtype=torch.long, device=input_ids.device
+            )
+        pos_tag_embeds = self.pos_tag_embedding(pos_tags_ids)
+        ner_tag_embeds = self.ner_tag_embedding(ner_tags_ids)
+        embeds = (
+            word_embeds + pos_embeds + tk_type_embeds + pos_tag_embeds + ner_tag_embeds
+        )
 
         output_embeds = self.embed_layer_norm(embeds)
         output_embeds = self.embed_dropout(output_embeds)

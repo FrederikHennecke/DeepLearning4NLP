@@ -48,32 +48,19 @@ N_PARAPHRASE_TYPES = 7
 
 
 class AttentionLayer(nn.Module):
-    def __init__(self, hidden_size):
+    def __init__(self, input_size):
         super(AttentionLayer, self).__init__()
-        self.hidden_size = hidden_size
-        self.attention = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.Tanh(),
-            nn.Linear(hidden_size, 1, bias=False),
-        )
+        self.linear_transform = nn.Linear(input_size, input_size)
+        self.linear_transform1 = nn.Linear(input_size, 1, bias=False)
 
-    def forward(self, encoder_outputs):
-        # encoder_outputs: [batch_size, seq_len, hidden_size]
-        seq_len = encoder_outputs.size(1)
-        # repeat the encoder_outputs to match the shape of the attention weights
-        encoder_outputs = encoder_outputs.repeat(1, 1, self.hidden_size).view(
-            -1, self.hidden_size
+    def forward(self, embeddings):
+        # embeddings: [batch_size, seq_len, hidden_size]
+        transformed_embeddings = torch.tanh(self.linear_transform(embeddings))
+        attention_weights = torch.softmax(
+            self.linear_transform1(transformed_embeddings), dim=1
         )
-        # calculate the attention weights
-        attention_weights = self.attention(encoder_outputs).view(-1, seq_len)
-        # apply softmax to the attention weights
-        attention_weights = torch.softmax(attention_weights, dim=1)
-        # calculate the context vector
-        context_vector = torch.bmm(
-            attention_weights.unsqueeze(1),
-            encoder_outputs.view(-1, seq_len, self.hidden_size),
-        )
-        return context_vector
+        attended_embeddings = torch.sum(attention_weights * embeddings, dim=1)
+        return attended_embeddings
 
 
 class MultitaskBERT(nn.Module):
@@ -115,6 +102,11 @@ class MultitaskBERT(nn.Module):
         else:
             self.layers = layers
 
+        self.sentiment_classifier = nn.Linear(
+            config.hidden_size
+            * max(1, len(self.layers) if self.pooling is None else 1),
+            N_SENTIMENT_CLASSES,
+        )
         # self.sentiment_classifier = nn.Linear(config.hidden_size, N_SENTIMENT_CLASSES)
 
         self.paraphrase_classifier = nn.Linear(
@@ -131,18 +123,11 @@ class MultitaskBERT(nn.Module):
         self.train_mode = train_mode
 
         # add more layers before the classifier
-        self.hidden_dim = 128
-        self.attn_heads = 1
         self.attention_layer = AttentionLayer(config.hidden_size)
 
         self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
         self.sentiment_linear1 = torch.nn.Linear(config.hidden_size, config.hidden_size)
         self.sentiment_linear2 = torch.nn.Linear(config.hidden_size, config.hidden_size)
-        self.sentiment_classifier = nn.Linear(
-            config.hidden_size
-            * max(1, len(self.layers) if self.pooling is None else 1),
-            N_SENTIMENT_CLASSES,
-        )
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
@@ -216,16 +201,21 @@ class MultitaskBERT(nn.Module):
                 hidden_state = torch.cat(hidden_state, dim=1)
 
         elif self.train_mode == "last_layer":
-            hidden_state = output["pooler_output"]
+            hidden_state = output["last_hidden_state"]
+
+        else:
+            raise ValueError("Invalid train mode")
 
         if self.pooling == None:
-            pooled_output = hidden_state.view(hidden_state.size(0), -1)
-        if self.pooling == "max":
+            # pooled_output = hidden_state.view(hidden_state.size(0), -1)
+            pooled_output = hidden_state
+
+        elif self.pooling == "max":
             pooled_output, _ = torch.max(hidden_state, dim=1)
         elif self.pooling == "mean":
             pooled_output = torch.mean(hidden_state, dim=1)
 
-        attention_results = AttentionLayer(pooled_output)
+        attention_results = self.attention_layer(pooled_output)
         # pooled_output = self.dropout(pooled_output)
         return attention_results
 
@@ -239,11 +229,11 @@ class MultitaskBERT(nn.Module):
         """
         ### TODO
         # raise NotImplementedError
-        pooled_output = self.forward(input_ids, attention_mask)
-        sentiment_logits = F.relu(self.sentiment_linear(pooled_output))
+        attention_results = self.forward(input_ids, attention_mask)
+        sentiment_logits = F.relu(self.sentiment_linear(attention_results))
         sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
         sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
-        sentiment_logits = self.sentiment_classifier(pooled_output)
+        sentiment_logits = self.sentiment_classifier(attention_results)
         return sentiment_logits
 
     def predict_paraphrase(
@@ -886,9 +876,7 @@ def get_args():
         "else means the detail layers. default is -2",
     )
 
-    parser.add_argument(
-        "--pooling_type", default=None, type=str, choices=["None", "mean", "max"]
-    )
+    parser.add_argument("--pooling_type", default=None, choices=[None, "mean", "max"])
 
     parser.add_argument(
         "--train_mode",

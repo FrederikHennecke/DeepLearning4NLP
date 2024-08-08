@@ -54,28 +54,10 @@ class SentenceClassificationDataset(Dataset):
         sents = [x[0] for x in data]
         labels = [x[1] for x in data]
         sent_ids = [x[2] for x in data]
-        sents = [preprocess_sentence(sent) for sent in sents]
-
-        # encoded_sents = [
-        #     self.tokenizer.encode(sent, add_special_tokens=True) for sent in sents
-        # ]
-        # max_len = max([len(sent) for sent in encoded_sents])
-        # print(f"max_len: {max_len}")
-
-        # input_ids = []
-        # attention_masks = []
-        # for sent in sents:
-        #     encoding = self.tokenizer.encode_plus(
-        #         sent, max_length=68, return_tensors="pt", padding=True, truncation=True
-        #     )
-        #     input_ids.append(encoding["input_ids"])
-        #     attention_masks.append(encoding["attention_mask"])
-        # token_ids = torch.cat(input_ids, dim=0)
-        # attention_mask = torch.cat(attention_masks, dim=0)
-        # labels = torch.tensor(labels)
+        # sents = [preprocess_sentence(sent) for sent in sents]
 
         encoding = self.tokenizer(
-            sents, max_length=68, return_tensors="pt", padding=True, truncation=True
+            sents, return_tensors="pt", padding=True, truncation=True
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -114,10 +96,10 @@ class SentenceClassificationTestDataset(Dataset):
     def pad_data(self, data):
         sents = [x[0] for x in data]
         sent_ids = [x[1] for x in data]
-        sents = [preprocess_sentence(sent) for sent in sents]
+        # sents = [preprocess_sentence(sent) for sent in sents]
 
         encoding = self.tokenizer(
-            sents, max_length=68, return_tensors="pt", padding=True, truncation=True
+            sents, return_tensors="pt", padding=True, truncation=True
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
