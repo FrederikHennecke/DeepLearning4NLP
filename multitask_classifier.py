@@ -903,7 +903,7 @@ def get_args():
     parser.add_argument(
         "--additional_inputs",
         type=bool,
-        default=True,
+        default=False,
         help="feed more features to the model",
     )
 
