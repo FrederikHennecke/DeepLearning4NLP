@@ -1,11 +1,10 @@
 import math
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from base_bert import BertPreTrainedModel
 from utils import get_extended_attention_mask
+import spacy
 
 
 class BertSelfAttention(nn.Module):
@@ -30,7 +29,9 @@ class BertSelfAttention(nn.Module):
         proj = linear_layer(x)
         # next, we need to produce multiple heads for the proj
         # this is done by spliting the hidden state to self.num_attention_heads, each of size self.attention_head_size
-        proj = proj.view(bs, seq_len, self.num_attention_heads, self.attention_head_size)
+        proj = proj.view(
+            bs, seq_len, self.num_attention_heads, self.attention_head_size
+        )
         # by proper transpose, we have proj of [bs, num_attention_heads, seq_len, attention_head_size]
         proj = proj.transpose(1, 2)
         return proj
@@ -91,14 +92,18 @@ class BertLayer(nn.Module):
         self.self_attention = BertSelfAttention(config)
         # add-norm
         self.attention_dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.attention_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.attention_layer_norm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.attention_dropout = nn.Dropout(config.hidden_dropout_prob)
         # feed forward
         self.interm_dense = nn.Linear(config.hidden_size, config.intermediate_size)
         self.interm_af = F.gelu
         # another add-norm
         self.out_dense = nn.Linear(config.intermediate_size, config.hidden_size)
-        self.out_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.out_layer_norm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.out_dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def add_norm(self, input, output, dense_layer, dropout, ln_layer):
@@ -176,9 +181,15 @@ class BertModel(BertPreTrainedModel):
         self.word_embedding = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
         )
-        self.pos_embedding = nn.Embedding(config.max_position_embeddings, config.hidden_size)
-        self.tk_type_embedding = nn.Embedding(config.type_vocab_size, config.hidden_size)
-        self.embed_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.pos_embedding = nn.Embedding(
+            config.max_position_embeddings, config.hidden_size
+        )
+        self.tk_type_embedding = nn.Embedding(
+            config.type_vocab_size, config.hidden_size
+        )
+        self.embed_layer_norm = nn.LayerNorm(
+            config.hidden_size, eps=config.layer_norm_eps
+        )
         self.embed_dropout = nn.Dropout(config.hidden_dropout_prob)
         # position_ids (1, len position emb) is a constant, register to buffer
         position_ids = torch.arange(config.max_position_embeddings).unsqueeze(0)
@@ -192,6 +203,21 @@ class BertModel(BertPreTrainedModel):
         # for [CLS] token
         self.pooler_dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_af = nn.Tanh()
+
+        # initialize parameters for more input features
+        spacy.prefer_gpu()
+        self.nlp = spacy.load("en_core_web_sm")
+        ner_tags_spacy = self.nlp.get_pipe("ner").labels
+        pos_tags_spacy = self.nlp.get_pipe("tagger").labels
+        self.ner_tag_embedding = nn.Embedding(
+            len(ner_tags_spacy) + 1, config.hidden_size
+        )
+        self.pos_tag_embedding = nn.Embedding(
+            len(pos_tags_spacy) + 1, config.hidden_size
+        )
+        self.pos_tag_vocab = {tag: i for i, tag in enumerate(pos_tags_spacy)}
+        self.ner_tag_vocab = {tag: i for i, tag in enumerate(ner_tags_spacy)}
+        self.input_cache = {}
 
         self.init_weights()
 
@@ -208,15 +234,80 @@ class BertModel(BertPreTrainedModel):
         pos_embeds = self.pos_embedding(pos_ids)
         # Get token type ids, since we are not considering token type,
         # this is just a placeholder.
-        tk_type_ids = torch.zeros(input_shape, dtype=torch.long, device=input_ids.device)
+        tk_type_ids = torch.zeros(
+            input_shape, dtype=torch.long, device=input_ids.device
+        )
         tk_type_embeds = self.tk_type_embedding(tk_type_ids)
 
         # Add three embeddings together; then apply embed_layer_norm and dropout and
         # return the hidden states.
-        out = inputs_embeds + pos_embeds + tk_type_embeds
-        out = self.embed_layer_norm(out)
-        out = self.embed_dropout(out)
-        return out
+
+        if self.config.additional_inputs:
+            # get the pos and ner tags
+
+            all_pos_tags = []
+            all_ner_tags = []
+            for sequence_id in input_ids:
+                sequence_id_tup = tuple(sequence_id.tolist())
+                if sequence_id_tup in self.input_cache:
+                    pos_tags, ner_tags = self.input_cache[sequence_id_tup]
+                else:
+                    tokens = self.tokenizer.convert_ids_to_tokens(sequence_id.tolist())
+                    token_strings = [
+                        token
+                        for token in tokens
+                        if token not in ["[PAD]", "[CLS]", "[SEP]"]
+                    ]
+                    input_string = self.tokenizer.convert_tokens_to_string(
+                        token_strings
+                    )
+                    tokenized = self.nlp(input_string)
+                    pos_tags = [0] * len(tokens)
+                    ner_tags = [0] * len(tokens)
+                    counter = -1
+                    for i in range(len(token_strings)):
+                        if not token_strings[i].startswith("##"):
+                            counter += 1
+                        pos_tags[i + 1] = self.pos_tag_vocab.get(
+                            tokenized[counter].tag_, 0
+                        )
+                        ner_tags[i + 1] = self.ner_tag_vocab.get(
+                            tokenized[counter].ent_type_, 0
+                        )
+
+                    self.input_cache[sequence_id_tup] = (pos_tags, ner_tags)
+
+                all_pos_tags.append(pos_tags)
+                all_ner_tags.append(ner_tags)
+
+            pos_tags_ids = torch.tensor(
+                all_pos_tags, dtype=torch.long, device=input_ids.device
+            )
+            ner_tags_ids = torch.tensor(
+                all_ner_tags, dtype=torch.long, device=input_ids.device
+            )
+
+        else:
+            pos_tags_ids = torch.zeros(
+                input_shape, dtype=torch.long, device=input_ids.device
+            )
+            ner_tags_ids = torch.zeros(
+                input_shape, dtype=torch.long, device=input_ids.device
+            )
+
+        pos_tag_embeds = self.pos_tag_embedding(pos_tags_ids)
+        ner_tag_embeds = self.ner_tag_embedding(ner_tags_ids)
+        embeds = (
+            inputs_embeds
+            + pos_embeds
+            + tk_type_embeds
+            + pos_tag_embeds
+            + ner_tag_embeds
+        )
+
+        output_embeds = self.embed_layer_norm(embeds)
+        output_embeds = self.embed_dropout(output_embeds)
+        return output_embeds
 
     def encode(self, hidden_states, attention_mask):
         """
@@ -231,11 +322,20 @@ class BertModel(BertPreTrainedModel):
         )
 
         # pass the hidden states through the encoder layers
+        all_hidden_states = []
         for i, layer_module in enumerate(self.bert_layers):
             # feed the encoding from the last bert_layer to the next
             hidden_states = layer_module(hidden_states, extended_attention_mask)
+            all_hidden_states.append(hidden_states)
+        return all_hidden_states
 
-        return hidden_states
+    def first_token(self, input_sequence):
+        # get cls token hidden state
+
+        first_tk = input_sequence[:, 0]
+        pooled_output = self.pooler_dense(first_tk)
+        pooled_output = self.pooler_af(pooled_output)
+        return pooled_output
 
     def forward(self, input_ids, attention_mask):
         """
@@ -246,11 +346,61 @@ class BertModel(BertPreTrainedModel):
         embedding_output = self.embed(input_ids=input_ids)
 
         # feed to a transformer (a stack of BertLayers)
-        sequence_output = self.encode(embedding_output, attention_mask=attention_mask)
+        all_encoded_layers = self.encode(
+            embedding_output, attention_mask=attention_mask
+        )
+        last_hidden_state = all_encoded_layers[-1]
+        pooler_output = self.first_token(last_hidden_state)
+        sequence_output2 = all_encoded_layers[-2]
+        pooled_output2 = self.first_token(sequence_output2)
+        sequence_output3 = all_encoded_layers[-3]
+        pooled_output3 = self.first_token(sequence_output3)
+        sequence_output4 = all_encoded_layers[-4]
+        pooled_output4 = self.first_token(sequence_output4)
+        sequence_output5 = all_encoded_layers[-5]
+        pooled_output5 = self.first_token(sequence_output5)
+        sequence_output6 = all_encoded_layers[-6]
+        pooled_output6 = self.first_token(sequence_output6)
+        sequence_output7 = all_encoded_layers[-7]
+        pooled_output7 = self.first_token(sequence_output7)
+        sequence_output8 = all_encoded_layers[-8]
+        pooled_output8 = self.first_token(sequence_output8)
+        sequence_output9 = all_encoded_layers[-9]
+        pooled_output9 = self.first_token(sequence_output9)
+        sequence_output10 = all_encoded_layers[-10]
+        pooled_output10 = self.first_token(sequence_output10)
+        sequence_output11 = all_encoded_layers[-11]
+        pooled_output11 = self.first_token(sequence_output11)
+        sequence_output12 = all_encoded_layers[-12]
+        pooled_output12 = self.first_token(sequence_output12)
 
-        # get cls token hidden state
-        first_tk = sequence_output[:, 0]
-        first_tk = self.pooler_dense(first_tk)
-        first_tk = self.pooler_af(first_tk)
+        all_sequences = {
+            "last_hidden_state": last_hidden_state,
+            "sequence_output2": sequence_output2,
+            "sequence_output3": sequence_output3,
+            "sequence_output4": sequence_output4,
+            "sequence_output5": sequence_output5,
+            "sequence_output6": sequence_output6,
+            "sequence_output7": sequence_output7,
+            "sequence_output8": sequence_output8,
+            "sequence_output9": sequence_output9,
+            "sequence_output10": sequence_output10,
+            "sequence_output11": sequence_output11,
+            "sequence_output12": sequence_output12,
+        }
+        all_pooled = {
+            "pooler_output": pooler_output,
+            "pooled_output2": pooled_output2,
+            "pooled_output3": pooled_output3,
+            "pooled_output4": pooled_output4,
+            "pooled_output5": pooled_output5,
+            "pooled_output6": pooled_output6,
+            "pooled_output7": pooled_output7,
+            "pooled_output8": pooled_output8,
+            "pooled_output9": pooled_output9,
+            "pooled_output10": pooled_output10,
+            "pooled_output11": pooled_output11,
+            "pooled_output12": pooled_output12,
+        }
 
-        return {"last_hidden_state": sequence_output, "pooler_output": first_tk}
+        return all_encoded_layers, pooler_output, all_sequences, all_pooled

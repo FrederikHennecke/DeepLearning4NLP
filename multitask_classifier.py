@@ -25,6 +25,7 @@ from datasets import (
 from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW, SophiaG
 from contextlib import nullcontext
+from bert import BertLayer
 
 TQDM_DISABLE = True
 
@@ -42,6 +43,7 @@ def seed_everything(seed=11711):
 
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
+N_HIDDEN_LAYERS = 12
 
 
 class AttentionLayer(nn.Module):
@@ -75,17 +77,35 @@ class MultitaskBERT(nn.Module):
 
         # You will want to add layers here to perform the downstream tasks.
         # Pretrain mode does not require updating bert parameters.
+        self.config = config
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
+        # self.bert_layers = nn.ModuleList(
+        #     [BertLayer(config) for _ in range(config.num_hidden_layers)]
+        # )
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
             elif config.option == "finetune":
                 param.requires_grad = True
 
-        # raise NotImplementedError
-        self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        if config.layers[0] == -2 and config.train_mode == "last_layer":
+            self.layers = []
+        elif config.layers[0] == -1 and config.train_mode == "all_layers":
+            self.layers = [i for i in range(config.num_hidden_layers)]
+        elif config.train_mode == "single_layers":
+            self.layers = config.layers
+        else:
+            self.layers = []
+
+        self.sentiment_classifier = nn.Linear(
+            config.hidden_size
+            * max(1, len(self.layers) if config.pooling is None else 1),
+            N_SENTIMENT_CLASSES,
+        )
+
+        # self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
         self.paraphrase_classifier = nn.Linear(
             3 * BERT_HIDDEN_SIZE, 1
         )  # WARN Not needed anymore
@@ -97,12 +117,19 @@ class MultitaskBERT(nn.Module):
 
         # attention layer
         self.attention_layer = AttentionLayer(config.hidden_size)
-        self.additional_inputs = config.additional_inputs
 
         # more layers
         self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
         self.sentiment_linear1 = torch.nn.Linear(config.hidden_size, config.hidden_size)
         self.sentiment_linear2 = torch.nn.Linear(config.hidden_size, config.hidden_size)
+
+        self.d_a = 128
+        self.attn_heads = 1
+
+        self.linear_first = torch.nn.Linear(config.hidden_size, self.d_a)
+        self.linear_first.bias.data.fill_(0)
+        self.linear_second = torch.nn.Linear(self.d_a, self.attn_heads)
+        self.linear_second.bias.data.fill_(0)
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
@@ -113,9 +140,82 @@ class MultitaskBERT(nn.Module):
         # When thinking of improvements, you can later try modifying this
         # (e.g., by adding other layers).
 
-        out = self.bert(input_ids, attention_mask)
-        attention_results = self.attention_layer(out["last_hidden_state"])
-        return attention_results
+        all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
+            input_ids, attention_mask
+        )
+
+        if len(self.layers) > 0 and self.config.train_mode == "single_layers":
+            hidden_states = []
+            for l in self.layers:
+                hidden_states.append(all_encoded_layers[l][:, 0].unsqueeze(1))
+            hidden_states = torch.cat(hidden_states, dim=1)
+
+        elif self.config.train_mode == "all_pooled":
+            pooler_output = self.dropout(all_pooled["pooler_output"]).unsqueeze(0)
+            pooled_output2 = self.dropout(all_pooled["pooled_output2"]).unsqueeze(0)
+            pooled_output3 = self.dropout(all_pooled["pooled_output3"]).unsqueeze(0)
+            pooled_output4 = self.dropout(all_pooled["pooled_output4"]).unsqueeze(0)
+            pooled_output5 = self.dropout(all_pooled["pooled_output5"]).unsqueeze(0)
+            pooled_output6 = self.dropout(all_pooled["pooled_output6"]).unsqueeze(0)
+            pooled_output7 = self.dropout(all_pooled["pooled_output7"]).unsqueeze(0)
+            pooled_output8 = self.dropout(all_pooled["pooled_output8"]).unsqueeze(0)
+            pooled_output9 = self.dropout(all_pooled["pooled_output9"]).unsqueeze(0)
+            pooled_output10 = self.dropout(all_pooled["pooled_output10"]).unsqueeze(0)
+            pooled_output11 = self.dropout(all_pooled["pooled_output11"]).unsqueeze(0)
+            pooled_output12 = self.dropout(all_pooled["pooled_output12"]).unsqueeze(
+                0
+            )  # 12, batchsize, hidden_dim
+            all_pooled_output = torch.cat(
+                (
+                    pooler_output,
+                    pooled_output2,
+                    pooled_output3,
+                    pooled_output4,
+                    pooled_output5,
+                    pooled_output6,
+                    pooled_output7,
+                    pooled_output8,
+                    pooled_output9,
+                    pooled_output10,
+                    pooled_output11,
+                    pooled_output12,
+                ),
+                0,
+            )
+
+            seq_len, batch_size, hidden_dim = all_pooled_output.size()
+
+            add_layer = self.linear_first(
+                all_pooled_output
+            )  # seq_len. batchsize. hidden_dim
+            add_layer = F.tanh(add_layer)
+            add_layer = self.linear_second(add_layer)
+            add_layer = F.softmax(add_layer, dim=0)
+
+            b = []
+            y = []
+            for i in range(self.attn_heads):
+                b.append(add_layer[:, :, i])
+                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
+                y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
+            hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
+
+        else:
+            hidden_states = pooled_output
+
+        # attention_results = self.attention_layer(hidden_states)
+        attention_results = hidden_states
+
+        if self.config.pooling == None:
+            pooled_output = attention_results
+        elif self.config.pooling == "max":
+            # pooled_output, _ = torch.max(attention_results, dim=1)
+            pooled_output = nn.MaxPool1d(1)(attention_results).squeeze(-1)
+        elif self.config.pooling == "mean":
+            # pooled_output = torch.mean(attention_results, dim=1)
+            pooled_output = nn.AvgPool1d(1)(attention_results).squeeze(-1)
+
+        return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
         """
@@ -126,9 +226,14 @@ class MultitaskBERT(nn.Module):
         Dataset: SST
         """
         sentiment_logits = self.forward(input_ids, attention_mask)
-        sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
-        sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
-        sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
+        if self.config.add_layers:
+            sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
+            sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
+            sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
+
+        if self.config.dropout:
+            sentiment_logits = self.dropout(sentiment_logits)
+
         sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
@@ -300,10 +405,16 @@ def train_multitask(args):
     config = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
         "hidden_size": BERT_HIDDEN_SIZE,
+        "num_hidden_layers": N_HIDDEN_LAYERS,
         "data_dir": ".",
         "option": args.option,
         "local_files_only": args.local_files_only,
-        "optimizer": args.optimizer,
+        "pooling": args.pooling,
+        "additional_inputs": args.additional_inputs,
+        "add_layers": args.add_layers,
+        "layers": args.layers,
+        "train_mode": args.train_mode,
+        "dropout": args.dropout,
     }
 
     config = SimpleNamespace(**config)
@@ -740,14 +851,14 @@ def get_args():
 
     # Hyperparameters
     parser.add_argument(
-        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=32
+        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
         "--lr",
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
-        default=1e-3 if args.option == "pretrain" else 1e-5,
+        default=1e-3 if args.option == "pretrain" else 2e-5,
     )
     parser.add_argument("--local_files_only", action="store_true")
     parser.add_argument(
@@ -756,6 +867,38 @@ def get_args():
         type=str,
         choices=["adamw", "sophiag"],
         help="choose the optimizer",
+    )
+    parser.add_argument(
+        "--pooling",
+        default="max",
+        choices=[None, "max", "mean"],
+        help="choose the pooling method",
+    )
+    parser.add_argument(
+        "--additional_inputs",
+        default=False,
+        help="use additional inputs for the model",
+    )
+    parser.add_argument(
+        "--add_layers",
+        default=False,
+        help="add more layers to the model",
+    )
+    parser.add_argument(
+        "--layers",
+        default=[0],
+        help="choose the layers to use for the model",
+    )
+    parser.add_argument(
+        "--train_mode",
+        default="all_pooled",
+        help="choose the layers to use for the model",
+        choices=["single_layers", "all_layers", "last_layer", "all_pooled"],
+    )
+    parser.add_argument(
+        "--dropout",
+        default=True,
+        help="add dropout to the model",
     )
 
     args = parser.parse_args()

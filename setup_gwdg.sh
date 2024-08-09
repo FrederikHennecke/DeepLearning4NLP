@@ -24,11 +24,11 @@ install_miniconda() {
 
 # Function to check if conda environment exists
 check_conda_env() {
-    if conda env list | grep -q "dnlp"; then
-        echo "Conda environment 'dnlp' already exists."
+    if conda env list | grep -q "dnlp2"; then
+        echo "Conda environment 'dnlp2' already exists."
     else
-        echo "Conda environment 'dnlp' does not exist. Creating environment..."
-        conda create -n dnlp python=3.10 -y
+        echo "Conda environment 'dnlp2' does not exist. Creating environment..."
+        conda create -n dnlp2 python=3.10 -y
     fi
 }
 
@@ -41,8 +41,8 @@ set -e
 # Initialize Conda for the current shell
 eval "$(conda shell.bash hook)"
 
-echo "Activating conda environment 'dnlp'..."
-conda activate dnlp
+echo "Activating conda environment 'dnlp2'..."
+conda activate dnlp2
 
 echo $CONDA_DEFAULT_ENV
 

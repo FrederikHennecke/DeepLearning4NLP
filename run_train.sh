@@ -12,8 +12,13 @@
 #SBATCH --output=./slurm_files/slurm-%x-%j.out     # where to write output, %x give job name, %j names job id
 #SBATCH --error=./slurm_files/slurm-%x-%j.err      # where to write slurm error
 
+# srun -p grete --pty -n 1 -C inet -c 80 -G A100:4 /bin/bash
 module load anaconda3
 source activate dnlp # Or whatever you called your environment.
+# conda install -y -c conda-forge spacy cupy spacy-transformers
+# pip install spacy-lookups-data
+# python -m spacy download en_core_web_sm
+
 
 # Printing out some info.
 echo "Submitting job with sbatch from directory: ${SLURM_SUBMIT_DIR}"
