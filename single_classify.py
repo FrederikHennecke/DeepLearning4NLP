@@ -26,6 +26,8 @@ from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW, SophiaG
 from contextlib import nullcontext
 from bert import BertLayer
+from transformers import get_linear_schedule_with_warmup
+
 
 TQDM_DISABLE = True
 
@@ -110,7 +112,6 @@ class MultitaskBERT(nn.Module):
             3 * BERT_HIDDEN_SIZE, 1
         )  # WARN Not needed anymore
         self.similarity_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
-        self.paraphrase_type_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 7)
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -402,7 +403,9 @@ def train_multitask(args):
         )
 
     # Init model
-    config = {
+    global config_dict
+
+    config_dict = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
@@ -417,7 +420,7 @@ def train_multitask(args):
         "dropout": args.dropout,
     }
 
-    config = SimpleNamespace(**config)
+    config = SimpleNamespace(**config_dict)
     ctx = (
         nullcontext()
         if not args.use_gpu
@@ -448,6 +451,15 @@ def train_multitask(args):
         )
     hess_interval = 10
     iter_num = 0
+
+    if args.scheduler == "linear_warmup":
+        scheduler = get_linear_schedule_with_warmup(
+            optimizer,
+            num_warmup_steps=0,
+            num_training_steps=len(sst_train_dataloader) * args.epochs,
+        )
+    else:
+        scheduler = None
 
     best_dev_acc = float("-inf")
 
@@ -481,6 +493,8 @@ def train_multitask(args):
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
                 optimizer.zero_grad(set_to_none=True)
+                if scheduler is not None:
+                    scheduler.step()
 
                 if (
                     hasattr(optimizer, "update_hessian")
@@ -678,7 +692,7 @@ def test_model(args):
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
 
-        return test_model_multitask(args, model, device)
+        return test_model_multitask(args, model, device, config_dict)
 
 
 def split_csv(split=0.8):
@@ -721,7 +735,7 @@ def get_args():
 
     # Model configuration
     parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument(
         "--option",
         type=str,
@@ -851,7 +865,7 @@ def get_args():
 
     # Hyperparameters
     parser.add_argument(
-        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=64
+        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=32
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
@@ -869,6 +883,12 @@ def get_args():
         help="choose the optimizer",
     )
     parser.add_argument(
+        "--scheduler",
+        default="linear_warmup",
+        choices=["linear_warmup", None],
+        help="choose the scheduler",
+    )
+    parser.add_argument(
         "--pooling",
         default="max",
         choices=[None, "max", "mean"],
@@ -876,7 +896,7 @@ def get_args():
     )
     parser.add_argument(
         "--additional_inputs",
-        default=False,
+        default=True,
         help="use additional inputs for the model",
     )
     parser.add_argument(
@@ -887,11 +907,13 @@ def get_args():
     parser.add_argument(
         "--layers",
         default=[0],
-        help="choose the layers to use for the model",
+        help="choose the layers that used for downstream tasks, "
+        "-2 means use pooled output, -1 means all layer,"
+        "else means the detail layers. default is -2",
     )
     parser.add_argument(
         "--train_mode",
-        default="all_pooled",
+        default="last_layer",
         help="choose the layers to use for the model",
         choices=["single_layers", "all_layers", "last_layer", "all_pooled"],
     )
@@ -899,6 +921,30 @@ def get_args():
         "--dropout",
         default=True,
         help="add dropout to the model",
+    )
+    parser.add_argument(
+        "--improve_dir",
+        type=str,
+        default="./improve_dir",
+        help="path to save the params",
+    )
+    parser.add_argument(
+        "--sst_improve_dir",
+        type=str,
+        default="./improve_dir/sst",
+        help="path to save the params",
+    )
+    parser.add_argument(
+        "--sts_improve_dir",
+        type=str,
+        default="./improve_dir/sts",
+        help="path to save the params",
+    )
+    parser.add_argument(
+        "--qqp_improve_dir",
+        type=str,
+        default="./improve_dir/qqp",
+        help="path to save the params",
     )
 
     args = parser.parse_args()

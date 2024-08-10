@@ -27,6 +27,8 @@ from datasets import (
     SentencePairTestDataset,
     load_multitask_data,
 )
+import os, json
+from datetime import datetime
 
 TQDM_DISABLE = True
 
@@ -346,7 +348,7 @@ def model_eval_test_multitask(
         )
 
 
-def test_model_multitask(args, model, device):
+def test_model_multitask(args, model, device, config_dict):
     sst_test_data, _, quora_test_data, sts_test_data, etpc_test_data = (
         load_multitask_data(
             args.sst_test, args.quora_test, args.sts_test, args.etpc_test, split="test"
@@ -465,41 +467,99 @@ def test_model_multitask(args, model, device):
         task,
     )
 
-    if task == "sst" or task == "multitask":
-        with open(args.sst_dev_out, "w+") as f:
-            print(f"dev sentiment acc :: {dev_sst_accuracy :.3f}")
-            f.write("id,Predicted_Sentiment\n")
-            for p, s in zip(dev_sst_sent_ids, dev_sst_y_pred):
-                f.write(f"{p}\t{s}\n")
+    if not os.path.exists(args.improve_dir):
+        os.makedirs(args.improve_dir)
 
-        with open(args.sst_test_out, "w+") as f:
-            f.write("id,Predicted_Sentiment\n")
-            for p, s in zip(test_sst_sent_ids, test_sst_y_pred):
-                f.write(f"{p}\t{s}\n")
+    if task == "sst" or task == "multitask":
+        print(f"dev sentiment acc :: {dev_sst_accuracy :.3f}")
+
+        if dev_sst_accuracy > 0.522:
+            print("Your score is higher than the baseline for sst task")
+            print("saving params")
+            if not os.path.exists(args.sst_improve_dir):
+                os.makedirs(args.sst_improve_dir)
+
+            with open(
+                os.path.join(
+                    args.sst_improve_dir,
+                    f"sst_params_{datetime.now().strftime('%Y%m%d-%H%M%S').json}",
+                ),
+                "w",
+            ) as f:
+                json.dump(config_dict, f)
+
+            with open(args.sst_dev_out, "w+") as f:
+                f.write("id,Predicted_Sentiment\n")
+                for p, s in zip(dev_sst_sent_ids, dev_sst_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+            with open(args.sst_test_out, "w+") as f:
+                f.write("id,Predicted_Sentiment\n")
+                for p, s in zip(test_sst_sent_ids, test_sst_y_pred):
+                    f.write(f"{p}\t{s}\n")
+        else:
+            print("your score is lower than the baseline for sst task")
 
     if task == "qqp" or task == "multitask":
-        with open(args.quora_dev_out, "w+") as f:
-            print(f"dev paraphrase acc :: {dev_quora_accuracy :.3f}")
-            f.write("id,Predicted_Is_Paraphrase\n")
-            for p, s in zip(dev_quora_sent_ids, dev_quora_y_pred):
-                f.write(f"{p}\t{s}\n")
+        print(f"dev paraphrase acc :: {dev_quora_accuracy :.3f}")
 
-        with open(args.quora_test_out, "w+") as f:
-            f.write("id,Predicted_Is_Paraphrase\n")
-            for p, s in zip(test_quora_sent_ids, test_quora_y_pred):
-                f.write(f"{p}\t{s}\n")
+        if dev_quora_accuracy > 0.806:
+            print("Your score is higher than the baseline for qqp task")
+            print("saving params")
+            if not os.path.exists(args.qqp_improve_dir):
+                os.makedirs(args.qqp_improve_dir)
+
+            with open(
+                os.path.join(
+                    args.qqp_improve_dir,
+                    f"qqp_params_{datetime.now().strftime('%Y%m%d-%H%M%S').json}",
+                ),
+                "w",
+            ) as f:
+                json.dump(config_dict, f)
+
+            with open(args.quora_dev_out, "w+") as f:
+                f.write("id,Predicted_Is_Paraphrase\n")
+                for p, s in zip(dev_quora_sent_ids, dev_quora_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+            with open(args.quora_test_out, "w+") as f:
+                f.write("id,Predicted_Is_Paraphrase\n")
+                for p, s in zip(test_quora_sent_ids, test_quora_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+        else:
+            print("your score is lower than the baseline for qqp task")
 
     if task == "sts" or task == "multitask":
-        with open(args.sts_dev_out, "w+") as f:
-            print(f"dev sts corr :: {dev_sts_corr :.3f}")
-            f.write("id,Predicted_Similarity\n")
-            for p, s in zip(dev_sts_sent_ids, dev_sts_y_pred):
-                f.write(f"{p}\t{s}\n")
+        print(f"dev sts corr :: {dev_sts_corr :.3f}")
 
-        with open(args.sts_test_out, "w+") as f:
-            f.write("id,Predicted_Similarity\n")
-            for p, s in zip(test_sts_sent_ids, test_sts_y_pred):
-                f.write(f"{p}\t{s}\n")
+        if dev_sts_corr > 0.414:
+            print("Your score is higher than the baseline for sts task")
+            print("saving params")
+            if not os.path.exists(args.sts_improve_dir):
+                os.makedirs(args.sts_improve_dir)
+
+            with open(
+                os.path.join(
+                    args.sts_improve_dir,
+                    f"sts_params_{datetime.now().strftime('%Y%m%d-%H%M%S').json}",
+                ),
+                "w",
+            ) as f:
+                json.dump(config_dict, f)
+
+            with open(args.sts_dev_out, "w+") as f:
+                f.write("id,Predicted_Similarity\n")
+                for p, s in zip(dev_sts_sent_ids, dev_sts_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+            with open(args.sts_test_out, "w+") as f:
+                f.write("id,Predicted_Similarity\n")
+                for p, s in zip(test_sts_sent_ids, test_sts_y_pred):
+                    f.write(f"{p}\t{s}\n")
+        else:
+            print("your score is lower than the baseline for sts task")
 
     if task == "etpc" or task == "multitask":
         with open(args.etpc_dev_out, "w+") as f:

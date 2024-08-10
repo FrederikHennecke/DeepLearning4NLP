@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from base_bert import BertPreTrainedModel
 from utils import get_extended_attention_mask
-import spacy
 
 
 class BertSelfAttention(nn.Module):
@@ -205,6 +204,8 @@ class BertModel(BertPreTrainedModel):
         self.pooler_af = nn.Tanh()
 
         # initialize parameters for more input features
+        import spacy
+
         spacy.prefer_gpu()
         self.nlp = spacy.load("en_core_web_sm")
         ner_tags_spacy = self.nlp.get_pipe("ner").labels
@@ -244,6 +245,7 @@ class BertModel(BertPreTrainedModel):
 
         if self.config.additional_inputs:
             # get the pos and ner tags
+            print("Getting pos and ner tags")
 
             all_pos_tags = []
             all_ner_tags = []
