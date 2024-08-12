@@ -421,6 +421,8 @@ def train_multitask(args):
     }
 
     config = SimpleNamespace(**config_dict)
+    print(f"config: {config}")
+
     ctx = (
         nullcontext()
         if not args.use_gpu
@@ -691,8 +693,7 @@ def test_model(args):
         model.load_state_dict(saved["model"])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
-
-        return test_model_multitask(args, model, device, config_dict)
+        test_model_multitask(args, model, device, config_dict)
 
 
 def split_csv(split=0.8):

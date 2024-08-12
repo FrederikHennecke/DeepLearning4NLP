@@ -4,13 +4,18 @@ import os
 import zipfile
 
 # Collect predictions
+predictions_dir = "predictions/bert/multitask/train_multitask_alldata_STS_QQP_improve"
 required_files = []
-for root, dirs, files in os.walk("predictions"):
-    required_files += [os.path.join(root, file) for file in files if not file.endswith(".gitkeep")]
+
+for files in os.listdir(predictions_dir):
+    required_files += [os.path.join(predictions_dir, files)]
+
+print(f"required_files: {required_files}")
+print(f"len(required_files): {len(required_files)}")
 
 
 def main():
-    aid = "dnlp_final_project_submission"
+    aid = "alldata_multitask_STS_QQP_improvement"
     with zipfile.ZipFile(f"{aid}.zip", "w") as zz:
         for file in required_files:
             zz.write(file, os.path.join(".", file))

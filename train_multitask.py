@@ -8,12 +8,15 @@ import re
 import sys
 import time
 from types import SimpleNamespace
+import subprocess
+from datetime import datetime
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from bert import BertModel
@@ -28,9 +31,10 @@ from contextlib import nullcontext
 from bert import BertLayer
 from transformers import get_linear_schedule_with_warmup
 import math
+import warnings
+import json
 
-
-TQDM_DISABLE = True
+warnings.filterwarnings("ignore", category=UserWarning, module="torch.autograd")
 
 
 # fix the random seed
@@ -44,9 +48,12 @@ def seed_everything(seed=11711):
     torch.backends.cudnn.deterministic = True
 
 
+TQDM_DISABLE = False
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
+MAX_Position_EMBEDDINGS = 512
+os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
 
 
 class AttentionLayer(nn.Module):
@@ -67,7 +74,7 @@ class AttentionLayer(nn.Module):
 
 class MultitaskBERT(nn.Module):
     """
-    This module should use BERT for these tasks:
+    This should use BERT for these tasks:
 
     - Sentiment classification (predict_sentiment)
     - Paraphrase detection (predict_paraphrase)
@@ -77,6 +84,10 @@ class MultitaskBERT(nn.Module):
 
     def __init__(self, config):
         super(MultitaskBERT, self).__init__()
+
+        self.bert = BertModel.from_pretrained(
+            "bert-base-uncased", local_files_only=config.local_files_only
+        )
 
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -110,9 +121,7 @@ class MultitaskBERT(nn.Module):
         all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
             input_ids, attention_mask
         )
-        attention_results = self.attention_layer(
-            all_encoded_layers["last_hidden_state"]
-        )
+        attention_results = self.attention_layer(all_sequences["last_hidden_state"])
         return attention_results
 
     def predict_sentiment(self, input_ids, attention_mask):
@@ -137,7 +146,7 @@ class MultitaskBERT(nn.Module):
         abs_diff = torch.abs(combined_bert_embeddings1 - combined_bert_embeddings2)
         abs_sum = torch.abs(combined_bert_embeddings1 + combined_bert_embeddings2)
 
-        concatenated_features = torch.cat(abs_diff, abs_sum, dim=1)
+        concatenated_features = torch.cat((abs_diff, abs_sum), dim=1)
 
         paraphrase_logits = F.relu(self.paraphrase_linear1(concatenated_features))
         paraphrase_logits = F.relu(self.paraphrase_linear2(paraphrase_logits))
@@ -161,6 +170,7 @@ class MultitaskBERT(nn.Module):
         similarity = F.cosine_similarity(bert_embeddings1, bert_embeddings2)
         return similarity * 5
 
+
 def save_model(model, optimizer, args, config, filepath):
     save_info = {
         "model": model.state_dict(),
@@ -175,14 +185,17 @@ def save_model(model, optimizer, args, config, filepath):
     torch.save(save_info, filepath)
     print(f"Saving the model to {filepath}.")
 
+
 def load_model(filepath, model, optimizer, use_gpu):
     if not os.path.isfile(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
 
-    save_info = torch.load(filepath, map_location= torch.device('cuda') if use_gpu else 'cpu'))
+    save_info = torch.load(
+        filepath, map_location=torch.device("cuda") if use_gpu else "cpu"
+    )
     model.load_state_dict(save_info["model"])
     optimizer.load_state_dict(save_info["optim"])
-    args= save_info["args"]
+    args = save_info["args"]
     args.use_gpu = use_gpu
     config = save_info["model_config"]
 
@@ -192,16 +205,13 @@ def load_model(filepath, model, optimizer, use_gpu):
     print(f"Loading the model from {filepath}.")
     return model, optimizer, args, config
 
+
 def train_multitask(args):
     if isinstance(args, dict):
-        args= SimpleNamespace(**args)
+        args = SimpleNamespace(**args)
 
-    train_all_datasets= True
-    n_datasets= args.sst + args.sts + args.para
-    if args.sst or args.sts or args.para:
-        train_all_datasets= False
-    if n_datasets == 0:
-        n_datasets= 3
+    train_all_datasets = True
+    n_datasets = 3
 
     # Load data
     # Create the data and its corresponding datasets and dataloader:
@@ -214,8 +224,10 @@ def train_multitask(args):
             split="train",
         )
     )
-    sst_dev_data, num_labels, para_dev_data, sts_dev_data, etpc_dev_data = load_multitask_data(
-        args.sst_dev, args.quora_dev, args.sts_dev, args.etpc_dev, split="train"
+    sst_dev_data, num_labels, para_dev_data, sts_dev_data, etpc_dev_data = (
+        load_multitask_data(
+            args.sst_dev, args.quora_dev, args.sts_dev, args.etpc_dev, split="train"
+        )
     )
 
     sst_train_dataloader = None
@@ -228,15 +240,19 @@ def train_multitask(args):
     etpc_dev_dataloader = None
     total_num_batches = 0
 
-    sst_train_data = SentenceClassificationDataset(sst_train_data, args, override_length=args.sample_per_epoch)
-    sst_dev_data = SentenceClassificationDataset(sst_dev_data, args, override_length=10 if args.smoketest else None)
+    sst_train_data = SentenceClassificationDataset(
+        sst_train_data, args, override_length=args.samples_per_epoch
+    )
+    sst_dev_data = SentenceClassificationDataset(
+        sst_dev_data, args, override_length=10 if args.smoketest else None
+    )
 
     sst_train_dataloader = DataLoader(
         sst_train_data,
-        shuffle= False,     # check the shuffling later
+        shuffle=True,  # check the shuffling later
         batch_size=args.batch_size,
         collate_fn=sst_train_data.collate_fn,
-        num_workers= 2,
+        num_workers=2,
     )
     sst_dev_dataloader = DataLoader(
         sst_dev_data,
@@ -246,12 +262,16 @@ def train_multitask(args):
         num_workers=2,
     )
 
-    para_train_data = SentencePairDataset(para_train_data, args, override_length=args.sample_per_epoch)
-    para_dev_data = SentencePairDataset(para_dev_data, args, override_length=10 if args.smoketest else None)
+    para_train_data = SentencePairDataset(
+        para_train_data, args, override_length=args.samples_per_epoch
+    )
+    para_dev_data = SentencePairDataset(
+        para_dev_data, args, override_length=10 if args.smoketest else None
+    )
 
     para_train_dataloader = DataLoader(
         para_train_data,
-        shuffle=False,
+        shuffle=True,
         batch_size=args.batch_size,
         collate_fn=para_train_data.collate_fn,
         num_workers=2,
@@ -264,13 +284,16 @@ def train_multitask(args):
         num_workers=2,
     )
 
-
-    sts_train_data = SentencePairDataset(sts_train_data, args, override_length=args.sample_per_epoch)
-    sts_dev_data = SentencePairDataset(sts_dev_data, args, override_length=10 if args.smoketest else None)
+    sts_train_data = SentencePairDataset(
+        sts_train_data, args, override_length=args.samples_per_epoch
+    )
+    sts_dev_data = SentencePairDataset(
+        sts_dev_data, args, override_length=10 if args.smoketest else None
+    )
 
     sts_train_dataloader = DataLoader(
         sts_train_data,
-        shuffle=False,
+        shuffle=True,
         batch_size=args.batch_size,
         collate_fn=sts_train_data.collate_fn,
         num_workers=2,
@@ -283,20 +306,31 @@ def train_multitask(args):
         num_workers=2,
     )
 
-    tottal_num_batches += math.ceil(args.samples_per_epoch / args.batch_size)
+    total_num_batches += math.ceil(args.samples_per_epoch / args.batch_size)
     # Init model
-    global config_dict
 
-    config_dict = {
+    config = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
-        'num_labels': num_labels,
+        "num_labels": num_labels,
         "data_dir": ".",
         "option": args.option,
         "local_files_only": args.local_files_only,
         "additional_inputs": args.additional_inputs,
+        "hidden_size": BERT_HIDDEN_SIZE,
+        "num_hidden_layers": N_HIDDEN_LAYERS,
+        "max_position_embeddings": MAX_Position_EMBEDDINGS,
     }
+    name = f"{datetime.now().strftime('%m%d-%H%M')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.task}"
+    args.filepath = f"models1/multitask_classifier/{name}.pt"  # save path
 
-    config = SimpleNamespace(**config_dict)
+    save_params_dir = args.config_save_dir + name + ".json"
+    train_params = pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)})
+
+    with open(save_params_dir, "w") as f:
+        json.dump(train_params, f)
+
+    config = SimpleNamespace(**config)
+
     separator = "-" * 30
     print(separator)
     print("    Multitask BERT Model Configuration")
@@ -304,31 +338,60 @@ def train_multitask(args):
     print(pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)}))
     print(separator)
 
+    # Print Git info
+    branch = (
+        subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        .decode("utf-8")
+        .strip()
+    )
+    commit = (
+        subprocess.check_output(["git", "rev-parse", "HEAD"])
+        .decode("utf-8")
+        .strip()[:8]
+    )
+    is_modified = (
+        "(!)"
+        if subprocess.check_output(["git", "status", "--porcelain"])
+        .decode("utf-8")
+        .strip()
+        else ""
+    )
+
+    # Print Git info
+    print(f"Git Branch: {branch}")
+    print(f"Git Hash: {commit} {is_modified}")
+    print("-" * 60)  # Adjust as needed
+    print(f"Command: {' '.join(sys.argv)}")
+    print(separator)
+
     model = MultitaskBERT(config)
-    device= torch.device('*cpu')
+    device = torch.device("cpu")
     if torch.cuda.is_available() and args.use_gpu:
-        device= torch.device('cuda')
+        device = torch.device("cuda")
         if torch.cuda.device_count() > 1:
             print(f"Using {torch.cuda.device_count()} GPUs", file=sys.stderr)
-            model= nn.DataParallel(model)
+            model = nn.DataParallel(model).module
     model = model.to(device)
 
     lr = args.lr
-    hess_interval= args.hess_interval
-    ctx= (nullcontext()
-    if not args.use_gpu else torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16))
+    hess_interval = args.hess_interval
+    ctx = (
+        nullcontext()
+        if not args.use_gpu
+        else torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
+    )
 
     if args.optimizer == "adamw":
-        optimizer = AdamW(model.parameters(), lr=lr, weight_decay= args.weight_decay)
+        optimizer = AdamW(model.parameters(), lr=lr, weight_decay=args.weight_decay)
     elif args.optimizer == "sophiah":
         optimizer = SophiaH(
             model.parameters(),
             lr=lr,
             eps=1e-12,
-            rho= args.rho,
+            rho=args.rho,
             betas=(0.985, 0.99),
             weight_decay=args.weight_decay,
-            update_interval= hess_interval
+            update_period=hess_interval,
         )
     else:
         raise ValueError(f"Invalid optimizer: {args.optimizer}")
@@ -345,7 +408,8 @@ def train_multitask(args):
         )
     elif args.scheduler == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=1, eta_min=1)
+            optimizer, T_max=1, eta_min=1
+        )
     else:
         scheduler = None
 
@@ -354,4 +418,547 @@ def train_multitask(args):
     best_dev_acc_sts = 0
 
     if args.checkpoint:
-        model, optimizer, _, config = load_model(args.checkpoint, model, optimizer, args.use_gpu)
+        model, optimizer, _, config = load_model(
+            args.checkpoint, model, optimizer, args.use_gpu
+        )
+    path = (
+        args.logdir
+        + "/multitask_classifier/"
+        + (f"{args.tensorboard_subfolder}/" if args.tensorboard_subfolder else "")
+        + name
+    )
+    writer = SummaryWriter(log_dir=path)
+
+    writer.add_hparams(vars(args), {}, run_name="hparams")
+
+    if args.profiler:
+        prof = torch.profiler.profile(
+            schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(path + "_profiler"),
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+        )
+        prof.start()
+
+    for epoch in range(args.epochs):
+        model.train()
+        train_loss = 0
+        num_batches = 0
+        num_layers = N_HIDDEN_LAYERS
+
+        # unfreeze layers in case of pretraining
+        unfreeze = set()
+        if args.unfreeze_interval and args.option == "pretrain":
+            for name, param in model.named_parameters():
+                if not name.startswith("bert_layers"):
+                    continue
+                layer_num = int(name.split(".")[1])
+                unfreeze_up_to = num_layers - epoch // args.unfreeze_interval
+                if layer_num >= unfreeze_up_to:
+                    unfreeze.add(layer_num)
+                else:
+                    param.requires_grad = True
+
+        if len(unfreeze) > 0:
+            print(f"Unfreezing layers {unfreeze}", file=sys.stderr)
+
+        for sts, para, sst in tqdm(
+            zip(sts_train_dataloader, para_train_dataloader, sst_train_dataloader),
+            total=total_num_batches,
+            disable=TQDM_DISABLE,
+            desc=f"train-{epoch}",
+        ):
+
+            optimizer.zero_grad()
+            sts_loss, para_loss, sst_loss = 0, 0, 0
+
+            # STS
+            if train_all_datasets or args.sts:
+                b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
+                    sts["token_ids_1"],
+                    sts["attention_mask_1"],
+                    sts["token_ids_2"],
+                    sts["attention_mask_2"],
+                    sts["labels"],
+                )
+
+                b_ids_1 = b_ids_1.to(device)
+                b_mask_1 = b_mask_1.to(device)
+                b_ids_2 = b_ids_2.to(device)
+                b_mask_2 = b_mask_2.to(device)
+                b_labels = b_labels.to(device)
+
+                with ctx:
+                    sts_logits = model.predict_similarity(
+                        b_ids_1, b_mask_1, b_ids_2, b_mask_2
+                    )
+                    b_labels = b_labels.to(torch.float32)
+                    sts_loss = F.mse_loss(sts_logits, b_labels)
+
+            # PARAPHRASE
+            if train_all_datasets or args.para:
+                b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
+                    para["token_ids_1"],
+                    para["attention_mask_1"],
+                    para["token_ids_2"],
+                    para["attention_mask_2"],
+                    para["labels"],
+                )
+
+                b_ids_1 = b_ids_1.to(device)
+                b_mask_1 = b_mask_1.to(device)
+                b_ids_2 = b_ids_2.to(device)
+                b_mask_2 = b_mask_2.to(device)
+                b_labels = b_labels.to(device)
+
+                with ctx:
+                    para_logits = model.predict_paraphrase_train(
+                        b_ids_1, b_mask_1, b_ids_2, b_mask_2
+                    )
+                    para_loss = F.cross_entropy(para_logits, b_labels.view(-1))
+
+            # SST
+            if train_all_datasets or args.sst:
+                b_ids, b_mask, b_labels = (
+                    sst["token_ids"],
+                    sst["attention_mask"],
+                    sst["labels"],
+                )
+
+                b_ids = b_ids.to(device)
+                b_mask = b_mask.to(device)
+                b_labels = b_labels.to(device)
+
+                with ctx:
+                    sst_logits = model.predict_sentiment(b_ids, b_mask)
+                    sst_loss = F.cross_entropy(sst_logits, b_labels.view(-1))
+
+            # Combine Losses
+            full_loss = sts_loss + para_loss + sst_loss
+            full_loss.backward(
+                create_graph=True if args.optimizer == "sophiah" else False
+            )
+
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+
+            optimizer.step()
+            optimizer.zero_grad()
+            train_loss += full_loss.item()
+            num_batches += 1
+
+            if args.scheduler == "cosine":
+                scheduler.step(epoch + num_batches / total_num_batches)
+            writer.add_scalar(
+                "Loss/train", full_loss.item(), epoch * total_num_batches + num_batches
+            )
+
+            if args.profiler:
+                prof.step()
+
+        train_loss = train_loss / num_batches
+        writer.add_scalar("Loss/train", train_loss, epoch)
+
+        # Evaluate
+        (
+            para_train_acc,
+            _,
+            _,
+            sst_train_acc,
+            _,
+            _,
+            sts_train_acc,
+            _,
+            _,
+            etpc_train_acc,
+            _,
+            _,
+        ) = model_eval_multitask(
+            sst_train_dataloader,
+            para_train_dataloader,
+            sts_train_dataloader,
+            etpc_train_dataloader,
+            model=model,
+            device=device,
+            task=args.task,
+        )
+
+        para_dev_acc, _, _, sst_dev_acc, _, _, sts_dev_acc, _, _, etpc_dev_acc, _, _ = (
+            model_eval_multitask(
+                sst_dev_dataloader,
+                para_dev_dataloader,
+                sts_dev_dataloader,
+                etpc_dev_dataloader,
+                model=model,
+                device=device,
+                task=args.task,
+            )
+        )
+
+        writer.add_scalar("para_acc/train/Epochs", para_train_acc, epoch)
+        writer.add_scalar("para_acc/dev/Epochs", para_dev_acc, epoch)
+        writer.add_scalar("sst_acc/train/Epochs", sst_train_acc, epoch)
+        writer.add_scalar("sst_acc/dev/Epochs", sst_dev_acc, epoch)
+        writer.add_scalar("sts_acc/train/Epochs", sts_train_acc, epoch)
+        writer.add_scalar("sts_acc/dev/Epochs", sts_dev_acc, epoch)
+
+        if (
+            para_dev_acc > best_dev_acc_para
+            and sst_dev_acc > best_dev_acc_sst
+            and sts_dev_acc > best_dev_acc_sts
+        ):
+            best_dev_acc_para = para_dev_acc
+            best_dev_acc_sst = sst_dev_acc
+            best_dev_acc_sts = sts_dev_acc
+            if args.hpo:
+                args.filepath = f"ray_checkpoint/{session.get_trial_name()}-{epoch}.pt"
+
+            save_model(model, optimizer, args, config, args.filepath)
+        train_acc = para_train_acc + sst_train_acc + sts_train_acc
+        dev_acc = para_dev_acc + sst_dev_acc + sts_dev_acc
+
+        if args.hpo:
+            session.report(
+                {
+                    "sst_dev_acc": sst_dev_acc,
+                    "para_dev_acc": para_dev_acc,
+                    "sts_dev_acc": sts_dev_acc,
+                    "mean_dev_acc": dev_acc / 3,
+                    "mean_train_acc": train_acc / 3,
+                }
+            )
+        if args.scheduler == "plateau":
+            scheduler.step(dev_acc)
+
+        writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
+        writer.add_scalar("acc/train/Epochs", train_acc, epoch)
+        writer.add_scalar("acc/dev/Epochs", dev_acc, epoch)
+        print(
+            f"Epoch {epoch}: Avg Train Loss :: {train_loss/3 :.3f}, Avg Train Acc :: {train_acc/3:.3f}, Avg Dev Acc :: {dev_acc/3:.3f}"
+        )
+
+
+def test_model(args):
+    with torch.no_grad():
+        device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
+        saved = torch.load(args.filepath)
+        config = saved["model_config"]
+
+        model = MultitaskBERT(config)
+        model.load_state_dict(saved["model"])
+        model = model.to(device)
+        print(f"Loaded model to test from {args.filepath}")
+
+        test_model_multitask(args, model, device, config)
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+
+    # Training task
+    parser.add_argument(
+        "--task",
+        type=str,
+        help='choose between "sst","sts","qqp","etpc","multitask" to train for different tasks ',
+        choices=("sst", "sts", "qqp", "etpc", "multitask"),
+        default="multitask",
+    )
+
+    # Model configuration
+    parser.add_argument("--seed", type=int, default=11711)
+    parser.add_argument(
+        "--option",
+        type=str,
+        help="pretrain: the BERT parameters are frozen; finetune: BERT parameters are updated",
+        choices=("pretrain", "finetune"),
+        default="finetune",
+    )
+    parser.add_argument("--use_gpu", action="store_true")
+
+    args, _ = parser.parse_known_args()
+
+    # Dataset paths
+    parser.add_argument("--sst_train", type=str, default="data/sst-sentiment-train.csv")
+    parser.add_argument("--sst_dev", type=str, default="data/sst-sentiment-dev.csv")
+    parser.add_argument(
+        "--sst_test", type=str, default="data/sst-sentiment-test-student.csv"
+    )
+
+    parser.add_argument(
+        "--quora_train", type=str, default="data/quora-paraphrase-train.csv"
+    )
+    parser.add_argument(
+        "--quora_dev", type=str, default="data/quora-paraphrase-dev.csv"
+    )
+    parser.add_argument(
+        "--quora_test", type=str, default="data/quora-paraphrase-test-student.csv"
+    )
+
+    parser.add_argument(
+        "--sts_train", type=str, default="data/sts-similarity-train.csv"
+    )
+    parser.add_argument("--sts_dev", type=str, default="data/sts-similarity-dev.csv")
+    parser.add_argument(
+        "--sts_test", type=str, default="data/sts-similarity-test-student.csv"
+    )
+
+    parser.add_argument(
+        "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
+    )
+    parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
+    parser.add_argument(
+        "--etpc_test",
+        type=str,
+        default="data/etpc-paraphrase-detection-test-student.csv",
+    )
+
+    parser.add_argument(
+        "--etpc_dev_out",
+        type=str,
+        default=(
+            "predictions/bert/etpc-paraphrase-detection-dev-output.csv"
+            if not args.task == "multitask"
+            else "predictions/bert/multitask/etpc-paraphrase-detection-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--etpc_test_out",
+        type=str,
+        default=(
+            "predictions/bert/etpc-paraphrase-detection-test-output.csv"
+            if not args.task == "multitask"
+            else "predictions/bert/multitask/etpc-paraphrase-detection-test-output.csv"
+        ),
+    )
+    parser.add_argument("--unfreeze_interval", type=int, default=None)
+    parser.add_argument("--additional_inputs", action="store_false")
+    parser.add_argument("--profiler", action="store_true")
+    parser.add_argument("--sts", action="store_true")
+    parser.add_argument("--sst", action="store_true")
+    parser.add_argument("--para", action="store_true")
+
+    parser.add_argument("--logdir", type=str, default="logdir")
+    parser.add_argument(
+        "--config_save_dir", type=str, default="./config_params/bert/multitask/"
+    )
+
+    parser.add_argument(
+        "--optimizer",
+        type=str,
+        choices=("adamw", "sophiah"),
+        default="adamw",
+    )
+    parser.add_argument(
+        "--rho", type=float, default=0.05, help="rho for SophiaH optimizer"
+    )
+    parser.add_argument("--weight_decay", type=float, default=0.05)
+    parser.add_argument(
+        "--hess_interval",
+        type=int,
+        default=10,
+        help="Hessian update interval for SophiaH",
+    )
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+
+    args, _ = parser.parse_known_args()
+    parser.add_argument("--epochs", type=int, default=20 if not args.smoketest else 1)
+    # hyper parameters
+    parser.add_argument(
+        "--batch_size",
+        help="sst: 64 can fit a 12GB GPU",
+        type=int,
+        default=64 if not args.smoketest else 64,
+    )
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
+    parser.add_argument(
+        "--clip", type=float, default=0.25, help="value used gradient clipping"
+    )
+    parser.add_argument(
+        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
+    )
+
+    parser.add_argument(
+        "--lr",
+        type=float,
+        help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
+        default=(
+            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            if args.option == "finetune"
+            else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+        ),
+    )
+    parser.add_argument("--checkpoint", type=str, default=None)
+    parser.add_argument("--tensorboard_subfolder", type=str, default=None)
+    parser.add_argument("--local_files_only", action="store_true")
+    parser.add_argument(
+        "--scheduler",
+        type=str,
+        default="plateau",
+        choices=("plateau", "cosine", "none"),
+    )
+    parser.add_argument(
+        "--hpo", action="store_true", help="Activate hyperparameter optimization"
+    )
+    parser.add_argument(
+        "--hpo_trials",
+        type=int,
+        default=20 if not args.smoketest else 1,
+        help="Number of trials for HPO",
+    )
+
+    args, _ = parser.parse_known_args()
+    record_time = datetime.now().strftime("%m%d-%H%M")
+    path = f"{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.task}"
+    predictions_path = f"./predictions/bert/multitask/{path}"
+    if not os.path.exists(predictions_path):
+        os.makedirs(predictions_path, exist_ok=True)
+
+    # Output paths
+    parser.add_argument(
+        "--sst_dev_out",
+        type=str,
+        default=(
+            f"predictions/bert/sst-sentiment-dev-output.csv"
+            if not args.task == "multitask"
+            else f"{predictions_path}/{record_time}_sst-sentiment-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--sst_test_out",
+        type=str,
+        default=(
+            f"predictions/bert/sst-sentiment-test-output.csv"
+            if not args.task == "multitask"
+            else f"{predictions_path}/{record_time}_sst-sentiment-test-output.csv"
+        ),
+    )
+
+    parser.add_argument(
+        "--quora_dev_out",
+        type=str,
+        default=(
+            "predictions/bert/quora-paraphrase-dev-output.csv"
+            if not args.task == "multitask"
+            else f"{predictions_path}/{record_time}_quora-paraphrase-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--quora_test_out",
+        type=str,
+        default=(
+            "predictions/bert/quora-paraphrase-test-output.csv"
+            if not args.task == "multitask"
+            else f"{predictions_path}/{record_time}_quora-paraphrase-test-output.csv"
+        ),
+    )
+
+    parser.add_argument(
+        "--sts_dev_out",
+        type=str,
+        default=(
+            "predictions/bert/sts-similarity-dev-output.csv"
+            if not args.task == "multitask"
+            else f"{predictions_path}/{record_time}_sts-similarity-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--sts_test_out",
+        type=str,
+        default=(
+            "predictions/bert/sts-similarity-test-output.csv"
+            if not args.task == "multitask"
+            else f"{predictions_path}/{record_time}_sts-similarity-test-output.csv"
+        ),
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+if __name__ == "__main__":
+    if not os.path.exists("./logdir/multitas_classifier"):
+        os.makedirs("./logdir/multitask_classifier", exist_ok=True)
+    if not os.path.exists("./ray_checkpoint"):
+        os.makedirs("./ray_checkpoint", exist_ok=True)
+    if not os.path.exists("./config_params/bert/multitask"):
+        os.makedirs("./config_params/bert/multitask", exist_ok=True)
+
+    args = get_args()
+    seed_everything(args.seed)
+
+    if args.hpo:
+
+        def format_value(value):
+            if isinstance(value, float):
+                return "{:.2e}".format(value)
+            return value
+
+        import ray
+        from ray import tune, air
+        from ray.air import session
+        from ray.tune.schedulers import ASHAScheduler
+        from ray.tune.search.optuna import OptunaSearch
+
+        config = vars(args)
+        tune_config = {
+            "weight_decay": tune.choice([0.1, 0.01, 0.001, 0.0001, 0]),
+            "hidden_dropout_prob": tune.choice([0.0, 0.1, 0.2, 0.3, 0.4, 0.5]),
+            "clip": tune.loguniform(0.01, 10),
+        }
+        config.update(tune_config)
+
+        scheduler = ASHAScheduler(
+            metric="mean_dev_acc",
+            mode="max",
+            max_t=args.epochs,
+            grace_period=min(2, args.epochs),
+            reduction_factor=2,
+        )
+
+        algo = OptunaSearch(
+            metric=["sst_dev_acc", "para_dev_acc", "sts_dev_acc"], mode=["max"] * 3
+        )
+
+        ray.init(log_to_driver=False)
+
+        tuner = tune.Tuner(
+            tune.with_resources(
+                tune.with_parameters(train_multitask),
+                resources={"cpu": 16, "gpu": 2 if args.use_gpu else 0},
+            ),
+            tune_config=tune.TuneConfig(
+                num_samples=args.hpo_trials,
+                scheduler=scheduler,
+                search_alg=algo,
+                max_concurrent_trials=2,
+                trial_dirname_creator=lambda trial: f"{trial.trainable_name}_{trial.trial_id}_{'.'.join(f'{k}={format_value(v)}' for k, v in trial.evaluated_params.items())}",
+            ),
+            run_config=air.RunConfig(
+                log_to_file="std.log",
+                verbose=1,
+            ),
+            param_space=config,
+        )
+        results = tuner.fit()
+        best_result = results.get_best_result("mean_dev_acc", "max")
+
+        separator = "=" * 60
+        print(separator)
+        print("   Best Multitask BERT Model Configuration")
+        print(separator)
+        filtered_vars = {
+            k: v
+            for k, v in best_result.config.items()
+            if "csv" not in str(v) and "pt" not in str(v)
+        }
+        print(pformat(filtered_vars))
+        print(separator)
+        print(f"Best mean_dev_acc: {best_result.metrics.get('mean_dev_acc', 'N/A')}")
+
+        config["weight_decay"] = best_result.config["weight_decay"]
+        config["hidden_dropout_prob"] = best_result.config["hidden_dropout_prob"]
+        config["clip"] = best_result.config["clip"]
+
+    train_multitask(args)
+    test_model(args)
