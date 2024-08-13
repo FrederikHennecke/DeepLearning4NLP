@@ -268,7 +268,7 @@ def finetune_paraphrase_generation(args):
     dev_data = transform_data(dev_dataset, shuffle=False, target_encoding=True)
     test_data = transform_data(test_dataset, shuffle=False, target_encoding=False)
 
-    model = train_model(model, train_data, dev_dataset, device, tokenizer)
+    model = train_model(model, train_data, dev_data, device, tokenizer)
 
     print("Training finished.")
 
