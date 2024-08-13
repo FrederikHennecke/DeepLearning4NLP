@@ -1,0 +1,318 @@
+================================================================================
+JobID = 636096
+User = u11450, Account = nhr_dnlpss24_g04
+Partition = grete, Nodelist = ggpu122
+================================================================================
+Submitting job with sbatch from directory: /home/frederik.hennecke/u11450/DeepLearning4NLP
+Home directory: /user/frederik.hennecke/u11450
+Working directory: /home/frederik.hennecke/u11450/DeepLearning4NLP
+Current node: ggpu122
+Python 3.10.14
+Collecting environment information...
+PyTorch version: 2.2.0
+Is debug build: False
+CUDA used to build PyTorch: 12.1
+ROCM used to build PyTorch: N/A
+
+OS: Rocky Linux 8.8 (Green Obsidian) (x86_64)
+GCC version: (GCC) 8.5.0 20210514 (Red Hat 8.5.0-18)
+Clang version: Could not collect
+CMake version: version 3.20.2
+Libc version: glibc-2.28
+
+Python version: 3.10.14 (main, May  6 2024, 19:42:50) [GCC 11.2.0] (64-bit runtime)
+Python platform: Linux-4.18.0-477.21.1.el8_8.x86_64-x86_64-with-glibc2.28
+Is CUDA available: True
+CUDA runtime version: Could not collect
+CUDA_MODULE_LOADING set to: LAZY
+GPU models and configuration: 
+GPU 0: NVIDIA A100-SXM4-40GB
+GPU 1: NVIDIA A100-SXM4-40GB
+GPU 2: NVIDIA A100-SXM4-40GB
+GPU 3: NVIDIA A100-SXM4-40GB
+
+Nvidia driver version: 535.104.12
+cuDNN version: Probably one of the following:
+/usr/lib64/libcudnn.so.8.9.5
+/usr/lib64/libcudnn_adv_infer.so.8.9.5
+/usr/lib64/libcudnn_adv_train.so.8.9.5
+/usr/lib64/libcudnn_cnn_infer.so.8.9.5
+/usr/lib64/libcudnn_cnn_train.so.8.9.5
+/usr/lib64/libcudnn_ops_infer.so.8.9.5
+/usr/lib64/libcudnn_ops_train.so.8.9.5
+HIP runtime version: N/A
+MIOpen runtime version: N/A
+Is XNNPACK available: True
+
+CPU:
+Architecture:        x86_64
+CPU op-mode(s):      32-bit, 64-bit
+Byte Order:          Little Endian
+CPU(s):              128
+On-line CPU(s) list: 0-127
+Thread(s) per core:  2
+Core(s) per socket:  32
+Socket(s):           2
+NUMA node(s):        8
+Vendor ID:           AuthenticAMD
+CPU family:          25
+Model:               1
+Model name:          AMD EPYC 7513 32-Core Processor
+Stepping:            1
+CPU MHz:             2600.000
+CPU max MHz:         3681.6399
+CPU min MHz:         1500.0000
+BogoMIPS:            5200.48
+Virtualization:      AMD-V
+L1d cache:           32K
+L1i cache:           32K
+L2 cache:            512K
+L3 cache:            32768K
+NUMA node0 CPU(s):   0-7,64-71
+NUMA node1 CPU(s):   8-15,72-79
+NUMA node2 CPU(s):   16-23,80-87
+NUMA node3 CPU(s):   24-31,88-95
+NUMA node4 CPU(s):   32-39,96-103
+NUMA node5 CPU(s):   40-47,104-111
+NUMA node6 CPU(s):   48-55,112-119
+NUMA node7 CPU(s):   56-63,120-127
+Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local clzero irperf xsaveerptr wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm
+
+Versions of relevant libraries:
+[pip3] numpy==1.26.4
+[pip3] torch==2.2.0
+[pip3] torchaudio==2.2.0
+[pip3] torchvision==0.17.0
+[pip3] triton==2.2.0
+[conda] blas                      1.0                         mkl  
+[conda] ffmpeg                    4.3                  hf484d3e_0    pytorch
+[conda] libjpeg-turbo             2.0.0                h9bf148f_0    pytorch
+[conda] mkl                       2023.1.0         h213fc3f_46344  
+[conda] mkl-service               2.4.0           py310h5eee18b_1  
+[conda] mkl_fft                   1.3.8           py310h5eee18b_0  
+[conda] mkl_random                1.2.4           py310hdb19cb5_0  
+[conda] numpy                     1.26.4          py310h5f9d8c6_0  
+[conda] numpy-base                1.26.4          py310hb5e798b_0  
+[conda] pytorch                   2.2.0           py3.10_cuda12.1_cudnn8.9.2_0    pytorch
+[conda] pytorch-cuda              12.1                 ha16c6d3_5    pytorch
+[conda] pytorch-mutex             1.0                        cuda    pytorch
+[conda] torchaudio                2.2.0               py310_cu121    pytorch
+[conda] torchtriton               2.2.0                     py310    pytorch
+[conda] torchvision               0.17.0              py310_cu121    pytorch
+
+Current Branch: frederik-part1
+Latest Commit: 8a30c5c
+Uncommitted Changes: 6
+
+task: sst
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 2019 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 505 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    BERT Model Configuration
+------------------------------
+{'batch_size': 64,
+ 'epochs': 10,
+ 'filepath': 'models/finetune-10-1e-05-sst.pt',
+ 'hidden_dropout_prob': 0.1,
+ 'local_files_only': True,
+ 'lr': 1e-05,
+ 'option': 'finetune',
+ 'seed': 11711,
+ 'task': 'sst',
+ 'use_gpu': True}
+------------------------------
+Sentiment classification accuracy: 0.511
+Sentiment classification accuracy: 0.468
+Epoch 01 (sst): train loss :: 1.444, train :: 0.511, dev :: 0.468
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.588
+Sentiment classification accuracy: 0.501
+Epoch 02 (sst): train loss :: 1.148, train :: 0.588, dev :: 0.501
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.642
+Sentiment classification accuracy: 0.495
+Epoch 03 (sst): train loss :: 1.001, train :: 0.642, dev :: 0.495
+Sentiment classification accuracy: 0.722
+Sentiment classification accuracy: 0.522
+Epoch 04 (sst): train loss :: 0.877, train :: 0.722, dev :: 0.522
+Saving the model to models/finetune-10-1e-05-sst.pt.
+Sentiment classification accuracy: 0.775
+Sentiment classification accuracy: 0.504
+Epoch 05 (sst): train loss :: 0.774, train :: 0.775, dev :: 0.504
+Sentiment classification accuracy: 0.850
+Sentiment classification accuracy: 0.518
+Epoch 06 (sst): train loss :: 0.681, train :: 0.850, dev :: 0.518
+Sentiment classification accuracy: 0.798
+Sentiment classification accuracy: 0.481
+Epoch 07 (sst): train loss :: 0.569, train :: 0.798, dev :: 0.481
+Sentiment classification accuracy: 0.912
+Sentiment classification accuracy: 0.501
+Epoch 08 (sst): train loss :: 0.485, train :: 0.912, dev :: 0.501
+Sentiment classification accuracy: 0.941
+Sentiment classification accuracy: 0.514
+Epoch 09 (sst): train loss :: 0.384, train :: 0.941, dev :: 0.514
+Sentiment classification accuracy: 0.962
+Sentiment classification accuracy: 0.503
+Epoch 10 (sst): train loss :: 0.305, train :: 0.962, dev :: 0.503
+Loaded model to test from models/finetune-10-1e-05-sst.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 505 dev examples from data/etpc-paraphrase-dev.csv
+Sentiment classification accuracy: 0.522
+dev sentiment acc :: 0.522
+task: sts
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 2019 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 505 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    BERT Model Configuration
+------------------------------
+{'batch_size': 64,
+ 'epochs': 10,
+ 'filepath': 'models/finetune-10-1e-05-sts.pt',
+ 'hidden_dropout_prob': 0.1,
+ 'local_files_only': True,
+ 'lr': 1e-05,
+ 'option': 'finetune',
+ 'seed': 11711,
+ 'task': 'sts',
+ 'use_gpu': True}
+------------------------------
+Semantic Textual Similarity correlation: 0.344
+Semantic Textual Similarity correlation: 0.312
+Epoch 01 (sts): train loss :: 2.160, train :: 0.344, dev :: 0.312
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.468
+Semantic Textual Similarity correlation: 0.373
+Epoch 02 (sts): train loss :: 1.959, train :: 0.468, dev :: 0.373
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.587
+Semantic Textual Similarity correlation: 0.389
+Epoch 03 (sts): train loss :: 1.781, train :: 0.587, dev :: 0.389
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.684
+Semantic Textual Similarity correlation: 0.387
+Epoch 04 (sts): train loss :: 1.597, train :: 0.684, dev :: 0.387
+Semantic Textual Similarity correlation: 0.743
+Semantic Textual Similarity correlation: 0.381
+Epoch 05 (sts): train loss :: 1.368, train :: 0.743, dev :: 0.381
+Semantic Textual Similarity correlation: 0.798
+Semantic Textual Similarity correlation: 0.377
+Epoch 06 (sts): train loss :: 1.171, train :: 0.798, dev :: 0.377
+Semantic Textual Similarity correlation: 0.846
+Semantic Textual Similarity correlation: 0.405
+Epoch 07 (sts): train loss :: 0.988, train :: 0.846, dev :: 0.405
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.874
+Semantic Textual Similarity correlation: 0.407
+Epoch 08 (sts): train loss :: 0.846, train :: 0.874, dev :: 0.407
+Saving the model to models/finetune-10-1e-05-sts.pt.
+Semantic Textual Similarity correlation: 0.896
+Semantic Textual Similarity correlation: 0.404
+Epoch 09 (sts): train loss :: 0.739, train :: 0.896, dev :: 0.404
+Semantic Textual Similarity correlation: 0.912
+Semantic Textual Similarity correlation: 0.401
+Epoch 10 (sts): train loss :: 0.633, train :: 0.912, dev :: 0.401
+Loaded model to test from models/finetune-10-1e-05-sts.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 505 dev examples from data/etpc-paraphrase-dev.csv
+Semantic Textual Similarity correlation: 0.414
+dev sts corr :: 0.414
+task: qqp
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 2019 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 505 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    BERT Model Configuration
+------------------------------
+{'batch_size': 64,
+ 'epochs': 10,
+ 'filepath': 'models/finetune-10-1e-05-qqp.pt',
+ 'hidden_dropout_prob': 0.1,
+ 'local_files_only': True,
+ 'lr': 1e-05,
+ 'option': 'finetune',
+ 'seed': 11711,
+ 'task': 'qqp',
+ 'use_gpu': True}
+------------------------------
+Paraphrase detection accuracy: 0.805
+Paraphrase detection accuracy: 0.778
+Epoch 01 (qqp): train loss :: 0.517, train :: 0.805, dev :: 0.778
+Saving the model to models/finetune-10-1e-05-qqp.pt.
+Paraphrase detection accuracy: 0.846
+Paraphrase detection accuracy: 0.789
+Epoch 02 (qqp): train loss :: 0.419, train :: 0.846, dev :: 0.789
+Saving the model to models/finetune-10-1e-05-qqp.pt.
+Paraphrase detection accuracy: 0.885
+Paraphrase detection accuracy: 0.798
+Epoch 03 (qqp): train loss :: 0.353, train :: 0.885, dev :: 0.798
+Saving the model to models/finetune-10-1e-05-qqp.pt.
+Paraphrase detection accuracy: 0.919
+Paraphrase detection accuracy: 0.806
+Epoch 04 (qqp): train loss :: 0.297, train :: 0.919, dev :: 0.806
+Saving the model to models/finetune-10-1e-05-qqp.pt.
+Paraphrase detection accuracy: 0.920
+Paraphrase detection accuracy: 0.788
+Epoch 05 (qqp): train loss :: 0.245, train :: 0.920, dev :: 0.788
+Paraphrase detection accuracy: 0.942
+Paraphrase detection accuracy: 0.790
+Epoch 06 (qqp): train loss :: 0.202, train :: 0.942, dev :: 0.790
+Paraphrase detection accuracy: 0.955
+Paraphrase detection accuracy: 0.793
+Epoch 07 (qqp): train loss :: 0.164, train :: 0.955, dev :: 0.793
+Paraphrase detection accuracy: 0.962
+Paraphrase detection accuracy: 0.789
+Epoch 08 (qqp): train loss :: 0.134, train :: 0.962, dev :: 0.789
+Paraphrase detection accuracy: 0.972
+Paraphrase detection accuracy: 0.785
+Epoch 09 (qqp): train loss :: 0.107, train :: 0.972, dev :: 0.785
+Paraphrase detection accuracy: 0.985
+Paraphrase detection accuracy: 0.799
+Epoch 10 (qqp): train loss :: 0.089, train :: 0.985, dev :: 0.799
+Loaded model to test from models/finetune-10-1e-05-qqp.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 505 dev examples from data/etpc-paraphrase-dev.csv
+Paraphrase detection accuracy: 0.806
+dev paraphrase acc :: 0.806
+============ Job Information ===================================================
+Submitted: 2024-07-08T11:28:03
+Started: 2024-07-08T13:01:41
+Ended: 2024-07-08T15:44:36
+Elapsed: 163 min, Limit: 240 min, Difference: 77 min
+CPUs: 128, Nodes: 1
+Estimated Consumption: 3260.00 core-hours
+================================================================================
