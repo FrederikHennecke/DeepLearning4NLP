@@ -15,6 +15,7 @@ from sklearn.metrics import matthews_corrcoef
 from optimizer import AdamW
 from sophia import SophiaG
 from datasets import preprocess_string
+import costum_loss
 
 TQDM_DISABLE = False
 
@@ -105,7 +106,6 @@ def transform_data(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
     return dataloader
 
-
 def train_model(model, train_data, dev_data, device):
     """
     Train the model. You can use any training loop you want. We recommend starting with
@@ -124,7 +124,7 @@ def train_model(model, train_data, dev_data, device):
     optimizer = SophiaG(model.parameters(), lr=args.lr, betas=(0.965, 0.99), rho=0.01, weight_decay=1e-1)
     k = 10
     iter_num = -1
-    loss_fun = nn.BCEWithLogitsLoss()
+    loss_fun = costum_loss.CustomLoss() # nn.BCEWithLogitsLoss()
 
     # Run for the specified number of epochs
     for epoch in range(args.epochs):
@@ -145,6 +145,7 @@ def train_model(model, train_data, dev_data, device):
             
             logits = model(b_ids, b_mask)
             loss = loss_fun(logits, b_labels.float())
+            # print(f"loss: {loss}")
             loss.backward()
             optimizer.step(bs=args.batch_size)
             optimizer.zero_grad(set_to_none=True)
@@ -177,7 +178,7 @@ def train_model(model, train_data, dev_data, device):
         train_accuracy = correct_preds / total_examples
         dev_accuracy, matthews_coefficient  = evaluate_model(model, dev_data, device)
         print(
-            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | matthews_coefficient: {matthews_coefficient:.4f}" 
+            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | dev matthews_coefficient: {matthews_coefficient:.4f}" 
         )
 
     return model
@@ -196,6 +197,7 @@ def test_model(model, test_data, test_ids, device):
     model.to(device)
     model.eval()
     all_preds = []
+    all_logits = []
 
     with torch.no_grad():
         for batch in tqdm(test_data, desc="test", disable=TQDM_DISABLE):
@@ -207,9 +209,15 @@ def test_model(model, test_data, test_ids, device):
             preds = logits.round().cpu().numpy()
             all_preds.extend(preds)
 
+            logits = logits.cpu().numpy()
+            all_logits.extend(logits)
+
     pred_paraphrase_types = [[int(x) for x in pred] for pred in all_preds]
+
+    logit_paraphrase_types = [[float(x) for x in logit] for logit in all_logits]
+    
     df_test_results = pd.DataFrame(
-        {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types}
+        {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types, "logits": logit_paraphrase_types}
     )
     return df_test_results
 
