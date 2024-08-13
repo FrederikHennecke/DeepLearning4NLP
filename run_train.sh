@@ -31,4 +31,6 @@ echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
 # Run the script:
-python -u multitask_classifier.py --use_gpu --local_files_only --option finetune --task sst --hidden_dropout_prob 0.1
+# python -u multitask_classifier.py --use_gpu --local_files_only --option finetune --task sst --hidden_dropout_prob 0.1
+# run the bart_detection.py script using minibatch training on cpu
+python -u bart_detection.py --epochs 2 --lr 1e-5 --etpc_train "data/etpc-paraphrase-train-minibatch.csv"

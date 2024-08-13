@@ -22,7 +22,7 @@ class BartWithClassifier(nn.Module):
         super(BartWithClassifier, self).__init__()
 
         self.bart = BartModel.from_pretrained(
-            "facebook/bart-large", local_files_only=True
+            "facebook/bart-large", local_files_only=False
         )
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
@@ -66,7 +66,7 @@ def transform_data(
     """
     # raise NotImplementedError
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-large", local_files_only=True
+        "facebook/bart-large", local_files_only=False
     )
     sentences1 = dataset["sentence1"].tolist()
     sentences2 = dataset["sentence2"].tolist()
@@ -121,7 +121,7 @@ def train_model(model, train_data, dev_data, device):
     model = model.to(device)
     optimizer = SophiaG(model.parameters(), lr=args.lr, betas=(0.965, 0.99), rho=0.01, weight_decay=1e-1)
     k = 10
-    iterm_num = -1
+    iter_num = -1
     loss_fun = nn.BCEWithLogitsLoss()
 
     # Run for the specified number of epochs
@@ -146,7 +146,7 @@ def train_model(model, train_data, dev_data, device):
             loss.backward()
             optimizer.step(bs=args.batch_size)
             optimizer.zero_grad(set_to_none=True)
-            iterm_num += 1
+            iter_num += 1
             # scheduler.step() if used with the number of steps in a scheduler like OneCycleLR
 
             train_loss += loss.item()
@@ -276,7 +276,7 @@ def get_args():
     # parser.add_argument("--lr_steps", type=int, default=10)
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
-    )
+    ) 
     parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
     parser.add_argument(
         "--etpc_test",
@@ -326,13 +326,13 @@ def finetune_paraphrase_detection(args):
     accuracy = evaluate_model(model, dev_data, device)
     print(f"The accuracy of the model is: {accuracy:.3f}")
 
-    test_ids = test_dataset["id"]
-    test_results = test_model(model, test_data, test_ids, device)
-    test_results.to_csv(
-        "predictions/bart/etpc-paraphrase-detection-test-output.csv",
-        index=False,
-        sep="\t",
-    )
+    # test_ids = test_dataset["id"]
+    # test_results = test_model(model, test_data, test_ids, device)
+    # test_results.to_csv(
+    #    "predictions/bart/etpc-paraphrase-detection-test-output.csv",
+    #    index=False,
+    #    sep="\t",
+    #)
 
 
 if __name__ == "__main__":
