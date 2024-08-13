@@ -5,6 +5,7 @@ import pandas as pd
 import csv
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, BartModel
@@ -23,7 +24,7 @@ class BartWithClassifier(nn.Module):
         super(BartWithClassifier, self).__init__()
 
         self.bart = BartModel.from_pretrained(
-            "facebook/bart-large", local_files_only=False
+            "facebook/bart-large", local_files_only=True
         )
         self.classifier = nn.Linear(self.bart.config.hidden_size, num_labels)
         self.sigmoid = nn.Sigmoid()
@@ -67,7 +68,7 @@ def transform_data(
     """
     # raise NotImplementedError
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/bart-large", local_files_only=False
+        "facebook/bart-large", local_files_only=True
     )
     sentences1 = dataset["sentence1"].tolist()
     sentences2 = dataset["sentence2"].tolist()
@@ -162,9 +163,11 @@ def train_model(model, train_data, dev_data, device):
                 continue
             else:
                 # update hessian EMA
+                logits = model(b_ids, None)
                 samp_dist = torch.distributions.Categorical(logits=logits)
                 y_sample = samp_dist.sample()
-                loss_sampled = loss_fun(logits.view(-1, logits.size(-1)), y_sample.view(-1), ignore_index=-1)
+                y_sample_one_hot = F.one_hot(y_sample, num_classes=logits.size(-1)).float()
+                loss_sampled = loss_fun(logits.view(-1, logits.size(-1)), y_sample_one_hot.view(-1, logits.size(-1)))#, ignore_index=-1)
                 loss_sampled.backward()
                 optimizer.update_hessian()
                 optimizer.zero_grad(set_to_none=True)
@@ -334,13 +337,13 @@ def finetune_paraphrase_detection(args):
     print(f"The accuracy of the model is: {accuracy:.3f}")
     print(f"Matthews Correlation Coefficient of the model is: {matthews_corr:.3f}")
 
-    # test_ids = test_dataset["id"]
-    # test_results = test_model(model, test_data, test_ids, device)
-    # test_results.to_csv(
-    #    "predictions/bart/etpc-paraphrase-detection-test-output.csv",
-    #    index=False,
-    #    sep="\t",
-    #)
+    test_ids = test_dataset["id"]
+    test_results = test_model(model, test_data, test_ids, device)
+    test_results.to_csv(
+        "predictions/bart/etpc-paraphrase-detection-test-output.csv",
+        index=False,
+        sep="\t",
+    )
 
 
 if __name__ == "__main__":

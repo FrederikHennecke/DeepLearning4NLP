@@ -43,7 +43,7 @@ bart_files=("bart_detection.py")
 for file in "${bart_files[@]}"
 do
     echo "Running file: $file for etpc tasks"
-    python -u "$file" --use_gpu --epochs 5 --lr 1e-5
+    python -u "$file" --use_gpu --epochs 20 --lr 1e-5 # --etpc_train "data/etpc-paraphrase-train-minibatch.csv"
     echo
 done
 
