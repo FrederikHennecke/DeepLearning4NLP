@@ -204,21 +204,22 @@ class BertModel(BertPreTrainedModel):
         self.pooler_af = nn.Tanh()
 
         # initialize parameters for more input features
-        import spacy
+        if config.additional_inputs:
+            import spacy
 
-        spacy.prefer_gpu()
-        self.nlp = spacy.load("en_core_web_sm")
-        ner_tags_spacy = self.nlp.get_pipe("ner").labels
-        pos_tags_spacy = self.nlp.get_pipe("tagger").labels
-        self.ner_tag_embedding = nn.Embedding(
-            len(ner_tags_spacy) + 1, config.hidden_size
-        )
-        self.pos_tag_embedding = nn.Embedding(
-            len(pos_tags_spacy) + 1, config.hidden_size
-        )
-        self.pos_tag_vocab = {tag: i for i, tag in enumerate(pos_tags_spacy)}
-        self.ner_tag_vocab = {tag: i for i, tag in enumerate(ner_tags_spacy)}
-        self.input_cache = {}
+            spacy.prefer_gpu()
+            self.nlp = spacy.load("en_core_web_sm")
+            ner_tags_spacy = self.nlp.get_pipe("ner").labels
+            pos_tags_spacy = self.nlp.get_pipe("tagger").labels
+            self.ner_tag_embedding = nn.Embedding(
+                len(ner_tags_spacy) + 1, config.hidden_size
+            )
+            self.pos_tag_embedding = nn.Embedding(
+                len(pos_tags_spacy) + 1, config.hidden_size
+            )
+            self.pos_tag_vocab = {tag: i for i, tag in enumerate(pos_tags_spacy)}
+            self.ner_tag_vocab = {tag: i for i, tag in enumerate(ner_tags_spacy)}
+            self.input_cache = {}
 
         self.init_weights()
 
@@ -289,23 +290,24 @@ class BertModel(BertPreTrainedModel):
                 all_ner_tags, dtype=torch.long, device=input_ids.device
             )
 
-        else:
-            pos_tags_ids = torch.zeros(
-                input_shape, dtype=torch.long, device=input_ids.device
-            )
-            ner_tags_ids = torch.zeros(
-                input_shape, dtype=torch.long, device=input_ids.device
+            pos_tag_embeds = self.pos_tag_embedding(pos_tags_ids)
+            ner_tag_embeds = self.ner_tag_embedding(ner_tags_ids)
+            embeds = (
+                inputs_embeds
+                + pos_embeds
+                + tk_type_embeds
+                + pos_tag_embeds
+                + ner_tag_embeds
             )
 
-        pos_tag_embeds = self.pos_tag_embedding(pos_tags_ids)
-        ner_tag_embeds = self.ner_tag_embedding(ner_tags_ids)
-        embeds = (
-            inputs_embeds
-            + pos_embeds
-            + tk_type_embeds
-            + pos_tag_embeds
-            + ner_tag_embeds
-        )
+        else:
+            embeds = inputs_embeds + pos_embeds + tk_type_embeds
+            # pos_tags_ids = torch.zeros(
+            #     input_shape, dtype=torch.long, device=input_ids.device
+            # )
+            # ner_tags_ids = torch.zeros(
+            #     input_shape, dtype=torch.long, device=input_ids.device
+            # )
 
         output_embeds = self.embed_layer_norm(embeds)
         output_embeds = self.embed_dropout(output_embeds)

@@ -489,7 +489,7 @@ def test_model_multitask(args, model, device, config):
             with open(
                 os.path.join(
                     args.sst_improve_dir,
-                    f"sst_params_{datetime.now().strftime('%Y%m%d-%H%M%S').json}",
+                    f"sst_params_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
                 ),
                 "w",
             ) as f:
@@ -519,7 +519,7 @@ def test_model_multitask(args, model, device, config):
             with open(
                 os.path.join(
                     args.qqp_improve_dir,
-                    f"qqp_params_{datetime.now().strftime('%Y%m%d-%H%M%S').json}",
+                    f"qqp_params_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
                 ),
                 "w",
             ) as f:
@@ -550,7 +550,7 @@ def test_model_multitask(args, model, device, config):
             with open(
                 os.path.join(
                     args.sts_improve_dir,
-                    f"sts_params_{datetime.now().strftime('%Y%m%d-%H%M%S').json}",
+                    f"sts_params_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
                 ),
                 "w",
             ) as f:

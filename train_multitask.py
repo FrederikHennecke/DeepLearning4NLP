@@ -33,6 +33,7 @@ from transformers import get_linear_schedule_with_warmup
 import math
 import warnings
 import json
+import uuid
 
 warnings.filterwarnings("ignore", category=UserWarning, module="torch.autograd")
 
@@ -96,6 +97,10 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
 
         self.config = config
+        if config.train_mode == "single_layers":
+            self.layers = config.layers
+        else:
+            self.layers = []
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -177,11 +182,20 @@ class MultitaskBERT(nn.Module):
             for i in range(self.attn_heads):
                 b.append(add_layer[:, :, i])
                 b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
-                y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
+                y.append(
+                    (b[i] * all_pooled_output).sum(dim=0)
+                )  #  batchsize, hidden_dim
             hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
 
-        if self.config.train_mode == "last_hidden_state":
+        elif self.config.train_mode == "last_hidden_state":
+            self.layers = []
             hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
+
+        elif len(self.layers) > 0 and self.config.train_mode == "single_layers":
+            hidden_states = []
+            for l in self.layers:
+                hidden_states.append(all_encoded_layers[l][:, 0].unsqueeze(1))
+            hidden_states = torch.cat(hidden_states, dim=1)
 
         if self.config.pooling == None:
             output = hidden_states
@@ -393,9 +407,11 @@ def train_multitask(args):
         "max_position_embeddings": MAX_Position_EMBEDDINGS,
         "train_mode": args.train_mode,
         "pooling": args.pooling,
+        "layers": args.layers,
     }
 
-    name = f"{datetime.now().strftime('%m%d-%H%M')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.task}"
+    file_uuid = str(uuid.uuid4())
+    name = f"{file_uuid}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
     args.filepath = f"models1/multitask_classifier/{name}.pt"  # save path
 
     save_params_dir = args.config_save_dir + name + ".json"
@@ -503,8 +519,11 @@ def train_multitask(args):
         + name
     )
     writer = SummaryWriter(log_dir=path)
-
-    writer.add_hparams(vars(args), {}, run_name="hparams")
+    writer.add_hparams(
+        vars(args),
+        {},
+        run_name="hparams",
+    )
 
     if args.profiler:
         prof = torch.profiler.profile(
@@ -846,12 +865,12 @@ def get_args():
         type=int,
         default=64 if not args.smoketest else 64,
     )
-    parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
     parser.add_argument(
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
     )
 
     parser.add_argument(
@@ -885,12 +904,15 @@ def get_args():
     parser.add_argument(
         "--train_mode",
         default="last_hidden_state",
-        choices=["all_pooled", "last_hidden_state"],
+        choices=["all_pooled", "last_hidden_state", "single_layers"],
     )
     parser.add_argument(
         "--pooling",
         default=None,
         choices=["mean", "max", None],
+    )
+    parser.add_argument(
+        "--layers", default=None, type=int, nargs="+", help="Layers to train"
     )
 
     args, _ = parser.parse_known_args()

@@ -46,6 +46,7 @@ def seed_everything(seed=11711):
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
+MAX_POSITION_EMBEDDINGS = 128
 
 
 class AttentionLayer(nn.Module):
@@ -94,10 +95,8 @@ class MultitaskBERT(nn.Module):
 
         if config.layers[0] == -2 and config.train_mode == "last_layer":
             self.layers = []
-        elif config.layers[0] == -1 and config.train_mode == "all_layers":
+        elif config.layers[0] != -2 and config.train_mode == "single_layers":
             self.layers = [i for i in range(config.num_hidden_layers)]
-        elif config.train_mode == "single_layers":
-            self.layers = config.layers
         else:
             self.layers = []
 
@@ -144,14 +143,7 @@ class MultitaskBERT(nn.Module):
         all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
             input_ids, attention_mask
         )
-
-        if len(self.layers) > 0 and self.config.train_mode == "single_layers":
-            hidden_states = []
-            for l in self.layers:
-                hidden_states.append(all_encoded_layers[l][:, 0].unsqueeze(1))
-            hidden_states = torch.cat(hidden_states, dim=1)
-
-        elif self.config.train_mode == "all_pooled":
+        if self.config.train_mode == "all_pooled":
             pooler_output = self.dropout(all_pooled["pooler_output"]).unsqueeze(0)
             pooled_output2 = self.dropout(all_pooled["pooled_output2"]).unsqueeze(0)
             pooled_output3 = self.dropout(all_pooled["pooled_output3"]).unsqueeze(0)
@@ -166,28 +158,28 @@ class MultitaskBERT(nn.Module):
             pooled_output12 = self.dropout(all_pooled["pooled_output12"]).unsqueeze(
                 0
             )  # 12, batchsize, hidden_dim
-            all_pooled_output = torch.cat(
+            pooled_output = torch.cat(
                 (
                     pooler_output,
                     pooled_output2,
                     pooled_output3,
                     pooled_output4,
-                    pooled_output5,
-                    pooled_output6,
-                    pooled_output7,
-                    pooled_output8,
-                    pooled_output9,
-                    pooled_output10,
-                    pooled_output11,
-                    pooled_output12,
+                    # pooled_output5,
+                    # pooled_output6,
+                    # pooled_output7,
+                    # pooled_output8,
+                    # pooled_output9,
+                    # pooled_output10,
+                    # pooled_output11,
+                    # pooled_output12,
                 ),
                 0,
             )
 
-            seq_len, batch_size, hidden_dim = all_pooled_output.size()
+            seq_len, batch_size, hidden_dim = pooled_output.size()
 
             add_layer = self.linear_first(
-                all_pooled_output
+                pooled_output
             )  # seq_len. batchsize. hidden_dim
             add_layer = F.tanh(add_layer)
             add_layer = self.linear_second(add_layer)
@@ -418,6 +410,7 @@ def train_multitask(args):
         "layers": args.layers,
         "train_mode": args.train_mode,
         "dropout": args.dropout,
+        "max_position_embeddings": MAX_POSITION_EMBEDDINGS,
     }
 
     config = SimpleNamespace(**config_dict)
@@ -458,7 +451,7 @@ def train_multitask(args):
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
             num_warmup_steps=0,
-            num_training_steps=len(sst_train_dataloader) * args.epochs,
+            num_training_steps=len(quora_train_dataloader) * args.epochs,
         )
     else:
         scheduler = None
@@ -736,13 +729,13 @@ def get_args():
 
     # Model configuration
     parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=4)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument(
         "--option",
         type=str,
         help="pretrain: the BERT parameters are frozen; finetune: BERT parameters are updated",
         choices=("pretrain", "finetune"),
-        default="pretrain",
+        default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
 
@@ -897,7 +890,7 @@ def get_args():
     )
     parser.add_argument(
         "--additional_inputs",
-        default=True,
+        default=False,
         help="use additional inputs for the model",
     )
     parser.add_argument(
@@ -914,7 +907,7 @@ def get_args():
     )
     parser.add_argument(
         "--train_mode",
-        default="last_layer",
+        default="all_pooled",
         help="choose the layers to use for the model",
         choices=["single_layers", "all_layers", "last_layer", "all_pooled"],
     )
