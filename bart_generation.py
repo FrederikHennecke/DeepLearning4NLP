@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, BartForConditionalGeneration
 
 from optimizer import AdamW
-from bart_detection import get_args, seed_everything
+from bart_detection import get_args
 
 TQDM_DISABLE = False
 
@@ -159,23 +159,22 @@ def test_model(test_data, test_ids, device, model, tokenizer):
     return df_gen_results
 
 
-def evaluate_model(model, dev_data, device, tokenizer):
+def evaluate_model(model, test_data, device, tokenizer):
     """
     You can use your train/validation set to evaluate models performance with the BLEU score.
+    test_data is a Pandas Dataframe, the column "sentence1" contains all input sentence and
+    the column "sentence2" contains all target sentences
     """
     model.eval()
     bleu = BLEU()
     predictions = []
-    references = []
 
+    dataloader = transform_data(test_data, shuffle=False)
     with torch.no_grad():
-        for batch in dev_data:
-            input_ids, attention_mask, target_ids = (
-                batch  # WARN! paraphrase type is inseted in the encoder in the transform_data function above, but how to extract them as target_ids to use here??
-            )
+        for batch in dataloader:
+            input_ids, attention_mask, _ = batch
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
-            target_ids = target_ids.to(device)
 
             # Generate paraphrases
             outputs = model.generate(
@@ -187,26 +186,39 @@ def evaluate_model(model, dev_data, device, tokenizer):
             )
 
             pred_text = [
-                tokenizer.decode(
-                    g, skip_special_tokens=True, clean_up_tokenization_spaces=True
-                )
+                tokenizer.decode(g, skip_special_tokens=True, clean_up_tokenization_spaces=True)
                 for g in outputs
-            ]
-            ref_text = [
-                tokenizer.decode(
-                    g, skip_special_tokens=True, clean_up_tokenization_spaces=True
-                )
-                for g in target_ids
             ]
 
             predictions.extend(pred_text)
-            references.extend(ref_text)
+
+    inputs = test_data["sentence1"].tolist()
+    references = test_data["sentence2"].tolist()
 
     model.train()
-
     # Calculate BLEU score
-    bleu_score = bleu.corpus_score(predictions, [references])
-    return bleu_score.score
+    bleu_score_reference = bleu.corpus_score(references, [predictions]).score
+    # Penalize BLEU score if its to close to the input
+    bleu_score_inputs = 100 - bleu.corpus_score(inputs, [predictions]).score
+
+    print(f"BLEU Score: {bleu_score_reference}", f"Negative BLEU Score with input: {bleu_score_inputs}")
+
+    # Penalize BLEU and rescale it to 0-100
+    # If you perfectly predict all the targets, you should get an penalized BLEU score of around 52
+    penalized_bleu = bleu_score_reference * bleu_score_inputs / 52
+    print(f"Penalized BLEU Score: {penalized_bleu}")
+
+    return penalized_bleu
+
+
+def seed_everything(seed=11711):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 
 def finetune_paraphrase_generation(args):
@@ -256,12 +268,12 @@ def finetune_paraphrase_generation(args):
     dev_data = transform_data(dev_dataset, shuffle=False, target_encoding=True)
     test_data = transform_data(test_dataset, shuffle=False, target_encoding=False)
 
-    model = train_model(model, train_data, dev_data, device, tokenizer)
+    model = train_model(model, train_data, dev_dataset, device, tokenizer)
 
     print("Training finished.")
 
-    bleu_score = evaluate_model(model, dev_data, device, tokenizer)
-    print(f"The BLEU-score of the model is: {bleu_score:.3f}")
+    bleu_score = evaluate_model(model, dev_dataset, device, tokenizer)
+    print(f"The penalized BLEU-score of the model is: {bleu_score:.3f}")
 
     test_ids = test_dataset["id"]
     test_results = test_model(test_data, test_ids, device, model, tokenizer)
@@ -270,6 +282,7 @@ def finetune_paraphrase_generation(args):
         index=False,
         sep="\t",
     )
+
 
 
 if __name__ == "__main__":
