@@ -95,11 +95,20 @@ class MultitaskBERT(nn.Module):
             elif config.option == "finetune":
                 param.requires_grad = True
 
+        self.config = config
+
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # attention layer
         self.attention_layer = AttentionLayer(config.hidden_size)
+
+        # all pooled train mode
+        self.d_a = 128
+        self.attn_heads = 1
+
+        self.linear_first = torch.nn.Linear(config.hidden_size, self.d_a)
+        self.linear_second = torch.nn.Linear(self.d_a, self.attn_heads)
 
         # sentiment
         self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
@@ -121,8 +130,71 @@ class MultitaskBERT(nn.Module):
         all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
             input_ids, attention_mask
         )
-        attention_results = self.attention_layer(all_sequences["last_hidden_state"])
-        return attention_results
+        if self.config.train_mode == "all_pooled":
+            pooler_output = self.dropout(all_pooled["pooler_output"]).unsqueeze(0)
+            pooled_output2 = self.dropout(all_pooled["pooled_output2"]).unsqueeze(0)
+            pooled_output3 = self.dropout(all_pooled["pooled_output3"]).unsqueeze(0)
+            pooled_output4 = self.dropout(all_pooled["pooled_output4"]).unsqueeze(0)
+            pooled_output5 = self.dropout(all_pooled["pooled_output5"]).unsqueeze(0)
+            pooled_output6 = self.dropout(all_pooled["pooled_output6"]).unsqueeze(0)
+            pooled_output7 = self.dropout(all_pooled["pooled_output7"]).unsqueeze(0)
+            pooled_output8 = self.dropout(all_pooled["pooled_output8"]).unsqueeze(0)
+            pooled_output9 = self.dropout(all_pooled["pooled_output9"]).unsqueeze(0)
+            pooled_output10 = self.dropout(all_pooled["pooled_output10"]).unsqueeze(0)
+            pooled_output11 = self.dropout(all_pooled["pooled_output11"]).unsqueeze(0)
+            pooled_output12 = self.dropout(all_pooled["pooled_output12"]).unsqueeze(
+                0
+            )  # 12, batchsize, hidden_dim
+            all_pooled_output = torch.cat(
+                (
+                    pooler_output,
+                    pooled_output2,
+                    pooled_output3,
+                    pooled_output4,
+                    pooled_output5,
+                    pooled_output6,
+                    pooled_output7,
+                    pooled_output8,
+                    pooled_output9,
+                    pooled_output10,
+                    pooled_output11,
+                    pooled_output12,
+                ),
+                0,
+            )
+
+            seq_len, batch_size, hidden_dim = all_pooled_output.size()
+
+            add_layer = self.linear_first(
+                all_pooled_output
+            )  # seq_len. batchsize. hidden_dim
+            add_layer = F.tanh(add_layer)
+            add_layer = self.linear_second(add_layer)
+            add_layer = F.softmax(add_layer, dim=0)
+
+            b = []
+            y = []
+            for i in range(self.attn_heads):
+                b.append(add_layer[:, :, i])
+                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
+                y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
+            hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
+
+        if self.config.train_mode == "last_hidden_state":
+            hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
+
+        if self.config.pooling == None:
+            output = hidden_states
+
+        elif self.config.pooling == "max":
+            # output, _ = torch.max(hidden_states, dim=1)
+            output = nn.MaxPool1d(1)(hidden_states).squeeze(-1)
+
+        elif self.config.pooling == "mean":
+            # output = torch.mean(hidden_states, dim=1)
+            output = nn.AvgPool1d(1)(hidden_states).squeeze(-1)
+
+        return output
 
     def predict_sentiment(self, input_ids, attention_mask):
         bert_embeddings = F.relu(self.forward(input_ids, attention_mask))
@@ -319,7 +391,10 @@ def train_multitask(args):
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
         "max_position_embeddings": MAX_Position_EMBEDDINGS,
+        "train_mode": args.train_mode,
+        "pooling": args.pooling,
     }
+
     name = f"{datetime.now().strftime('%m%d-%H%M')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.task}"
     args.filepath = f"models1/multitask_classifier/{name}.pt"  # save path
 
@@ -761,7 +836,9 @@ def get_args():
     parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
+
     parser.add_argument("--epochs", type=int, default=20 if not args.smoketest else 1)
+
     # hyper parameters
     parser.add_argument(
         "--batch_size",
@@ -782,7 +859,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
@@ -797,13 +874,23 @@ def get_args():
         choices=("plateau", "cosine", "none"),
     )
     parser.add_argument(
-        "--hpo", action="store_true", help="Activate hyperparameter optimization"
+        "--hpo", action="store_false", help="Activate hyperparameter optimization"
     )
     parser.add_argument(
         "--hpo_trials",
         type=int,
-        default=20 if not args.smoketest else 1,
+        default=10 if not args.smoketest else 1,
         help="Number of trials for HPO",
+    )
+    parser.add_argument(
+        "--train_mode",
+        default="last_hidden_state",
+        choices=["all_pooled", "last_hidden_state"],
+    )
+    parser.add_argument(
+        "--pooling",
+        default=None,
+        choices=["mean", "max", None],
     )
 
     args, _ = parser.parse_known_args()
@@ -905,6 +992,7 @@ if __name__ == "__main__":
             "weight_decay": tune.choice([0.1, 0.01, 0.001, 0.0001, 0]),
             "hidden_dropout_prob": tune.choice([0.0, 0.1, 0.2, 0.3, 0.4, 0.5]),
             "clip": tune.loguniform(0.01, 10),
+            "lr": tune.choice([2e-5, 5e-8, 8e-5, 1e-6]),
         }
         config.update(tune_config)
 
@@ -959,6 +1047,7 @@ if __name__ == "__main__":
         config["weight_decay"] = best_result.config["weight_decay"]
         config["hidden_dropout_prob"] = best_result.config["hidden_dropout_prob"]
         config["clip"] = best_result.config["clip"]
+        config["lr"] = best_result.config["lr"]
 
     train_multitask(args)
     test_model(args)
