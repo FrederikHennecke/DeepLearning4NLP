@@ -172,9 +172,9 @@ def train_model(model, train_data, dev_data, device):
 
         avg_train_loss = train_loss / num_batches
         train_accuracy = correct_preds / total_examples
-        dev_accuracy = evaluate_model(model, dev_data, device)
+        dev_accuracy, matthews_coefficient  = evaluate_model(model, dev_data, device)
         print(
-            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f}"
+            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | matthews_coefficient: {matthews_coefficient:.4f}" 
         )
 
     return model
