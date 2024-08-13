@@ -8,7 +8,9 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, BartModel
+from multitask_classifier import split_csv
 
+from sklearn.metrics import matthews_corrcoef
 from optimizer import AdamW
 from datasets import preprocess_string
 
@@ -76,11 +78,9 @@ def transform_data(
             .apply(lambda x: list(map(int, x.strip("[]").split(", "))))
             .tolist()
         )
-        print(labels)
         binary_labels = [
             [1 if i in label else 0 for i in range(1, 8)] for label in labels
         ]  # number of labels = 7
-        print(binary_labels)
     else:
         binary_labels = None
 
@@ -225,6 +225,7 @@ def evaluate_model(model, test_data, device):
 
     # Compute the accuracy for each label
     accuracies = []
+    matthews_coefficients = []
     for label_idx in range(true_labels_np.shape[1]):
         correct_predictions = np.sum(
             true_labels_np[:, label_idx] == predicted_labels_np[:, label_idx]
@@ -233,10 +234,15 @@ def evaluate_model(model, test_data, device):
         label_accuracy = correct_predictions / total_predictions
         accuracies.append(label_accuracy)
 
+        #compute Matthwes Correlation Coefficient for each paraphrase type
+        matth_coef = matthews_corrcoef(true_labels_np[:,label_idx], predicted_labels_np[:,label_idx])
+        matthews_coefficients.append(matth_coef)
+
     # Calculate the average accuracy over all labels
     accuracy = np.mean(accuracies)
+    matthews_coefficient = np.mean(matthews_coefficients)
     model.train()
-    return accuracy
+    return accuracy, matthews_coefficient
 
 
 def seed_everything(seed=11711):
@@ -305,8 +311,9 @@ def finetune_paraphrase_detection(args):
 
     print("Training finished.")
 
-    accuracy = evaluate_model(model, dev_data, device)
+    accuracy, matthews_corr = evaluate_model(model, train_data, device)
     print(f"The accuracy of the model is: {accuracy:.3f}")
+    print(f"Matthews Correlation Coefficient of the model is: {matthews_corr:.3f}")
 
     test_ids = test_dataset["id"]
     test_results = test_model(model, test_data, test_ids, device)
@@ -319,6 +326,5 @@ def finetune_paraphrase_detection(args):
 
 if __name__ == "__main__":
     args = get_args()
-    args.use_gpu = True
     seed_everything(args.seed)
     finetune_paraphrase_detection(args)
