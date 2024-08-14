@@ -521,12 +521,13 @@ def train_multitask(args):
         + (f"{args.tensorboard_subfolder}/" if args.tensorboard_subfolder else "")
         + name
     )
-    writer = SummaryWriter(log_dir=path)
-    writer.add_hparams(
-        vars(args),
-        {},
-        run_name="hparams",
-    )
+    if args.write_summary:
+        writer = SummaryWriter(log_dir=path)
+        writer.add_hparams(
+            vars(args),
+            {},
+            run_name="hparams",
+        )
 
     if args.profiler:
         prof = torch.profiler.profile(
@@ -646,15 +647,21 @@ def train_multitask(args):
 
             if args.scheduler == "cosine":
                 scheduler.step(epoch + num_batches / total_num_batches)
-            writer.add_scalar(
-                "Loss/train", full_loss.item(), epoch * total_num_batches + num_batches
-            )
+
+            if args.write_summary:
+                writer.add_scalar(
+                    "Loss/train",
+                    full_loss.item(),
+                    epoch * total_num_batches + num_batches,
+                )
 
             if args.profiler:
                 prof.step()
 
         train_loss = train_loss / num_batches
-        writer.add_scalar("Loss/train", train_loss, epoch)
+
+        if args.write_summary:
+            writer.add_scalar("Loss/train", train_loss, epoch)
 
         # Evaluate
         (
@@ -692,12 +699,13 @@ def train_multitask(args):
             )
         )
 
-        writer.add_scalar("para_acc/train/Epochs", para_train_acc, epoch)
-        writer.add_scalar("para_acc/dev/Epochs", para_dev_acc, epoch)
-        writer.add_scalar("sst_acc/train/Epochs", sst_train_acc, epoch)
-        writer.add_scalar("sst_acc/dev/Epochs", sst_dev_acc, epoch)
-        writer.add_scalar("sts_acc/train/Epochs", sts_train_acc, epoch)
-        writer.add_scalar("sts_acc/dev/Epochs", sts_dev_acc, epoch)
+        if args.write_summary:
+            writer.add_scalar("para_acc/train/Epochs", para_train_acc, epoch)
+            writer.add_scalar("para_acc/dev/Epochs", para_dev_acc, epoch)
+            writer.add_scalar("sst_acc/train/Epochs", sst_train_acc, epoch)
+            writer.add_scalar("sst_acc/dev/Epochs", sst_dev_acc, epoch)
+            writer.add_scalar("sts_acc/train/Epochs", sts_train_acc, epoch)
+            writer.add_scalar("sts_acc/dev/Epochs", sts_dev_acc, epoch)
 
         if (
             para_dev_acc > best_dev_acc_para
@@ -727,9 +735,10 @@ def train_multitask(args):
         if args.scheduler == "plateau":
             scheduler.step(dev_acc)
 
-        writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
-        writer.add_scalar("acc/train/Epochs", train_acc, epoch)
-        writer.add_scalar("acc/dev/Epochs", dev_acc, epoch)
+        if args.write_summary:
+            writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
+            writer.add_scalar("acc/train/Epochs", train_acc, epoch)
+            writer.add_scalar("acc/dev/Epochs", dev_acc, epoch)
         print(
             f"Epoch {epoch}: Avg Train Loss :: {train_loss/3 :.3f}, Avg Train Acc :: {train_acc/3:.3f}, Avg Dev Acc :: {dev_acc/3:.3f}"
         )
@@ -927,6 +936,11 @@ def get_args():
         type=int,
         default=512,
         help="Max position embeddings",
+    )
+    parser.add_argument(
+        "--write_summary",
+        action="store_false",
+        help="Write summary to tensorboard",
     )
 
     args, _ = parser.parse_known_args()
