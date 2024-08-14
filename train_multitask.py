@@ -188,7 +188,6 @@ class MultitaskBERT(nn.Module):
             hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
 
         elif self.config.train_mode == "last_hidden_state":
-            self.layers = []
             hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
 
         elif len(self.layers) > 0 and self.config.train_mode == "single_layers":
@@ -216,7 +215,7 @@ class MultitaskBERT(nn.Module):
             sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
             sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
             sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
-        sentiment_logits = self.dropout(sentiment_logits)
+        # sentiment_logits = self.dropout(sentiment_logits)
         sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
@@ -837,7 +836,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_false")
+    parser.add_argument("--additional_inputs", action="store_true")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -864,7 +863,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -890,7 +889,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
