@@ -156,14 +156,14 @@ class MultitaskBERT(nn.Module):
                     pooled_output2,
                     pooled_output3,
                     pooled_output4,
-                    pooled_output5,
-                    pooled_output6,
-                    pooled_output7,
-                    pooled_output8,
-                    pooled_output9,
-                    pooled_output10,
-                    pooled_output11,
-                    pooled_output12,
+                    # pooled_output5,
+                    # pooled_output6,
+                    # pooled_output7,
+                    # pooled_output8,
+                    # pooled_output9,
+                    # pooled_output10,
+                    # pooled_output11,
+                    # pooled_output12,
                 ),
                 0,
             )
@@ -211,10 +211,12 @@ class MultitaskBERT(nn.Module):
         return output
 
     def predict_sentiment(self, input_ids, attention_mask):
-        bert_embeddings = F.relu(self.forward(input_ids, attention_mask))
-        sentiment_logits = F.relu(self.sentiment_linear(bert_embeddings))
-        sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
-        sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
+        sentiment_logits = F.relu(self.forward(input_ids, attention_mask))
+        if self.config.add_layers:
+            sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
+            sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
+            sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
+        sentiment_logits = self.dropout(sentiment_logits)
         sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
@@ -404,14 +406,15 @@ def train_multitask(args):
         "additional_inputs": args.additional_inputs,
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
-        "max_position_embeddings": MAX_Position_EMBEDDINGS,
+        "max_position_embeddings": args.max_position_embeddings,
         "train_mode": args.train_mode,
         "pooling": args.pooling,
         "layers": args.layers,
+        "add_layers": args.add_layers,
     }
 
     file_uuid = str(uuid.uuid4())
-    name = f"{file_uuid}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
+    name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}-{file_uuid}"
     args.filepath = f"models1/multitask_classifier/{name}.pt"  # save path
 
     save_params_dir = args.config_save_dir + name + ".json"
@@ -743,7 +746,7 @@ def test_model(args):
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
 
-        test_model_multitask(args, model, device, config)
+        test_model_multitask(args, model, device)
 
 
 def get_args():
@@ -863,7 +866,7 @@ def get_args():
         "--batch_size",
         help="sst: 64 can fit a 12GB GPU",
         type=int,
-        default=64 if not args.smoketest else 64,
+        default=32 if not args.smoketest else 64,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
     parser.add_argument(
@@ -903,16 +906,27 @@ def get_args():
     )
     parser.add_argument(
         "--train_mode",
-        default="last_hidden_state",
+        default="all_pooled",
         choices=["all_pooled", "last_hidden_state", "single_layers"],
     )
     parser.add_argument(
         "--pooling",
-        default=None,
+        default="max",
         choices=["mean", "max", None],
     )
     parser.add_argument(
         "--layers", default=None, type=int, nargs="+", help="Layers to train"
+    )
+    parser.add_argument(
+        "--add_layers",
+        action="store_false",
+        help="Add additional layers to the model",
+    )
+    parser.add_argument(
+        "--max_position_embeddings",
+        type=int,
+        default=128,
+        help="Max position embeddings",
     )
 
     args, _ = parser.parse_known_args()
@@ -978,6 +992,12 @@ def get_args():
             if not args.task == "multitask"
             else f"{predictions_path}/{record_time}_sts-similarity-test-output.csv"
         ),
+    )
+    parser.add_argument(
+        "--improve_dir",
+        type=str,
+        default="./improve_dir",
+        help="path to save the params",
     )
 
     args = parser.parse_args()

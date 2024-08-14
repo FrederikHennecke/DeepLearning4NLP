@@ -395,9 +395,9 @@ def train_multitask(args):
         )
 
     # Init model
-    global config_dict
+    # global config_dict
 
-    config_dict = {
+    config = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
@@ -410,10 +410,10 @@ def train_multitask(args):
         "layers": args.layers,
         "train_mode": args.train_mode,
         "dropout": args.dropout,
-        "max_position_embeddings": MAX_POSITION_EMBEDDINGS,
+        "max_position_embeddings": args.max_position_embeddings,
     }
 
-    config = SimpleNamespace(**config_dict)
+    config = SimpleNamespace(**config)
     print(f"config: {config}")
 
     ctx = (
@@ -448,11 +448,24 @@ def train_multitask(args):
     iter_num = 0
 
     if args.scheduler == "linear_warmup":
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=0,
-            num_training_steps=len(quora_train_dataloader) * args.epochs,
-        )
+        if args.task == "sst":
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=0,
+                num_training_steps=len(sst_train_dataloader) * args.epochs,
+            )
+        elif args.task == "sts":
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=0,
+                num_training_steps=len(sts_train_dataloader) * args.epochs,
+            )
+        elif args.task == "qqp":
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=0,
+                num_training_steps=len(quora_train_dataloader) * args.epochs,
+            )
     else:
         scheduler = None
 
@@ -686,7 +699,8 @@ def test_model(args):
         model.load_state_dict(saved["model"])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
-        test_model_multitask(args, model, device, config_dict)
+
+        test_model_multitask(args, model, device)
 
 
 def split_csv(split=0.8):
@@ -729,7 +743,7 @@ def get_args():
 
     # Model configuration
     parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument(
         "--option",
         type=str,
@@ -940,6 +954,12 @@ def get_args():
         default="./improve_dir/qqp",
         help="path to save the params",
     )
+    parser.add_argument(
+        "--max_position_embeddings",
+        type=int,
+        default=128,
+        help="max position embeddings for the model",
+    )
 
     args = parser.parse_args()
     return args
@@ -952,5 +972,5 @@ if __name__ == "__main__":
         f"models1/{args.option}-{args.epochs}-{args.lr}-{args.task}.pt"  # save path
     )
     seed_everything(args.seed)  # fix the seed for reproducibility
-    train_multitask(args)
+    # train_multitask(args)
     test_model(args)
