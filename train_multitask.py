@@ -866,7 +866,7 @@ def get_args():
         "--batch_size",
         help="sst: 64 can fit a 12GB GPU",
         type=int,
-        default=32 if not args.smoketest else 64,
+        default=64 if not args.smoketest else 64,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
     parser.add_argument(
@@ -906,12 +906,12 @@ def get_args():
     )
     parser.add_argument(
         "--train_mode",
-        default="all_pooled",
+        default="last_hidden_state",
         choices=["all_pooled", "last_hidden_state", "single_layers"],
     )
     parser.add_argument(
         "--pooling",
-        default="max",
+        default=None,
         choices=["mean", "max", None],
     )
     parser.add_argument(
@@ -919,13 +919,13 @@ def get_args():
     )
     parser.add_argument(
         "--add_layers",
-        action="store_false",
+        action="store_true",
         help="Add additional layers to the model",
     )
     parser.add_argument(
         "--max_position_embeddings",
         type=int,
-        default=128,
+        default=512,
         help="Max position embeddings",
     )
 

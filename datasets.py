@@ -135,9 +135,13 @@ class SentencePairDataset(Dataset):
         return len(self.dataset)
 
     def __len__(self):
-        return len(self.dataset)
+        if self.override_length is None:
+            return self.real_len()
+        return self.override_length
 
     def __getitem__(self, idx):
+        if self.override_length is not None:
+            return random.choice(self.dataset)
         return self.dataset[idx]
 
     def pad_data(self, data):
