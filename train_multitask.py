@@ -29,11 +29,14 @@ from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW, SophiaG, SophiaH
 from contextlib import nullcontext
 from bert import BertLayer
+from combined_models import CombinedModel
+
 from transformers import get_linear_schedule_with_warmup
 import math
 import warnings
 import json
 import uuid
+from filelock import FileLock
 
 warnings.filterwarnings("ignore", category=UserWarning, module="torch.autograd")
 
@@ -86,9 +89,7 @@ class MultitaskBERT(nn.Module):
     def __init__(self, config):
         super(MultitaskBERT, self).__init__()
 
-        self.bert = BertModel.from_pretrained(
-            "bert-base-uncased", local_files_only=config.local_files_only
-        )
+        self.bert = CombinedModel(config)
 
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -97,23 +98,12 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
 
         self.config = config
-        if config.train_mode == "single_layers":
-            self.layers = config.layers
-        else:
-            self.layers = []
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # attention layer
         self.attention_layer = AttentionLayer(config.hidden_size)
-
-        # all pooled train mode
-        self.d_a = 128
-        self.attn_heads = 1
-
-        self.linear_first = torch.nn.Linear(config.hidden_size, self.d_a)
-        self.linear_second = torch.nn.Linear(self.d_a, self.attn_heads)
 
         # sentiment
         self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
@@ -132,70 +122,8 @@ class MultitaskBERT(nn.Module):
         self.paraphrase_classifier = nn.Linear(config.hidden_size, 2)
 
     def forward(self, input_ids, attention_mask):
-        all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
-            input_ids, attention_mask
-        )
-        if self.config.train_mode == "all_pooled":
-            pooler_output = self.dropout(all_pooled["pooler_output"]).unsqueeze(0)
-            pooled_output2 = self.dropout(all_pooled["pooled_output2"]).unsqueeze(0)
-            pooled_output3 = self.dropout(all_pooled["pooled_output3"]).unsqueeze(0)
-            pooled_output4 = self.dropout(all_pooled["pooled_output4"]).unsqueeze(0)
-            pooled_output5 = self.dropout(all_pooled["pooled_output5"]).unsqueeze(0)
-            pooled_output6 = self.dropout(all_pooled["pooled_output6"]).unsqueeze(0)
-            pooled_output7 = self.dropout(all_pooled["pooled_output7"]).unsqueeze(0)
-            pooled_output8 = self.dropout(all_pooled["pooled_output8"]).unsqueeze(0)
-            pooled_output9 = self.dropout(all_pooled["pooled_output9"]).unsqueeze(0)
-            pooled_output10 = self.dropout(all_pooled["pooled_output10"]).unsqueeze(0)
-            pooled_output11 = self.dropout(all_pooled["pooled_output11"]).unsqueeze(0)
-            pooled_output12 = self.dropout(all_pooled["pooled_output12"]).unsqueeze(
-                0
-            )  # 12, batchsize, hidden_dim
-            all_pooled_output = torch.cat(
-                (
-                    pooler_output,
-                    pooled_output2,
-                    pooled_output3,
-                    pooled_output4,
-                    # pooled_output5,
-                    # pooled_output6,
-                    # pooled_output7,
-                    # pooled_output8,
-                    # pooled_output9,
-                    # pooled_output10,
-                    # pooled_output11,
-                    # pooled_output12,
-                ),
-                0,
-            )
-
-            seq_len, batch_size, hidden_dim = all_pooled_output.size()
-
-            add_layer = self.linear_first(
-                all_pooled_output
-            )  # seq_len. batchsize. hidden_dim
-            add_layer = F.tanh(add_layer)
-            add_layer = self.linear_second(add_layer)
-            add_layer = F.softmax(add_layer, dim=0)
-
-            b = []
-            y = []
-            for i in range(self.attn_heads):
-                b.append(add_layer[:, :, i])
-                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
-                y.append(
-                    (b[i] * all_pooled_output).sum(dim=0)
-                )  #  batchsize, hidden_dim
-            hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
-
-        elif self.config.train_mode == "last_hidden_state":
-            self.layers = []
-            hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
-
-        elif len(self.layers) > 0 and self.config.train_mode == "single_layers":
-            hidden_states = []
-            for l in self.layers:
-                hidden_states.append(all_encoded_layers[l][:, 0].unsqueeze(1))
-            hidden_states = torch.cat(hidden_states, dim=1)
+        bert_output = self.bert(input_ids, attention_mask)
+        hidden_states = self.attention_layer(bert_output["last_hidden_state"])
 
         if self.config.pooling == None:
             output = hidden_states
@@ -270,28 +198,47 @@ def save_model(model, optimizer, args, config, filepath):
         "torch_rng": torch.random.get_rng_state(),
     }
 
-    torch.save(save_info, filepath)
-    print(f"Saving the model to {filepath}.")
+    lock_path = filepath.split(".")[0] + ".lock"
+    lock = FileLock(lock_path)
+
+    try:
+        with lock:
+            with open(filepath, "wb") as file:
+                torch.save(save_info, file)
+                print(f"Saving the model to {filepath}.")
+
+    except Exception as e:
+        print(f"Error saving model to {filepath}")
+        print(e)
 
 
 def load_model(filepath, model, optimizer, use_gpu):
     if not os.path.isfile(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
 
-    save_info = torch.load(
-        filepath, map_location=torch.device("cuda") if use_gpu else "cpu"
-    )
-    model.load_state_dict(save_info["model"])
-    optimizer.load_state_dict(save_info["optim"])
-    args = save_info["args"]
-    args.use_gpu = use_gpu
-    config = save_info["model_config"]
+    lock_path = filepath.split(".")[0] + ".lock"
+    lock = FileLock(lock_path)
 
-    random.setstate(save_info["system_rng"])
-    np.random.set_state(save_info["numpy_rng"])
-    torch.random.set_rng_state(save_info["torch_rng"])
-    print(f"Loading the model from {filepath}.")
-    return model, optimizer, args, config
+    try:
+        with lock:
+            with open(filepath, "rb") as file:
+                print(f"Loading the model from {file}.")
+                save_info = torch.load(
+                    file, map_location=torch.device("cuda") if use_gpu else "cpu"
+                )
+                model.load_state_dict(save_info["model"])
+                optimizer.load_state_dict(save_info["optim"])
+                args = save_info["args"]
+                args.use_gpu = use_gpu
+                config = save_info["model_config"]
+                random.setstate(save_info["system_rng"])
+                np.random.set_state(save_info["numpy_rng"])
+                torch.random.set_rng_state(save_info["torch_rng"])
+                return model, optimizer, args, config
+
+    except Exception as e:
+        print(f"Error loading model from {filepath}")
+        print(e)
 
 
 def train_multitask(args):
@@ -407,7 +354,6 @@ def train_multitask(args):
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
         "max_position_embeddings": args.max_position_embeddings,
-        "train_mode": args.train_mode,
         "pooling": args.pooling,
         "layers": args.layers,
         "add_layers": args.add_layers,
@@ -513,7 +459,7 @@ def train_multitask(args):
 
     if args.checkpoint:
         model, optimizer, _, config = load_model(
-            args.checkpoint, model, optimizer, args.use_gpu
+            args.checkpoint, model, optimizer, args.use_gpu, args.combined_models
         )
     path = (
         args.logdir
@@ -719,6 +665,8 @@ def train_multitask(args):
                 args.filepath = f"ray_checkpoint/{session.get_trial_name()}-{epoch}.pt"
 
             save_model(model, optimizer, args, config, args.filepath)
+            print("Model saved at", args.filepath)
+
         train_acc = para_train_acc + sst_train_acc + sts_train_acc
         dev_acc = para_dev_acc + sst_dev_acc + sts_dev_acc
 
@@ -747,15 +695,22 @@ def train_multitask(args):
 def test_model(args):
     with torch.no_grad():
         device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
-        saved = torch.load(args.filepath)
-        config = saved["model_config"]
 
-        model = MultitaskBERT(config)
-        model.load_state_dict(saved["model"])
-        model = model.to(device)
-        print(f"Loaded model to test from {args.filepath}")
+        lock_path = args.filepath.split(".")[0] + ".lock"
+        lock = FileLock(lock_path)
+        try:
+            with lock:
+                with open(args.filepath, "rb") as file:
+                    print(f"Loaded model to test from {file}")
+                    saved = torch.load(file, map_location=device)
+                    config = saved["model_config"]
+                    model = MultitaskBERT(config)
+                    model.load_state_dict(saved["model"])
+                    model = model.to(device)
+                    test_model_multitask(args, model, device)
 
-        test_model_multitask(args, model, device)
+        except Exception as e:
+            print(f"Error loading model from {e}")
 
 
 def get_args():
@@ -837,7 +792,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_false")
+    parser.add_argument("--additional_inputs", action="store_true")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -913,11 +868,7 @@ def get_args():
         default=10 if not args.smoketest else 1,
         help="Number of trials for HPO",
     )
-    parser.add_argument(
-        "--train_mode",
-        default="last_hidden_state",
-        choices=["all_pooled", "last_hidden_state", "single_layers"],
-    )
+
     parser.add_argument(
         "--pooling",
         default=None,
