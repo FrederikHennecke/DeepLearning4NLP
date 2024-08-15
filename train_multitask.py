@@ -89,7 +89,12 @@ class MultitaskBERT(nn.Module):
     def __init__(self, config):
         super(MultitaskBERT, self).__init__()
 
-        self.bert = CombinedModel(config)
+        if config.combined_models:
+            self.bert = CombinedModel(config)
+        else:
+            self.bert = BertModel.from_pretrained(
+                "bert-base-uncased", local_files_only=config.local_files_only
+            )
 
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -122,8 +127,13 @@ class MultitaskBERT(nn.Module):
         self.paraphrase_classifier = nn.Linear(config.hidden_size, 2)
 
     def forward(self, input_ids, attention_mask):
-        bert_output = self.bert(input_ids, attention_mask)
-        hidden_states = self.attention_layer(bert_output["last_hidden_state"])
+        if self.config.combined_models:
+            bert_output = self.bert(input_ids, attention_mask)
+            hidden_states = self.attention_layer(bert_output["last_hidden_state"])
+
+        else:
+            _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
+            hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
 
         if self.config.pooling == None:
             output = hidden_states
@@ -198,47 +208,68 @@ def save_model(model, optimizer, args, config, filepath):
         "torch_rng": torch.random.get_rng_state(),
     }
 
-    lock_path = filepath.split(".")[0] + ".lock"
-    lock = FileLock(lock_path)
+    if not config.combined_models:
+        print(f"Saving the model to {filepath}.")
+        torch.save(save_info, filepath)
 
-    try:
-        with lock:
-            with open(filepath, "wb") as file:
-                torch.save(save_info, file)
-                print(f"Saving the model to {filepath}.")
+    else:
+        lock_path = filepath.split(".")[0] + ".lock"
+        lock = FileLock(lock_path)
 
-    except Exception as e:
-        print(f"Error saving model to {filepath}")
-        print(e)
+        try:
+            with lock:
+                with open(filepath, "wb") as file:
+                    torch.save(save_info, file)
+                    print(f"Saving the model to {filepath}.")
+
+        except Exception as e:
+            print(f"Error saving model to {filepath}")
+            print(e)
 
 
-def load_model(filepath, model, optimizer, use_gpu):
+def load_model(filepath, model, optimizer, use_gpu, combined_models=False):
     if not os.path.isfile(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
 
-    lock_path = filepath.split(".")[0] + ".lock"
-    lock = FileLock(lock_path)
+    if not combined_models:
+        save_info = torch.load(
+            filepath, map_location=torch.device("cuda") if use_gpu else "cpu"
+        )
+        print(f"Loading the model from {filepath}.")
+        model.load_state_dict(save_info["model"])
+        optimizer.load_state_dict(save_info["optim"])
+        args = save_info["args"]
+        args.use_gpu = use_gpu
+        config = save_info["model_config"]
+        random.setstate(save_info["system_rng"])
+        np.random.set_state(save_info["numpy_rng"])
+        torch.random.set_rng_state(save_info["torch_rng"])
 
-    try:
-        with lock:
-            with open(filepath, "rb") as file:
-                print(f"Loading the model from {file}.")
-                save_info = torch.load(
-                    file, map_location=torch.device("cuda") if use_gpu else "cpu"
-                )
-                model.load_state_dict(save_info["model"])
-                optimizer.load_state_dict(save_info["optim"])
-                args = save_info["args"]
-                args.use_gpu = use_gpu
-                config = save_info["model_config"]
-                random.setstate(save_info["system_rng"])
-                np.random.set_state(save_info["numpy_rng"])
-                torch.random.set_rng_state(save_info["torch_rng"])
-                return model, optimizer, args, config
+    else:
+        lock_path = filepath.split(".")[0] + ".lock"
+        lock = FileLock(lock_path)
 
-    except Exception as e:
-        print(f"Error loading model from {filepath}")
-        print(e)
+        try:
+            with lock:
+                with open(filepath, "rb") as file:
+                    print(f"Loading the model from {file}.")
+                    save_info = torch.load(
+                        file, map_location=torch.device("cuda") if use_gpu else "cpu"
+                    )
+                    model.load_state_dict(save_info["model"])
+                    optimizer.load_state_dict(save_info["optim"])
+                    args = save_info["args"]
+                    args.use_gpu = use_gpu
+                    config = save_info["model_config"]
+                    random.setstate(save_info["system_rng"])
+                    np.random.set_state(save_info["numpy_rng"])
+                    torch.random.set_rng_state(save_info["torch_rng"])
+
+        except Exception as e:
+            print(f"Error loading model from {filepath}")
+            print(e)
+
+    return model, optimizer, args, config
 
 
 def train_multitask(args):
@@ -357,13 +388,10 @@ def train_multitask(args):
         "pooling": args.pooling,
         "layers": args.layers,
         "add_layers": args.add_layers,
+        "combined_models": args.combined_models,
     }
 
-    file_uuid = str(uuid.uuid4())
-    name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}-{file_uuid}"
-    args.filepath = f"models1/multitask_classifier/{name}.pt"  # save path
-
-    save_params_dir = args.config_save_dir + name + ".json"
+    save_params_dir = args.config_save_dir + args.name + ".json"
     train_params = pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)})
 
     with open(save_params_dir, "w") as f:
@@ -465,7 +493,7 @@ def train_multitask(args):
         args.logdir
         + "/multitask_classifier/"
         + (f"{args.tensorboard_subfolder}/" if args.tensorboard_subfolder else "")
-        + name
+        + args.name
     )
     if args.write_summary:
         writer = SummaryWriter(log_dir=path)
@@ -667,6 +695,11 @@ def train_multitask(args):
             save_model(model, optimizer, args, config, args.filepath)
             print("Model saved at", args.filepath)
 
+        else:
+            print(
+                f"Model not saved since the metrics are did not exceed the starting point. Best Dev Acc: Para: {best_dev_acc_para:.3f}, SST: {best_dev_acc_sst:.3f}, STS: {best_dev_acc_sts:.3f}"
+            )
+
         train_acc = para_train_acc + sst_train_acc + sts_train_acc
         dev_acc = para_dev_acc + sst_dev_acc + sts_dev_acc
 
@@ -695,22 +728,31 @@ def train_multitask(args):
 def test_model(args):
     with torch.no_grad():
         device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
+        if not args.combined_models:
+            saved = torch.load(args.filepath)
+            print(f"Loaded model to test from {args.filepath}")
+            config = saved["model_config"]
+            model = MultitaskBERT(config)
+            model.load_state_dict(saved["model"])
+            model = model.to(device)
 
-        lock_path = args.filepath.split(".")[0] + ".lock"
-        lock = FileLock(lock_path)
-        try:
-            with lock:
-                with open(args.filepath, "rb") as file:
-                    print(f"Loaded model to test from {file}")
-                    saved = torch.load(file, map_location=device)
-                    config = saved["model_config"]
-                    model = MultitaskBERT(config)
-                    model.load_state_dict(saved["model"])
-                    model = model.to(device)
-                    test_model_multitask(args, model, device)
+        else:
+            lock_path = args.filepath.split(".")[0] + ".lock"
+            lock = FileLock(lock_path)
+            try:
+                with lock:
+                    with open(args.filepath, "rb") as file:
+                        print(f"Loaded model to test from {file}")
+                        saved = torch.load(file, map_location=device)
+                        config = saved["model_config"]
+                        model = MultitaskBERT(config)
+                        model.load_state_dict(saved["model"])
+                        model = model.to(device)
 
-        except Exception as e:
-            print(f"Error loading model from {e}")
+            except Exception as e:
+                print(f"Error loading model from {e}")
+
+        test_model_multitask(args, model, device)
 
 
 def get_args():
@@ -819,7 +861,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -837,7 +879,7 @@ def get_args():
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
     )
 
     parser.add_argument(
@@ -845,7 +887,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
@@ -893,10 +935,16 @@ def get_args():
         action="store_false",
         help="Write summary to tensorboard",
     )
+    parser.add_argument(
+        "--combined_models",
+        action="store_false",
+        help="Save the model in a single file",
+    )
 
     args, _ = parser.parse_known_args()
     record_time = datetime.now().strftime("%m%d-%H%M")
     path = f"{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.task}"
+
     predictions_path = f"./predictions/bert/multitask/{path}"
     if not os.path.exists(predictions_path):
         os.makedirs(predictions_path, exist_ok=True)
@@ -980,6 +1028,8 @@ if __name__ == "__main__":
 
     args = get_args()
     seed_everything(args.seed)
+    args.name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
+    args.filepath = f"models1/multitask_classifier/{args.name}.pt"  # save path
 
     if args.hpo:
 
