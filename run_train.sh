@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=train-multitask_classifier
-#SBATCH -t 20:00:00                  # estimated time # TODO: adapt to your needs
+#SBATCH -t 15:00:00                  # estimated time # TODO: adapt to your needs
 #SBATCH -p grete:shared                     # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
 #SBATCH -G A100:2                    # take 1 GPU, see https://docs.hpc.gwdg.de/compute_partitions/gpu_partitions/index.html for more options
 #SBATCH --mem-per-gpu=8G             # setting the right constraints for the splitted gpu partitions
@@ -12,7 +12,7 @@
 #SBATCH --output=./slurm_files/slurm-%x-%j.out     # where to write output, %x give job name, %j names job id
 #SBATCH --error=./slurm_files/slurm-%x-%j.err      # where to write slurm error
 
-# srun -p grete --pty -n 1 -C inet -c 80 -G A100:2 /bin/bash
+# srun -p grete:shared --pty -n 1 -C inet -c 80 -G A100:1 --interactive /bin/bash
 module load anaconda3
 source activate dnlp # Or whatever you called your environment.
 # conda install -y -c conda-forge spacy cupy spacy-transformers
@@ -37,4 +37,5 @@ echo "Latest Commit: $(git rev-parse --short HEAD)"
 echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
 # Run the script:
-python -u train_multitask.py --use_gpu --local_files_only --option finetune --task multitask --hpo --smoketest --additional_inputs --add_layers --profiler --write_summary --combined_models --sst --sts --para
+# python -u train_multitask.py --use_gpu --local_files_only --option finetune --task multitask --hpo --smoketest --additional_inputs --add_layers --profiler --write_summary --combined_models --sst --sts --para
+python -u single_classify.py --use_gpu --local_files_only --option finetune --task sst --smoketest

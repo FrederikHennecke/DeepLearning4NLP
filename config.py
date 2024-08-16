@@ -212,7 +212,7 @@ class BertConfig(PretrainedConfig):
         hidden_act="gelu",
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
-        max_position_embeddings=128,
+        max_position_embeddings=512,
         type_vocab_size=2,
         initializer_range=0.02,
         layer_norm_eps=1e-12,
@@ -222,6 +222,7 @@ class BertConfig(PretrainedConfig):
         use_cache=True,
         additional_inputs=False,
         combined_models=False,
+        hidden_dim=128,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -243,3 +244,4 @@ class BertConfig(PretrainedConfig):
         self.use_cache = (use_cache,)
         self.additional_inputs = additional_inputs
         self.combined_models = combined_models
+        self.hidden_dim = hidden_dim

@@ -56,7 +56,8 @@ TQDM_DISABLE = False
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
-MAX_Position_EMBEDDINGS = 512
+HIDDEN_DIM = 128
+
 os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
 
 
@@ -96,6 +97,17 @@ class MultitaskBERT(nn.Module):
                 "bert-base-uncased", local_files_only=config.local_files_only
             )
 
+        # BILSTM layer
+        self.bilstm = torch.nn.LSTM(
+            input_size=config.hidden_size,
+            hidden_size=config.hidden_dim,
+            num_layers=3,
+            bidirectional=True,
+            batch_first=True,
+        )
+        bilstm_output_dim = config.hidden_dim * 2
+
+        # initialize params
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
@@ -111,50 +123,68 @@ class MultitaskBERT(nn.Module):
         self.attention_layer = AttentionLayer(config.hidden_size)
 
         # sentiment
-        self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
-        self.sentiment_linear1 = torch.nn.Linear(config.hidden_size, config.hidden_size)
-        self.sentiment_linear2 = torch.nn.Linear(config.hidden_size, config.hidden_size)
-        self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        if config.add_layers:
+            # more layers
+            self.sentiment_linear = torch.nn.Linear(
+                bilstm_output_dim, config.hidden_size
+            )
+            self.sentiment_linear1 = torch.nn.Linear(
+                config.hidden_size, config.hidden_size
+            )
+            self.sentiment_linear2 = torch.nn.Linear(
+                config.hidden_size, bilstm_output_dim
+            )
+            self.sentiment_classifier = nn.Linear(
+                bilstm_output_dim, N_SENTIMENT_CLASSES
+            )
+        else:
+            self.sentiment_classifier = nn.Linear(
+                bilstm_output_dim, N_SENTIMENT_CLASSES
+            )
+
+        self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
+
+        # sentiment classifier for BILISTM
+        self.sentiment_classifier = nn.Linear(bilstm_output_dim, N_SENTIMENT_CLASSES)
 
         # paraphrase
-        self.paraphrase_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.paraphrase_linear = torch.nn.Linear(bilstm_output_dim, config.hidden_size)
         self.paraphrase_linear1 = torch.nn.Linear(
             config.hidden_size * 2, config.hidden_size
         )
         self.paraphrase_linear2 = torch.nn.Linear(
-            config.hidden_size, config.hidden_size
+            config.hidden_size, 3 * bilstm_output_dim
         )
-        self.paraphrase_classifier = nn.Linear(config.hidden_size, 2)
+
+        # paraphrase classifier for BILISTM
+        self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
 
     def forward(self, input_ids, attention_mask):
-        if self.config.combined_models:
-            bert_output = self.bert(input_ids, attention_mask)
-            hidden_states = self.attention_layer(bert_output["last_hidden_state"])
-
-        else:
-            _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-            hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
+        _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
+        hidden_states = all_sequences["last_hidden_state"]
+        bilstm_output, _ = self.bilstm(hidden_states)
+        bilstm_output = self.dropout(bilstm_output)
 
         if self.config.pooling == None:
-            output = hidden_states
+            pooled_output = bilstm_output
 
         elif self.config.pooling == "max":
-            # output, _ = torch.max(hidden_states, dim=1)
-            output = nn.MaxPool1d(1)(hidden_states).squeeze(-1)
+            pooled_output, _ = torch.max(bilstm_output, dim=1)
+            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
 
         elif self.config.pooling == "mean":
-            # output = torch.mean(hidden_states, dim=1)
-            output = nn.AvgPool1d(1)(hidden_states).squeeze(-1)
+            pooled_output = torch.mean(bilstm_output, dim=1)
+            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
 
-        return output
+        return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
-        sentiment_logits = F.relu(self.forward(input_ids, attention_mask))
+        sentiment_logits = self.forward(input_ids, attention_mask)
         if self.config.add_layers:
             sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
             sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
             sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
-        sentiment_logits = self.dropout(sentiment_logits)
+
         sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
@@ -171,7 +201,6 @@ class MultitaskBERT(nn.Module):
 
         abs_diff = torch.abs(combined_bert_embeddings1 - combined_bert_embeddings2)
         abs_sum = torch.abs(combined_bert_embeddings1 + combined_bert_embeddings2)
-
         concatenated_features = torch.cat((abs_diff, abs_sum), dim=1)
 
         paraphrase_logits = F.relu(self.paraphrase_linear1(concatenated_features))
@@ -185,6 +214,7 @@ class MultitaskBERT(nn.Module):
         paraphrase_logits = self.predict_paraphrase_train(
             input_ids1, attention_mask1, input_ids2, attention_mask2
         )
+        # paraphrase_logits.argmax(dim=-1)
         return paraphrase_logits.argmax(dim=-1)
 
     def predict_similarity(
@@ -389,6 +419,7 @@ def train_multitask(args):
         "layers": args.layers,
         "add_layers": args.add_layers,
         "combined_models": args.combined_models,
+        "hidden_dim": HIDDEN_DIM,
     }
 
     save_params_dir = args.config_save_dir + args.name + ".json"
@@ -834,7 +865,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_true")
+    parser.add_argument("--additional_inputs", action="store_false")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -874,7 +905,7 @@ def get_args():
         type=int,
         default=64 if not args.smoketest else 64,
     )
-    parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument(
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
@@ -887,7 +918,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
@@ -913,7 +944,7 @@ def get_args():
 
     parser.add_argument(
         "--pooling",
-        default=None,
+        default="mean",
         choices=["mean", "max", None],
     )
     parser.add_argument(
