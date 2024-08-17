@@ -61,16 +61,20 @@ class SentenceClassificationDataset(Dataset):
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
+        token_type_ids = torch.LongTensor(encoding["token_type_ids"])
         labels = torch.LongTensor(labels)
 
-        return token_ids, attention_mask, labels, sents, sent_ids
+        return token_ids, attention_mask, token_type_ids, labels, sents, sent_ids
 
     def collate_fn(self, all_data):
-        token_ids, attention_mask, labels, sents, sent_ids = self.pad_data(all_data)
+        token_ids, attention_mask, token_type_ids, labels, sents, sent_ids = (
+            self.pad_data(all_data)
+        )
 
         batched_data = {
             "token_ids": token_ids,
             "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
             "labels": labels,
             "sents": sents,
             "sent_ids": sent_ids,
@@ -105,15 +109,19 @@ class SentenceClassificationTestDataset(Dataset):
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
+        token_type_ids = torch.LongTensor(encoding["token_type_ids"])
 
-        return token_ids, attention_mask, sents, sent_ids
+        return token_ids, attention_mask, token_type_ids, sents, sent_ids
 
     def collate_fn(self, all_data):
-        token_ids, attention_mask, sents, sent_ids = self.pad_data(all_data)
+        token_ids, attention_mask, token_type_ids, sents, sent_ids = self.pad_data(
+            all_data
+        )
 
         batched_data = {
             "token_ids": token_ids,
             "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
             "sents": sents,
             "sent_ids": sent_ids,
         }
@@ -164,6 +172,7 @@ class SentencePairDataset(Dataset):
         token_ids2 = torch.LongTensor(encoding2["input_ids"])
         attention_mask2 = torch.LongTensor(encoding2["attention_mask"])
         token_type_ids2 = torch.LongTensor(encoding2["token_type_ids"])
+
         if self.isRegression:
             labels = torch.DoubleTensor(labels)
         else:
