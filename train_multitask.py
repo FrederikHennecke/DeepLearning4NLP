@@ -425,8 +425,9 @@ def train_multitask(args):
     save_params_dir = args.config_save_dir + args.name + ".json"
     train_params = pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)})
 
-    with open(save_params_dir, "w") as f:
-        json.dump(train_params, f)
+    if args.train_summary:
+        with open(save_params_dir, "w") as f:
+            json.dump(train_params, f)
 
     config = SimpleNamespace(**config)
 
