@@ -131,6 +131,10 @@ class MultitaskBERT(nn.Module):
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
 
+        batch_size, num_segments, segment_length = input_ids.size()
+        input_ids = input_ids.view(batch_size * num_segments, segment_length)
+        attention_mask = attention_mask.view(batch_size * num_segments, segment_length)
+
         _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
         hidden_states = all_sequences["last_hidden_state"]
         bilstm_output, _ = self.bilstm(hidden_states)
@@ -141,6 +145,9 @@ class MultitaskBERT(nn.Module):
 
         elif self.config.pooling == "max":
             pooled_output, _ = torch.max(bilstm_output, dim=1)
+            pooled_output = pooled_output.view(batch_size, num_segments, -1)
+            pooled_output = torch.max(pooled_output, dim=1).values
+
             # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
 
         elif self.config.pooling == "mean":
@@ -165,7 +172,7 @@ class MultitaskBERT(nn.Module):
             sentiment_logits = self.sentiment_classifier(sentiment_logits)
 
         else:
-            sentiment_logits = self.sentiment_classifier(sentiment_logits)[:, -1, :]
+            sentiment_logits = self.sentiment_classifier(sentiment_logits)
 
         return sentiment_logits
 
@@ -327,6 +334,8 @@ def train_multitask(args):
         "add_layers": args.add_layers,
         "max_position_embeddings": args.max_position_embeddings,
         "hidden_dim": HIDDEN_DIM,
+        "max_length": args.max_length,
+        "segment_length": args.segment_length,
     }
 
     config = SimpleNamespace(**config)
@@ -666,7 +675,7 @@ def get_args():
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -822,7 +831,7 @@ def get_args():
     )
     parser.add_argument(
         "--pooling",
-        default=None,
+        default="max",
         choices=[None, "max", "mean"],
         help="choose the pooling method",
     )
@@ -864,8 +873,20 @@ def get_args():
     parser.add_argument(
         "--max_position_embeddings",
         type=int,
-        default=512,
+        default=128,
         help="max position embeddings for the model",
+    )
+    parser.add_argument(
+        "--segment_length",
+        type=int,
+        default=64,
+        help="segment length for the model",
+    )
+    parser.add_argument(
+        "--max_length",
+        type=int,
+        default=128,
+        help="max length for the model",
     )
 
     args = parser.parse_args()

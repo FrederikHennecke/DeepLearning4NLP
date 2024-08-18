@@ -58,7 +58,11 @@ class SentenceClassificationDataset(Dataset):
         sent_ids = [x[2] for x in data]
 
         encoding = self.tokenizer(
-            sents, return_tensors="pt", padding=True, truncation=True
+            sents,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.p.max_length,
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -139,7 +143,11 @@ class SentenceClassificationTestDataset(Dataset):
         sent_ids = [x[1] for x in data]
 
         encoding = self.tokenizer(
-            sents, return_tensors="pt", padding=True, truncation=True
+            sents,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.p.max_length,
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -224,7 +232,11 @@ class SentencePairDataset(Dataset):
             sent1, return_tensors="pt", padding=True, truncation=True
         )
         encoding2 = self.tokenizer(
-            sent2, return_tensors="pt", padding=True, truncation=True
+            sent2,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.p.max_length,
         )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
@@ -379,10 +391,18 @@ class SentencePairTestDataset(Dataset):
         sent_ids = [x[2] for x in data]
 
         encoding1 = self.tokenizer(
-            sent1, return_tensors="pt", padding=True, truncation=True
+            sent1,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.p.max_length,
         )
         encoding2 = self.tokenizer(
-            sent2, return_tensors="pt", padding=True, truncation=True
+            sent2,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.p.max_length,
         )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
