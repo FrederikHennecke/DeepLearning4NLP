@@ -7,7 +7,7 @@
 #SBATCH --nodes=1                    # total number of nodes
 #SBATCH --ntasks=1                   # total number of tasks
 #SBATCH --cpus-per-task=16            # number cores per task
-#SBATCH --mail-type=all              # send mail when job begins and ends
+#SBATCH --mail-type=END,FAIL              # send mail when job begins and ends
 #SBATCH --mail-user=mohamed.aly@stud.uni-goettingen.de
 #SBATCH --output=./slurm_files/slurm-%x-%j.out     # where to write output, %x give job name, %j names job id
 #SBATCH --error=./slurm_files/slurm-%x-%j.err      # where to write slurm error
@@ -38,4 +38,4 @@ echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
 # Run the script:
 # python -u train_multitask.py --use_gpu --local_files_only --option finetune --task multitask --hpo --smoketest --additional_inputs --add_layers --profiler --write_summary --combined_models --sst --sts --para
-python -u single_classify.py --use_gpu --local_files_only --option finetune --task sst --smoketest
+python -u single_classify.py --use_gpu --local_files_only --option finetune --task sts --smoketest

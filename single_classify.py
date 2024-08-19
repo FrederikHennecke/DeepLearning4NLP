@@ -355,6 +355,12 @@ def train_multitask(args):
     print(separator)
 
     model = MultitaskBERT(config)
+    device = torch.device("cpu")
+    if torch.cuda.is_available() and args.use_gpu:
+        device = torch.device("cuda")
+        if torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs", file=sys.stderr)
+            model = nn.DataParallel(model).module
     model = model.to(device)
 
     lr = args.lr
@@ -676,7 +682,7 @@ def get_args():
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 

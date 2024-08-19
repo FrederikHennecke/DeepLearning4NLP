@@ -642,7 +642,6 @@ def train_multitask(args):
                 b_ids = b_ids.to(device)
                 b_mask = b_mask.to(device)
                 b_labels = b_labels.to(device)
-                print(f"SST b_labels: {b_labels}")
 
                 with ctx:
                     sst_logits = model.predict_sentiment(b_ids, b_mask)
