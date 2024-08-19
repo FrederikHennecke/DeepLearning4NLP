@@ -56,25 +56,10 @@ TQDM_DISABLE = False
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
-HIDDEN_DIM = 128
+HIDDEN_DIM = 512
+output_dim = 64
 
 os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
-
-
-class AttentionLayer(nn.Module):
-    def __init__(self, input_size):
-        super(AttentionLayer, self).__init__()
-        self.linear_transform = nn.Linear(input_size, input_size)
-        self.linear_transform1 = nn.Linear(input_size, 1, bias=False)
-
-    def forward(self, embeddings):
-        # embeddings: [batch_size, seq_len, hidden_size]
-        transformed_embeddings = torch.tanh(self.linear_transform(embeddings))
-        attention_weights = torch.softmax(
-            self.linear_transform1(transformed_embeddings), dim=1
-        )
-        attended_embeddings = torch.sum(attention_weights * embeddings, dim=1)
-        return attended_embeddings
 
 
 class MultitaskBERT(nn.Module):
@@ -90,22 +75,12 @@ class MultitaskBERT(nn.Module):
     def __init__(self, config):
         super(MultitaskBERT, self).__init__()
 
-        if config.combined_models:
-            self.bert = CombinedModel(config)
-        else:
-            self.bert = BertModel.from_pretrained(
-                "bert-base-uncased", local_files_only=config.local_files_only
-            )
-
-        # BILSTM layer
-        self.bilstm = torch.nn.LSTM(
-            input_size=config.hidden_size,
-            hidden_size=config.hidden_dim,
-            num_layers=3,
-            bidirectional=True,
-            batch_first=True,
+        self.bert = BertModel.from_pretrained(
+            "bert-base-uncased", local_files_only=config.local_files_only
         )
-        bilstm_output_dim = config.hidden_dim * 2
+        self.conv1 = nn.Conv1d(BERT_HIDDEN_SIZE, HIDDEN_DIM, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(HIDDEN_DIM, 128, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv1d(128, 64, kernel_size=3, padding=1)
 
         # initialize params
         for param in self.bert.parameters():
@@ -119,64 +94,34 @@ class MultitaskBERT(nn.Module):
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        # attention layer
-        self.attention_layer = AttentionLayer(config.hidden_size)
-
-        # sentiment
-        if config.add_layers:
-            # more layers
-            self.sentiment_linear = torch.nn.Linear(
-                bilstm_output_dim, config.hidden_size
-            )
-            self.sentiment_linear1 = torch.nn.Linear(
-                config.hidden_size, config.hidden_size
-            )
-            self.sentiment_linear2 = torch.nn.Linear(
-                config.hidden_size, bilstm_output_dim
-            )
-            self.sentiment_classifier = nn.Linear(
-                bilstm_output_dim, N_SENTIMENT_CLASSES
-            )
-        else:
-            self.sentiment_classifier = nn.Linear(
-                bilstm_output_dim, N_SENTIMENT_CLASSES
-            )
-
-        self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
-
-        # sentiment classifier for BILISTM
-        self.sentiment_classifier = nn.Linear(bilstm_output_dim, N_SENTIMENT_CLASSES)
+        self.sentiment_linear = torch.nn.Linear(64, 64)
+        self.sentiment_classifier = nn.Linear(64, N_SENTIMENT_CLASSES)
 
         # paraphrase
-        self.paraphrase_linear = torch.nn.Linear(bilstm_output_dim, config.hidden_size)
-        self.paraphrase_linear1 = torch.nn.Linear(
-            config.hidden_size * 2, config.hidden_size
-        )
-        self.paraphrase_linear2 = torch.nn.Linear(
-            config.hidden_size, 3 * bilstm_output_dim
-        )
+        self.paraphrase_linear = torch.nn.Linear(64, 64)
+        self.paraphrase_linear1 = torch.nn.Linear(64 * 2, 64)
+        self.paraphrase_linear2 = torch.nn.Linear(64, 3 * 64)
 
         # paraphrase classifier for BILISTM
-        self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
+        self.paraphrase_classifier = nn.Linear(3 * 64, 2)
 
     def forward(self, input_ids, attention_mask):
 
-        batch_size, num_segments, segment_length = input_ids.size()
-        input_ids = input_ids.view(batch_size * num_segments, segment_length)
-        attention_mask = attention_mask.view(batch_size * num_segments, segment_length)
-
         _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
         hidden_states = all_sequences["last_hidden_state"]
-        bilstm_output, _ = self.bilstm(hidden_states)
-        bilstm_output = self.dropout(bilstm_output)
+        hidden_states = hidden_states.permute(0, 2, 1)
+        hidden_states = F.relu(self.conv1(hidden_states))
+        hidden_states = F.relu(self.conv2(hidden_states))
+        hidden_states = F.relu(self.conv3(hidden_states))
+        hidden_states = F.max_pool1d(hidden_states, hidden_states.size(2)).squeeze(2)
+
+        bilstm_output = self.dropout(hidden_states)
 
         if self.config.pooling == None:
-            pooled_output = bilstm_output
+            pooled_output = hidden_states
 
         elif self.config.pooling == "max":
             pooled_output, _ = torch.max(bilstm_output, dim=1)
-            pooled_output = pooled_output.view(batch_size, num_segments, -1)
-            pooled_output = torch.max(pooled_output, dim=1).values
             # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
 
         elif self.config.pooling == "mean":
@@ -187,11 +132,7 @@ class MultitaskBERT(nn.Module):
 
     def predict_sentiment(self, input_ids, attention_mask):
         sentiment_logits = self.forward(input_ids, attention_mask)
-        if self.config.add_layers:
-            sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
-            sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
-            sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
-
+        sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
         sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
@@ -221,7 +162,6 @@ class MultitaskBERT(nn.Module):
         paraphrase_logits = self.predict_paraphrase_train(
             input_ids1, attention_mask1, input_ids2, attention_mask2
         )
-        # paraphrase_logits.argmax(dim=-1)
         return paraphrase_logits.argmax(dim=-1)
 
     def predict_similarity(
@@ -424,11 +364,9 @@ def train_multitask(args):
         "max_position_embeddings": args.max_position_embeddings,
         "pooling": args.pooling,
         "layers": args.layers,
-        "add_layers": args.add_layers,
-        "combined_models": args.combined_models,
         "hidden_dim": HIDDEN_DIM,
         "max_length": args.max_length,
-        "segment_length": args.segment_length,
+        "combined_models": args.combined_models,
     }
 
     save_params_dir = args.config_save_dir + args.name + ".json"
@@ -954,26 +892,17 @@ def get_args():
 
     parser.add_argument(
         "--pooling",
-        default="max",
+        default=None,
         choices=["mean", "max", None],
     )
     parser.add_argument(
         "--layers", default=None, type=int, nargs="+", help="Layers to train"
     )
-    parser.add_argument(
-        "--add_layers",
-        action="store_true",
-        help="Add additional layers to the model",
-    )
+
     parser.add_argument(
         "--write_summary",
         action="store_false",
         help="Write summary to tensorboard",
-    )
-    parser.add_argument(
-        "--combined_models",
-        action="store_false",
-        help="Save the model in a single file",
     )
 
     args, _ = parser.parse_known_args()
@@ -1042,6 +971,16 @@ def get_args():
         ),
     )
     parser.add_argument(
+        "--add_layers",
+        action="store_false",
+        help="Add extra layers to the model",
+    )
+    parser.add_argument(
+        "--combined_models",
+        action="store_false",
+        help="Combine models for multitask learning",
+    )
+    parser.add_argument(
         "--improve_dir",
         type=str,
         default="./improve_dir",
@@ -1054,15 +993,9 @@ def get_args():
         help="Max position embeddings",
     )
     parser.add_argument(
-        "--segment_length",
-        type=int,
-        default=34,
-        help="segment length for the model",
-    )
-    parser.add_argument(
         "--max_length",
         type=int,
-        default=68,
+        default=512,
         help="max length for the model",
     )
 
