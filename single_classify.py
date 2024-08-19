@@ -463,6 +463,7 @@ def train_multitask(args):
                 b_mask_1 = b_mask_1.to(device)
                 b_ids_2 = b_ids_2.to(device)
                 b_mask_2 = b_mask_2.to(device)
+                # print(f"STS b_labels: {b_labels}")
                 b_labels = b_labels.to(device).float()
 
                 optimizer.zero_grad()
@@ -873,19 +874,19 @@ def get_args():
     parser.add_argument(
         "--max_position_embeddings",
         type=int,
-        default=128,
+        default=512,
         help="max position embeddings for the model",
     )
     parser.add_argument(
         "--segment_length",
         type=int,
-        default=64,
+        default=34,
         help="segment length for the model",
     )
     parser.add_argument(
         "--max_length",
         type=int,
-        default=128,
+        default=68,
         help="max length for the model",
     )
 

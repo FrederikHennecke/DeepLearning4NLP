@@ -66,12 +66,11 @@ class SentenceClassificationDataset(Dataset):
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
-        token_type_ids = torch.LongTensor(encoding["token_type_ids"])
         labels = torch.LongTensor(labels)
 
-        return token_ids, attention_mask, token_type_ids, labels, sents, sent_ids
+        return token_ids, attention_mask, labels, sents, sent_ids
 
-    def chunk_input(self, input_ids, input_type_ids, attention_mask, segment_length):
+    def chunk_input(self, input_ids, attention_mask, segment_length):
         batch_size, seq_length = input_ids.shape
         num_segments = (seq_length + segment_length - 1) // segment_length
         padded_length = num_segments * segment_length
@@ -80,17 +79,11 @@ class SentenceClassificationDataset(Dataset):
         attention_mask_padded = F.pad(
             attention_mask, (0, padded_length - seq_length), value=0
         )
-        input_type_ids_padded = F.pad(
-            input_type_ids, (0, padded_length - seq_length), value=0
-        )
 
         input_ids_segmented = input_ids_padded.view(
             batch_size, num_segments, segment_length
         )
         attention_mask_segmented = attention_mask_padded.view(
-            batch_size, num_segments, segment_length
-        )
-        input_type_ids_segmented = input_type_ids_padded.view(
             batch_size, num_segments, segment_length
         )
 
@@ -99,20 +92,17 @@ class SentenceClassificationDataset(Dataset):
         # input_ids = input_ids.view(batch_size, num_segments, segment_length)
         # attention_mask = attention_mask.view(batch_size, num_segments, segment_length)
 
-        return input_ids_segmented, attention_mask_segmented, input_type_ids_segmented
+        return input_ids_segmented, attention_mask_segmented
 
     def collate_fn(self, all_data):
-        token_ids, attention_mask, token_type_ids, labels, sents, sent_ids = (
-            self.pad_data(all_data)
-        )
-        token_ids, attention_mask, token_type_ids = self.chunk_input(
-            token_ids, token_type_ids, attention_mask, self.p.segment_length
+        token_ids, attention_mask, labels, sents, sent_ids = self.pad_data(all_data)
+        token_ids, attention_mask = self.chunk_input(
+            token_ids, attention_mask, self.p.segment_length
         )
 
         batched_data = {
             "token_ids": token_ids,
             "attention_mask": attention_mask,
-            "token_type_ids": token_type_ids,
             "labels": labels,
             "sents": sents,
             "sent_ids": sent_ids,
@@ -151,11 +141,10 @@ class SentenceClassificationTestDataset(Dataset):
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
-        token_type_ids = torch.LongTensor(encoding["token_type_ids"])
 
-        return token_ids, attention_mask, token_type_ids, sents, sent_ids
+        return token_ids, attention_mask, sents, sent_ids
 
-    def chunk_input(self, input_ids, attention_mask, input_type_ids, segment_length):
+    def chunk_input(self, input_ids, attention_mask, segment_length):
         batch_size, seq_length = input_ids.shape
         num_segments = (seq_length + segment_length - 1) // segment_length
         padded_length = num_segments * segment_length
@@ -164,9 +153,6 @@ class SentenceClassificationTestDataset(Dataset):
         attention_mask_padded = F.pad(
             attention_mask, (0, padded_length - seq_length), value=0
         )
-        input_type_ids_padded = F.pad(
-            input_type_ids, (0, padded_length - seq_length), value=0
-        )
 
         input_ids_segmented = input_ids_padded.view(
             batch_size, num_segments, segment_length
@@ -174,24 +160,18 @@ class SentenceClassificationTestDataset(Dataset):
         attention_mask_segmented = attention_mask_padded.view(
             batch_size, num_segments, segment_length
         )
-        input_type_ids_segmented = input_type_ids_padded.view(
-            batch_size, num_segments, segment_length
-        )
 
-        return input_ids_segmented, attention_mask_segmented, input_type_ids_segmented
+        return input_ids_segmented, attention_mask_segmented
 
     def collate_fn(self, all_data):
-        token_ids, attention_mask, token_type_ids, sents, sent_ids = self.pad_data(
-            all_data
-        )
-        token_ids, attention_mask, token_type_ids = self.chunk_input(
-            token_ids, attention_mask, token_type_ids, self.p.segment_length
+        token_ids, attention_mask, sents, sent_ids = self.pad_data(all_data)
+        token_ids, attention_mask = self.chunk_input(
+            token_ids, attention_mask, self.p.segment_length
         )
 
         batched_data = {
             "token_ids": token_ids,
             "attention_mask": attention_mask,
-            "token_type_ids": token_type_ids,
             "sents": sents,
             "sent_ids": sent_ids,
         }
@@ -229,7 +209,11 @@ class SentencePairDataset(Dataset):
         sent_ids = [x[3] for x in data]
 
         encoding1 = self.tokenizer(
-            sent1, return_tensors="pt", padding=True, truncation=True
+            sent1,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=self.p.max_length,
         )
         encoding2 = self.tokenizer(
             sent2,
@@ -241,11 +225,9 @@ class SentencePairDataset(Dataset):
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
         attention_mask = torch.LongTensor(encoding1["attention_mask"])
-        token_type_ids = torch.LongTensor(encoding1["token_type_ids"])
 
         token_ids2 = torch.LongTensor(encoding2["input_ids"])
         attention_mask2 = torch.LongTensor(encoding2["attention_mask"])
-        token_type_ids2 = torch.LongTensor(encoding2["token_type_ids"])
 
         if self.isRegression:
             labels = torch.DoubleTensor(labels)
@@ -254,10 +236,8 @@ class SentencePairDataset(Dataset):
 
         return (
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
             labels,
             sent_ids,
@@ -266,10 +246,8 @@ class SentencePairDataset(Dataset):
     def chunk_input(
         self,
         input_ids,
-        input_type_ids,
         attention_mask,
         input_ids2,
-        input_type_ids2,
         attention_mask2,
         segment_length,
     ):
@@ -283,9 +261,6 @@ class SentencePairDataset(Dataset):
         padded_length2 = num_segments2 * segment_length
 
         input_ids_padded = F.pad(input_ids, (0, padded_length - seq_length), value=0)
-        input_type_ids_padded = F.pad(
-            input_type_ids, (0, padded_length - seq_length), value=0
-        )
         attention_mask_padded = F.pad(
             attention_mask, (0, padded_length - seq_length), value=0
         )
@@ -293,17 +268,11 @@ class SentencePairDataset(Dataset):
         input_ids2_padded = F.pad(
             input_ids2, (0, padded_length2 - seq_length2), value=0
         )
-        input_type_ids2_padded = F.pad(
-            input_type_ids2, (0, padded_length2 - seq_length2), value=0
-        )
         attention_mask2_padded = F.pad(
             attention_mask2, (0, padded_length2 - seq_length2), value=0
         )
 
         input_ids_segmented = input_ids_padded.view(
-            batch_size, num_segments, segment_length
-        )
-        input_type_ids_segmented = input_type_ids_padded.view(
             batch_size, num_segments, segment_length
         )
         attention_mask_segmented = attention_mask_padded.view(
@@ -313,56 +282,43 @@ class SentencePairDataset(Dataset):
         input_ids2_segmented = input_ids2_padded.view(
             batch_size2, num_segments2, segment_length
         )
-        input_type_ids2_segmented = input_type_ids2_padded.view(
-            batch_size2, num_segments2, segment_length
-        )
         attention_mask2_segmented = attention_mask2_padded.view(
             batch_size2, num_segments2, segment_length
         )
 
         return (
             input_ids_segmented,
-            input_type_ids_segmented,
             attention_mask_segmented,
             input_ids2_segmented,
-            input_type_ids2_segmented,
             attention_mask2_segmented,
         )
 
     def collate_fn(self, all_data):
         (
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
-            sent_ids,
             labels,
+            sent_ids,
         ) = self.pad_data(all_data)
         (
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
         ) = self.chunk_input(
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
             self.p.segment_length,
         )
 
         batched_data = {
             "token_ids_1": token_ids,
-            "token_type_ids_1": token_type_ids,
             "attention_mask_1": attention_mask,
             "token_ids_2": token_ids2,
-            "token_type_ids_2": token_type_ids2,
             "attention_mask_2": attention_mask2,
             "labels": labels,
             "sent_ids": sent_ids,
@@ -407,18 +363,14 @@ class SentencePairTestDataset(Dataset):
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
         attention_mask = torch.LongTensor(encoding1["attention_mask"])
-        token_type_ids = torch.LongTensor(encoding1["token_type_ids"])
 
         token_ids2 = torch.LongTensor(encoding2["input_ids"])
         attention_mask2 = torch.LongTensor(encoding2["attention_mask"])
-        token_type_ids2 = torch.LongTensor(encoding2["token_type_ids"])
 
         return (
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
             sent_ids,
         )
@@ -426,10 +378,8 @@ class SentencePairTestDataset(Dataset):
     def chunk_input(
         self,
         input_ids,
-        input_type_ids,
         attention_mask,
         input_ids2,
-        input_type_ids2,
         attention_mask2,
         segment_length,
     ):
@@ -443,9 +393,6 @@ class SentencePairTestDataset(Dataset):
         padded_length2 = num_segments2 * segment_length
 
         input_ids_padded = F.pad(input_ids, (0, padded_length - seq_length), value=0)
-        input_type_ids_padded = F.pad(
-            input_type_ids, (0, padded_length - seq_length), value=0
-        )
         attention_mask_padded = F.pad(
             attention_mask, (0, padded_length - seq_length), value=0
         )
@@ -453,17 +400,11 @@ class SentencePairTestDataset(Dataset):
         input_ids2_padded = F.pad(
             input_ids2, (0, padded_length2 - seq_length2), value=0
         )
-        input_type_ids2_padded = F.pad(
-            input_type_ids2, (0, padded_length2 - seq_length2), value=0
-        )
         attention_mask2_padded = F.pad(
             attention_mask2, (0, padded_length2 - seq_length2), value=0
         )
 
         input_ids_segmented = input_ids_padded.view(
-            batch_size, num_segments, segment_length
-        )
-        input_type_ids_segmented = input_type_ids_padded.view(
             batch_size, num_segments, segment_length
         )
         attention_mask_segmented = attention_mask_padded.view(
@@ -473,56 +414,43 @@ class SentencePairTestDataset(Dataset):
         input_ids2_segmented = input_ids2_padded.view(
             batch_size2, num_segments2, segment_length
         )
-        input_type_ids2_segmented = input_type_ids2_padded.view(
-            batch_size2, num_segments2, segment_length
-        )
         attention_mask2_segmented = attention_mask2_padded.view(
             batch_size2, num_segments2, segment_length
         )
 
         return (
             input_ids_segmented,
-            input_type_ids_segmented,
             attention_mask_segmented,
             input_ids2_segmented,
-            input_type_ids2_segmented,
             attention_mask2_segmented,
         )
 
     def collate_fn(self, all_data):
         (
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
             sent_ids,
         ) = self.pad_data(all_data)
 
         (
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
         ) = self.chunk_input(
             token_ids,
-            token_type_ids,
             attention_mask,
             token_ids2,
-            token_type_ids2,
             attention_mask2,
             self.p.segment_length,
         )
 
         batched_data = {
             "token_ids_1": token_ids,
-            "token_type_ids_1": token_type_ids,
             "attention_mask_1": attention_mask,
             "token_ids_2": token_ids2,
-            "token_type_ids_2": token_type_ids2,
             "attention_mask_2": attention_mask2,
             "sent_ids": sent_ids,
         }

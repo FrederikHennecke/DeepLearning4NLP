@@ -160,6 +160,11 @@ class MultitaskBERT(nn.Module):
         self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
 
     def forward(self, input_ids, attention_mask):
+
+        batch_size, num_segments, segment_length = input_ids.size()
+        input_ids = input_ids.view(batch_size * num_segments, segment_length)
+        attention_mask = attention_mask.view(batch_size * num_segments, segment_length)
+
         _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
         hidden_states = all_sequences["last_hidden_state"]
         bilstm_output, _ = self.bilstm(hidden_states)
@@ -170,6 +175,8 @@ class MultitaskBERT(nn.Module):
 
         elif self.config.pooling == "max":
             pooled_output, _ = torch.max(bilstm_output, dim=1)
+            pooled_output = pooled_output.view(batch_size, num_segments, -1)
+            pooled_output = torch.max(pooled_output, dim=1).values
             # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
 
         elif self.config.pooling == "mean":
@@ -420,12 +427,14 @@ def train_multitask(args):
         "add_layers": args.add_layers,
         "combined_models": args.combined_models,
         "hidden_dim": HIDDEN_DIM,
+        "max_length": args.max_length,
+        "segment_length": args.segment_length,
     }
 
     save_params_dir = args.config_save_dir + args.name + ".json"
     train_params = pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)})
 
-    if args.train_summary:
+    if args.write_summary:
         with open(save_params_dir, "w") as f:
             json.dump(train_params, f)
 
@@ -633,6 +642,7 @@ def train_multitask(args):
                 b_ids = b_ids.to(device)
                 b_mask = b_mask.to(device)
                 b_labels = b_labels.to(device)
+                print(f"SST b_labels: {b_labels}")
 
                 with ctx:
                     sst_logits = model.predict_sentiment(b_ids, b_mask)
@@ -945,7 +955,7 @@ def get_args():
 
     parser.add_argument(
         "--pooling",
-        default="mean",
+        default="max",
         choices=["mean", "max", None],
     )
     parser.add_argument(
@@ -955,12 +965,6 @@ def get_args():
         "--add_layers",
         action="store_true",
         help="Add additional layers to the model",
-    )
-    parser.add_argument(
-        "--max_position_embeddings",
-        type=int,
-        default=512,
-        help="Max position embeddings",
     )
     parser.add_argument(
         "--write_summary",
@@ -1043,6 +1047,24 @@ def get_args():
         type=str,
         default="./improve_dir",
         help="path to save the params",
+    )
+    parser.add_argument(
+        "--max_position_embeddings",
+        type=int,
+        default=512,
+        help="Max position embeddings",
+    )
+    parser.add_argument(
+        "--segment_length",
+        type=int,
+        default=34,
+        help="segment length for the model",
+    )
+    parser.add_argument(
+        "--max_length",
+        type=int,
+        default=68,
+        help="max length for the model",
     )
 
     args = parser.parse_args()
