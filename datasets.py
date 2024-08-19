@@ -96,9 +96,9 @@ class SentenceClassificationDataset(Dataset):
 
     def collate_fn(self, all_data):
         token_ids, attention_mask, labels, sents, sent_ids = self.pad_data(all_data)
-        token_ids, attention_mask = self.chunk_input(
-            token_ids, attention_mask, self.p.segment_length
-        )
+        # token_ids, attention_mask = self.chunk_input(
+        #     token_ids, attention_mask, self.p.segment_length
+        # )
 
         batched_data = {
             "token_ids": token_ids,
@@ -165,9 +165,9 @@ class SentenceClassificationTestDataset(Dataset):
 
     def collate_fn(self, all_data):
         token_ids, attention_mask, sents, sent_ids = self.pad_data(all_data)
-        token_ids, attention_mask = self.chunk_input(
-            token_ids, attention_mask, self.p.segment_length
-        )
+        # token_ids, attention_mask = self.chunk_input(
+        #     token_ids, attention_mask, self.p.segment_length
+        # )
 
         batched_data = {
             "token_ids": token_ids,
@@ -302,18 +302,18 @@ class SentencePairDataset(Dataset):
             labels,
             sent_ids,
         ) = self.pad_data(all_data)
-        (
-            token_ids,
-            attention_mask,
-            token_ids2,
-            attention_mask2,
-        ) = self.chunk_input(
-            token_ids,
-            attention_mask,
-            token_ids2,
-            attention_mask2,
-            self.p.segment_length,
-        )
+        # (
+        #     token_ids,
+        #     attention_mask,
+        #     token_ids2,
+        #     attention_mask2,
+        # ) = self.chunk_input(
+        #     token_ids,
+        #     attention_mask,
+        #     token_ids2,
+        #     attention_mask2,
+        #     self.p.segment_length,
+        # )
 
         batched_data = {
             "token_ids_1": token_ids,
@@ -434,18 +434,18 @@ class SentencePairTestDataset(Dataset):
             sent_ids,
         ) = self.pad_data(all_data)
 
-        (
-            token_ids,
-            attention_mask,
-            token_ids2,
-            attention_mask2,
-        ) = self.chunk_input(
-            token_ids,
-            attention_mask,
-            token_ids2,
-            attention_mask2,
-            self.p.segment_length,
-        )
+        # (
+        #     token_ids,
+        #     attention_mask,
+        #     token_ids2,
+        #     attention_mask2,
+        # ) = self.chunk_input(
+        #     token_ids,
+        #     attention_mask,
+        #     token_ids2,
+        #     attention_mask2,
+        #     self.p.segment_length,
+        # )
 
         batched_data = {
             "token_ids_1": token_ids,

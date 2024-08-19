@@ -65,6 +65,40 @@ class AttentionLayer(nn.Module):
         return attended_embeddings
 
 
+class CapsuleLayer(nn.Module):
+    def __init__(self, num_capsules, num_routes, in_dim, out_dim):
+        super(CapsuleLayer, self).__init__()
+        self.num_capsules = num_capsules
+        self.num_routes = num_routes
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.W = nn.Parameter(torch.randn(num_capsules, num_routes, in_dim, out_dim))
+
+    def squash(self, s_j):
+        s_j_norm = torch.norm(s_j, dim=-1, keepdim=True)
+        return (s_j_norm**2 / (1 + s_j_norm**2)) * (s_j / s_j_norm)
+
+    def forward(self, x):
+        # x: [batch_size, num_capsules, num_routes, in_dim]
+        # W: [num_capsules, num_routes, in_dim, out_dim]
+
+        batch_size = x.size(0)
+        seq_len = x.size(1)
+        x = x.unsqueeze(1).expand(batch_size, self.num_capsules, seq_len, self.in_dim)
+        u_hat = torch.matmul(x, self.W[:, :seq_len, :, :])
+        b_ij = torch.zeros(batch_size, self.num_capsules, seq_len, 1).to(x.device)
+
+        for iteration in range(3):
+            c_ij = F.softmax(b_ij, dim=1)  # softmax along num_routes
+            s_j = (c_ij * u_hat).sum(dim=2)
+            v_j = self.squash(s_j)
+
+            if iteration < 2:
+                b_ij = b_ij + torch.matmul(u_hat, v_j.unsqueeze(-1)).squeeze(-1)
+
+        return v_j
+
+
 class MultitaskBERT(nn.Module):
     """
     This module should use BERT for these tasks:
@@ -85,15 +119,12 @@ class MultitaskBERT(nn.Module):
             "bert-base-uncased", local_files_only=config.local_files_only
         )
 
-        # BILSTM layer
-        self.bilstm = torch.nn.LSTM(
-            input_size=config.hidden_size,
-            hidden_size=config.hidden_dim,
-            num_layers=1,
-            bidirectional=True,
-            batch_first=True,
+        self.capsule_layer = CapsuleLayer(
+            num_capsules=10,
+            num_routes=768,
+            in_dim=768,
+            out_dim=16,
         )
-        bilstm_output_dim = config.hidden_dim * 2
 
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -104,55 +135,50 @@ class MultitaskBERT(nn.Module):
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        # attention layer
-        self.attention_layer = AttentionLayer(config.hidden_size)
+        capsule_output_dim = 10 * 16
 
         if config.add_layers:
             # more layers
             self.sentiment_linear = torch.nn.Linear(
-                bilstm_output_dim, config.hidden_size
+                capsule_output_dim, config.hidden_size
             )
             self.sentiment_linear1 = torch.nn.Linear(
                 config.hidden_size, config.hidden_size
             )
             self.sentiment_linear2 = torch.nn.Linear(
-                config.hidden_size, bilstm_output_dim
+                config.hidden_size, capsule_output_dim
             )
             self.sentiment_classifier = nn.Linear(
-                bilstm_output_dim, N_SENTIMENT_CLASSES
+                capsule_output_dim, N_SENTIMENT_CLASSES
             )
         else:
             self.sentiment_classifier = nn.Linear(
-                bilstm_output_dim, N_SENTIMENT_CLASSES
+                capsule_output_dim, N_SENTIMENT_CLASSES
             )
 
-        self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
+        self.paraphrase_classifier = nn.Linear(3 * capsule_output_dim, 2)
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
 
-        batch_size, num_segments, segment_length = input_ids.size()
-        input_ids = input_ids.view(batch_size * num_segments, segment_length)
-        attention_mask = attention_mask.view(batch_size * num_segments, segment_length)
-
         _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
         hidden_states = all_sequences["last_hidden_state"]
-        bilstm_output, _ = self.bilstm(hidden_states)
-        bilstm_output = self.dropout(bilstm_output)
+        # hidden_states= hidden_states.unsqueeze(1).repeat(1, self.capsule_layer.num_routes, 1)
+
+        capsule_output = self.capsule_layer(hidden_states)
+        capsule_output = capsule_output.view(capsule_output.size(0), -1)
+        # capsule_output = self.dropout(capsule_output)
 
         if self.config.pooling == None:
-            pooled_output = bilstm_output
+            pooled_output = capsule_output
 
         elif self.config.pooling == "max":
-            pooled_output, _ = torch.max(bilstm_output, dim=1)
-            pooled_output = pooled_output.view(batch_size, num_segments, -1)
-            pooled_output = torch.max(pooled_output, dim=1).values
-
-            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
+            pooled_output, _ = torch.max(capsule_output, dim=1)
+            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(capsule_output).squeeze(-1)
 
         elif self.config.pooling == "mean":
-            pooled_output = torch.mean(bilstm_output, dim=1)
-            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
+            pooled_output = torch.mean(capsule_output, dim=1)
+            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(capsule_output).squeeze(-1)
 
         return pooled_output
 
@@ -333,9 +359,7 @@ def train_multitask(args):
         "additional_inputs": args.additional_inputs,
         "add_layers": args.add_layers,
         "max_position_embeddings": args.max_position_embeddings,
-        "hidden_dim": HIDDEN_DIM,
         "max_length": args.max_length,
-        "segment_length": args.segment_length,
     }
 
     config = SimpleNamespace(**config)
@@ -682,7 +706,7 @@ def get_args():
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -838,7 +862,7 @@ def get_args():
     )
     parser.add_argument(
         "--pooling",
-        default="max",
+        default=None,
         choices=[None, "max", "mean"],
         help="choose the pooling method",
     )
@@ -884,15 +908,9 @@ def get_args():
         help="max position embeddings for the model",
     )
     parser.add_argument(
-        "--segment_length",
-        type=int,
-        default=34,
-        help="segment length for the model",
-    )
-    parser.add_argument(
         "--max_length",
         type=int,
-        default=68,
+        default=512,
         help="max length for the model",
     )
 

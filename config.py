@@ -221,8 +221,6 @@ class BertConfig(PretrainedConfig):
         position_embedding_type="absolute",
         use_cache=True,
         additional_inputs=False,
-        combined_models=False,
-        hidden_dim=128,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -243,5 +241,3 @@ class BertConfig(PretrainedConfig):
         self.position_embedding_type = position_embedding_type
         self.use_cache = (use_cache,)
         self.additional_inputs = additional_inputs
-        self.combined_models = combined_models
-        self.hidden_dim = hidden_dim
