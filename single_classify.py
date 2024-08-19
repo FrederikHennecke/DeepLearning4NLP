@@ -22,10 +22,12 @@ from datasets import (
     SentencePairDataset,
     load_multitask_data,
 )
+from bert import BertLayer
+from layers import Adapter
+
 from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW, SophiaG
 from contextlib import nullcontext
-from bert import BertLayer
 from transformers import get_linear_schedule_with_warmup
 
 
@@ -46,7 +48,7 @@ def seed_everything(seed=11711):
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
-HIDDEN_DIM = 512
+Adapter_DIM = 64
 
 
 class MultitaskBERT(nn.Module):
@@ -66,16 +68,12 @@ class MultitaskBERT(nn.Module):
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
-        self.conv1 = nn.Conv1d(BERT_HIDDEN_SIZE, HIDDEN_DIM, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv1d(HIDDEN_DIM, 128, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv1d(128, 64, kernel_size=3, padding=1)
-
-        # self.capsule_layer = CapsuleLayer(
-        #     num_capsules=10,
-        #     num_routes=768,
-        #     in_dim=768,
-        #     out_dim=16,
-        # )
+        self.adapters = nn.ModuleList(
+            [
+                Adapter(config.hidden_size, config.adapter_dim)
+                for _ in range(config.hidden_layers + 1)
+            ]
+        )
 
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -86,48 +84,41 @@ class MultitaskBERT(nn.Module):
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        capsule_output_dim = 10 * 16
-
         if config.add_layers:
             # more layers
             self.sentiment_linear = torch.nn.Linear(
-                capsule_output_dim, config.hidden_size
+                config.hidden_size, config.hidden_size
             )
             self.sentiment_linear1 = torch.nn.Linear(
                 config.hidden_size, config.hidden_size
             )
             self.sentiment_linear2 = torch.nn.Linear(
-                config.hidden_size, capsule_output_dim
+                config.hidden_size, config.hidden_size
             )
             self.sentiment_classifier = nn.Linear(
-                capsule_output_dim, N_SENTIMENT_CLASSES
+                config.hidden_size, N_SENTIMENT_CLASSES
             )
         else:
-            self.sentiment_classifier = nn.Linear(64, N_SENTIMENT_CLASSES)
+            self.sentiment_classifier = nn.Linear(
+                config.hidden_size, N_SENTIMENT_CLASSES
+            )
 
-        self.paraphrase_classifier = nn.Linear(3 * capsule_output_dim, 2)
+        self.paraphrase_classifier = nn.Linear(3 * config.hidden_size, 2)
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
 
-        _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-        hidden_states = all_sequences["last_hidden_state"]
-        hidden_states = hidden_states.permute(0, 2, 1)
-        hidden_states = F.relu(self.conv1(hidden_states))
-        hidden_states = F.relu(self.conv2(hidden_states))
-        hidden_states = F.relu(self.conv3(hidden_states))
-        hidden_states = F.max_pool1d(hidden_states, hidden_states.size(2)).squeeze(2)
+        all_encoded_layers, pooler_output, all_sequences, _ = self.bert(
+            input_ids, attention_mask
+        )
+        # print(f"all_encoded_layers: {all_encoded_layers[:2]}")
 
-        if self.config.pooling == None:
-            pooled_output = hidden_states
+        for i, adapter in enumerate(self.adapters):
+            all_encoded_layers[i + 1] = all_encoded_layers[i + 1] + adapter(
+                all_encoded_layers[i + 1]
+            )
 
-        elif self.config.pooling == "max":
-            pooled_output, _ = torch.max(hidden_states, dim=1)
-            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(hidden_states).squeeze(-1)
-
-        elif self.config.pooling == "mean":
-            pooled_output = torch.mean(hidden_states, dim=1)
-            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(hidden_states).squeeze(-1)
+        pooled_output = all_encoded_layers[-1][:, 0]
 
         return pooled_output
 
@@ -147,7 +138,7 @@ class MultitaskBERT(nn.Module):
             sentiment_logits = self.sentiment_classifier(sentiment_logits)
 
         else:
-            sentiment_logits = self.dropout(sentiment_logits)
+            # sentiment_logits = self.dropout(sentiment_logits)
             sentiment_logits = self.sentiment_classifier(sentiment_logits)
 
         return sentiment_logits
@@ -301,7 +292,7 @@ def train_multitask(args):
     config = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
         "hidden_size": BERT_HIDDEN_SIZE,
-        "num_hidden_layers": N_HIDDEN_LAYERS,
+        "hidden_layers": N_HIDDEN_LAYERS,
         "data_dir": ".",
         "option": args.option,
         "local_files_only": args.local_files_only,
@@ -310,6 +301,7 @@ def train_multitask(args):
         "add_layers": args.add_layers,
         "max_position_embeddings": args.max_position_embeddings,
         "max_length": args.max_length,
+        "adapter_dim": Adapter_DIM,
     }
 
     config = SimpleNamespace(**config)
@@ -656,7 +648,7 @@ def get_args():
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 

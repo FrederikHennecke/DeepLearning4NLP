@@ -51,3 +51,17 @@ class CapsuleLayer(nn.Module):
                 b_ij = b_ij + torch.matmul(u_hat, v_j.unsqueeze(-1)).squeeze(-1)
 
         return v_j
+
+
+class Adapter(nn.Module):
+    def __init__(self, input_dim, adapter_dim):
+        super(Adapter, self).__init__()
+        self.down_proj = nn.Linear(input_dim, adapter_dim)
+        self.relu = nn.ReLU()
+        self.up_proj = nn.Linear(adapter_dim, input_dim)
+
+    def forward(self, x):
+        x = self.down_proj(x)
+        x = self.relu(x)
+        x = self.up_proj(x)
+        return x
