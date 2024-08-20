@@ -30,6 +30,7 @@ from optimizer import AdamW, SophiaG, SophiaH
 from contextlib import nullcontext
 from bert import BertLayer
 from combined_models import CombinedModel
+from layers import AttentionLayer
 
 from transformers import get_linear_schedule_with_warmup
 import math
@@ -78,10 +79,6 @@ class MultitaskBERT(nn.Module):
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
-        self.conv1 = nn.Conv1d(BERT_HIDDEN_SIZE, HIDDEN_DIM, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv1d(HIDDEN_DIM, 128, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv1d(128, 64, kernel_size=3, padding=1)
-
         # initialize params
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -90,49 +87,51 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
 
         self.config = config
+        self.attention_layer = AttentionLayer(BERT_HIDDEN_SIZE)
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.sentiment_linear = torch.nn.Linear(64, 64)
-        self.sentiment_classifier = nn.Linear(64, N_SENTIMENT_CLASSES)
+        # sentiment
+        self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.sentiment_linear1 = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.sentiment_linear2 = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
 
         # paraphrase
-        self.paraphrase_linear = torch.nn.Linear(64, 64)
-        self.paraphrase_linear1 = torch.nn.Linear(64 * 2, 64)
-        self.paraphrase_linear2 = torch.nn.Linear(64, 3 * 64)
-
-        # paraphrase classifier for BILISTM
-        self.paraphrase_classifier = nn.Linear(3 * 64, 2)
+        self.paraphrase_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        self.paraphrase_linear1 = torch.nn.Linear(
+            config.hidden_size * 2, config.hidden_size
+        )
+        self.paraphrase_linear2 = torch.nn.Linear(
+            config.hidden_size, config.hidden_size
+        )
+        self.paraphrase_classifier = nn.Linear(config.hidden_size, 2)
 
     def forward(self, input_ids, attention_mask):
 
         _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-        hidden_states = all_sequences["last_hidden_state"]
-        hidden_states = hidden_states.permute(0, 2, 1)
-        hidden_states = F.relu(self.conv1(hidden_states))
-        hidden_states = F.relu(self.conv2(hidden_states))
-        hidden_states = F.relu(self.conv3(hidden_states))
-        hidden_states = F.max_pool1d(hidden_states, hidden_states.size(2)).squeeze(2)
-
-        bilstm_output = self.dropout(hidden_states)
+        hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
+        hidden_states = self.dropout(hidden_states)
 
         if self.config.pooling == None:
             pooled_output = hidden_states
 
         elif self.config.pooling == "max":
-            pooled_output, _ = torch.max(bilstm_output, dim=1)
-            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
+            pooled_output, _ = torch.max(hidden_states, dim=1)
+            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(hidden_states).squeeze(-1)
 
         elif self.config.pooling == "mean":
-            pooled_output = torch.mean(bilstm_output, dim=1)
-            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
+            pooled_output = torch.mean(hidden_states, dim=1)
+            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(hidden_states).squeeze(-1)
 
         return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
-        sentiment_logits = self.forward(input_ids, attention_mask)
-        sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
+        bert_embeddings = self.forward(input_ids, attention_mask)
+        sentiment_logits = F.relu(self.sentiment_linear(bert_embeddings))
+        sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
+        sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
         sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
@@ -813,7 +812,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_false")
+    parser.add_argument("--additional_inputs", action="store_true")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -828,7 +827,7 @@ def get_args():
         "--optimizer",
         type=str,
         choices=("adamw", "sophiah"),
-        default="adamw",
+        default="sophiah",
     )
     parser.add_argument(
         "--rho", type=float, default=0.05, help="rho for SophiaH optimizer"
@@ -853,12 +852,12 @@ def get_args():
         type=int,
         default=64 if not args.smoketest else 64,
     )
-    parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
+    parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
     )
 
     parser.add_argument(
@@ -866,7 +865,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
