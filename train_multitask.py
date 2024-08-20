@@ -19,19 +19,19 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from bert import BertModel
+from bert import BertModel, BertLayer, BertModelWithPAL
 from datasets import (
     SentenceClassificationDataset,
     SentencePairDataset,
     load_multitask_data,
 )
-from evaluation import model_eval_multitask, test_model_multitask
-from optimizer import AdamW, SophiaG, SophiaH
-from contextlib import nullcontext
-from bert import BertLayer
+from config import BertConfig
 from combined_models import CombinedModel
 from layers import AttentionLayer
 
+from evaluation import model_eval_multitask, test_model_multitask
+from optimizer import AdamW, SophiaG, SophiaH
+from contextlib import nullcontext
 from transformers import get_linear_schedule_with_warmup
 import math
 import warnings
@@ -108,27 +108,34 @@ class MultitaskBERT(nn.Module):
         )
         self.paraphrase_classifier = nn.Linear(config.hidden_size, 2)
 
-    def forward(self, input_ids, attention_mask):
+    def forward(self, input_ids, attention_mask, task_id):
 
-        _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-        hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
-        hidden_states = self.dropout(hidden_states)
+        if isinstance(self.bert, BertModelWithPAL):
+            bert_output = self.bert(input_ids, attention_mask, task_id)[
+                "last_hidden_state"
+            ]
+        else:
+            _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
+            bert_output = all_sequences["last_hidden_state"]
+
+        bert_output = self.attention_layer(bert_output)
+        bert_output = self.dropout(bert_output)
 
         if self.config.pooling == None:
-            pooled_output = hidden_states
+            pooled_output = bert_output
 
         elif self.config.pooling == "max":
-            pooled_output, _ = torch.max(hidden_states, dim=1)
-            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(hidden_states).squeeze(-1)
+            pooled_output, _ = torch.max(bert_output, dim=1)
+            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bert_output).squeeze(-1)
 
         elif self.config.pooling == "mean":
-            pooled_output = torch.mean(hidden_states, dim=1)
-            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(hidden_states).squeeze(-1)
+            pooled_output = torch.mean(bert_output, dim=1)
+            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(bert_output).squeeze(-1)
 
         return pooled_output
 
     def predict_sentiment(self, input_ids, attention_mask):
-        bert_embeddings = self.forward(input_ids, attention_mask)
+        bert_embeddings = self.forward(input_ids, attention_mask, task_id=2)
         sentiment_logits = F.relu(self.sentiment_linear(bert_embeddings))
         sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
         sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
@@ -136,11 +143,11 @@ class MultitaskBERT(nn.Module):
         return sentiment_logits
 
     def predict_paraphrase_train(
-        self, input_ids1, attention_mask1, input_ids2, attention_mask2
+        self, input_ids1, attention_mask1, input_ids2, attention_mask2, task_id=1
     ):
 
-        bert_embeddings1 = self.forward(input_ids1, attention_mask1)
-        bert_embeddings2 = self.forward(input_ids2, attention_mask2)
+        bert_embeddings1 = self.forward(input_ids1, attention_mask1, task_id=task_id)
+        bert_embeddings2 = self.forward(input_ids2, attention_mask2, task_id=task_id)
 
         # apply relu later
         combined_bert_embeddings1 = self.paraphrase_linear(bert_embeddings1)
@@ -159,15 +166,15 @@ class MultitaskBERT(nn.Module):
         self, input_ids1, attention_mask1, input_ids2, attention_mask2
     ):
         paraphrase_logits = self.predict_paraphrase_train(
-            input_ids1, attention_mask1, input_ids2, attention_mask2
+            input_ids1, attention_mask1, input_ids2, attention_mask2, task_id=1
         )
         return paraphrase_logits.argmax(dim=-1)
 
     def predict_similarity(
         self, input_ids1, attention_mask1, input_ids2, attention_mask2
     ):
-        bert_embeddings1 = self.forward(input_ids1, attention_mask1)
-        bert_embeddings2 = self.forward(input_ids2, attention_mask2)
+        bert_embeddings1 = self.forward(input_ids1, attention_mask1, task_id=0)
+        bert_embeddings2 = self.forward(input_ids2, attention_mask2, task_id=0)
 
         similarity = F.cosine_similarity(bert_embeddings1, bert_embeddings2)
         return similarity * 5
@@ -411,6 +418,11 @@ def train_multitask(args):
     print(separator)
 
     model = MultitaskBERT(config)
+    bert_config = BertConfig()
+
+    if args.use_pal:
+        BertModelWithPAL.from_BertModel(model.bert, bert_config, train_pal=True)
+
     device = torch.device("cpu")
     if torch.cuda.is_available() and args.use_gpu:
         device = torch.device("cuda")
@@ -708,11 +720,15 @@ def test_model(args):
         device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
         if not args.combined_models:
             saved = torch.load(args.filepath)
-            print(f"Loaded model to test from {args.filepath}")
             config = saved["model_config"]
             model = MultitaskBERT(config)
+            bert_config = BertConfig()
+            if args.use_pal:
+                BertModelWithPAL.from_BertModel(model.bert, bert_config, train_pal=True)
+
             model.load_state_dict(saved["model"])
             model = model.to(device)
+            print(f"Loaded model to test from {args.filepath}")
 
         else:
             lock_path = args.filepath.split(".")[0] + ".lock"
@@ -812,7 +828,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_true")
+    parser.add_argument("--additional_inputs", action="store_false")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -827,7 +843,7 @@ def get_args():
         "--optimizer",
         type=str,
         choices=("adamw", "sophiah"),
-        default="sophiah",
+        default="adamw",
     )
     parser.add_argument(
         "--rho", type=float, default=0.05, help="rho for SophiaH optimizer"
@@ -839,7 +855,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -857,7 +873,7 @@ def get_args():
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
     )
 
     parser.add_argument(
@@ -865,7 +881,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
@@ -996,6 +1012,11 @@ def get_args():
         type=int,
         default=512,
         help="max length for the model",
+    )
+    parser.add_argument(
+        "--use_pal",
+        action="store_false",
+        help="Use PAL for the model",
     )
 
     args = parser.parse_args()

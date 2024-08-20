@@ -4,10 +4,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from base_bert import BertPreTrainedModel
 from utils import get_extended_attention_mask
+import copy
 
 
 class BertSelfAttention(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, init_to_identity=False):
         super().__init__()
 
         self.num_attention_heads = config.num_attention_heads
@@ -21,6 +22,22 @@ class BertSelfAttention(nn.Module):
         # this dropout is applied to normalized attention scores following the original implementation of transformer
         # although it is a bit unusual, we empirically observe that it yields better performance
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+
+        if init_to_identity:
+            self.query.weight.data.zero_()
+            self.query.bias.data.fill_(
+                1.0 / (math.sqrt(self.attention_head_size + config.layer_norm_eps))
+            )
+
+            self.key.weight.data.zero_()
+            self.key.bias.data.fill_(
+                1.0 / (math.sqrt(self.attention_head_size + config.layer_norm_eps))
+            )
+
+            self.value.weight.data.zero_()
+            self.value.bias.data.fill_(
+                1.0 / (math.sqrt(self.attention_head_size + config.layer_norm_eps))
+            )
 
     def transform(self, x, linear_layer):
         # the corresponding linear_layer of k, v, q are used to project the hidden_state (x)
@@ -407,4 +424,196 @@ class BertModel(BertPreTrainedModel):
             "pooled_output12": pooled_output12,
         }
 
+        # return {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output}
         return all_encoded_layers, pooler_output, all_sequences, all_pooled
+
+
+class TaskSpecificAttention(nn.Module):
+    def __init__(
+        self, config, project_up=None, project_down=None, perform_initial_init=False
+    ):
+        super().__init__()
+
+        self.project_down = (
+            nn.Linear(config.hidden_size, config.low_rank_size)
+            if project_down is None
+            else project_down
+        )
+        self.project_up = (
+            nn.Linear(config.low_rank_size, config.hidden_size)
+            if project_up is None
+            else project_up
+        )
+        config_self_attention = copy.deepcopy(config)
+        config_self_attention.hidden_size = config.low_rank_size
+        self.attention = BertSelfAttention(
+            config_self_attention, init_to_identity=perform_initial_init
+        )
+
+        if perform_initial_init:
+            if project_down is None:
+                self.project_down.weight.data.zero_()
+                self.project_down.bias.data.zero_()
+            if project_up is None:
+                self.project_up.weight.data.zero_()
+                self.project_up.bias.data.zero_()
+
+    def forward(self, hidden_states, attention_mask):
+        low_rank_hidden_states = self.project_down(hidden_states)
+        low_rank_attention_mask = attention_mask
+        attn_value = self.attention(low_rank_hidden_states, low_rank_attention_mask)
+        attn_value = self.project_up(attn_value)
+        return attn_value
+
+
+class BertLayerWithPAL(BertLayer):
+    def __init__(self, config, project_ups=None, project_downs=None):
+        super().__init__(config)
+
+        self.project_ups = (
+            nn.ModuleList(
+                [
+                    nn.Linear(config.low_rank_size, config.hidden_size)
+                    for task in range(config.num_tasks)
+                ]
+            )
+            if project_ups is None
+            else project_ups
+        )
+        self.project_downs = (
+            nn.ModuleList(
+                [
+                    nn.Linear(config.hidden_size, config.low_rank_size)
+                    for task in range(config.num_tasks)
+                ]
+            )
+            if project_downs is None
+            else project_downs
+        )
+        self.task_attention = nn.ModuleList(
+            [
+                TaskSpecificAttention(
+                    config,
+                    project_up=self.project_ups[task],
+                    project_down=self.project_downs[task],
+                )
+                for task in range(config.num_tasks)
+            ]
+        )
+
+    def forward(self, hidden_states, attention_mask, task_id):
+        self_attention_output = self.self_attention(hidden_states, attention_mask)
+        task_attention_output = self.task_attention[task_id](
+            hidden_states, attention_mask
+        )
+        attention_output = self_attention_output + task_attention_output
+        self_attention_output = self.add_norm(
+            input=hidden_states,
+            output=attention_output,
+            dense_layer=self.attention_dense,
+            dropout=self.attention_dropout,
+            ln_layer=self.attention_layer_norm,
+        )
+        interm_output = self.interm_af(self.interm_dense(self_attention_output))
+        output = self.add_norm(
+            input=self_attention_output,
+            output=interm_output,
+            dense_layer=self.out_dense,
+            dropout=self.out_dropout,
+            ln_layer=self.out_layer_norm,
+        )
+
+        return output
+
+    def from_BertLayer(
+        bert_layer,
+        config,
+        project_ups=None,
+        project_downs=None,
+        train_pal=True,
+    ):
+
+        bert_layer.__class__ = BertLayerWithPAL
+        bert_layer.task_attention = nn.ModuleList(
+            [
+                TaskSpecificAttention(
+                    config,
+                    project_up=project_ups[task],
+                    project_down=project_downs[task],
+                    perform_initial_init=True,
+                )
+                for task in range(config.num_tasks)
+            ]
+        )
+
+        for param in bert_layer.task_attention.parameters():
+            param.requires_grad = train_pal
+
+        return bert_layer
+
+
+class BertModelWithPAL(BertModel):
+    def __init__(self, config):
+        super().__init__(config, bert_layer=BertLayerWithPAL)
+
+    def from_BertModel(bert_model, bert_config, train_pal=True):
+        bert_model.__class__ = BertModelWithPAL
+        bert_model.project_ups = nn.ModuleList(
+            [
+                nn.Linear(bert_config.low_rank_size, bert_config.hidden_size)
+                for task in range(bert_config.num_tasks)
+            ]
+        )
+        bert_model.project_downs = nn.ModuleList(
+            [
+                nn.Linear(bert_config.hidden_size, bert_config.low_rank_size)
+                for task in range(bert_config.num_tasks)
+            ]
+        )
+        for project_up in bert_model.project_ups:
+            nn.init.zeros_(project_up.weight)
+        for project_down in bert_model.project_downs:
+            nn.init.zeros_(project_down.weight)
+
+        bert_model.bert_layers = nn.ModuleList(
+            [
+                BertLayerWithPAL.from_BertLayer(
+                    bert_layer,
+                    bert_config,
+                    project_ups=bert_model.project_ups,
+                    project_downs=bert_model.project_downs,
+                    train_pal=train_pal,
+                )
+                for bert_layer in bert_model.bert_layers
+            ]
+        )
+
+        for param in bert_model.project_downs.parameters():
+            param.requires_grad = train_pal
+        for param in bert_model.project_ups.parameters():
+            param.requires_grad = train_pal
+
+    def encode(self, hidden_states, attention_mask, task_id):
+
+        extended_attention_mask = get_extended_attention_mask(
+            attention_mask, self.dtype
+        )
+        for i, layer_module in enumerate(self.bert_layers):
+            hidden_states = layer_module(
+                hidden_states, extended_attention_mask, task_id=task_id
+            )
+
+        return hidden_states
+
+    def forward(self, input_ids, attention_mask, task_id):
+
+        embedding_output = self.embed(input_ids=input_ids)
+        sequence_output = self.encode(
+            embedding_output, attention_mask=attention_mask, task_id=task_id
+        )
+        # first_tk = self.first_token(sequence_output)
+        first_tk = sequence_output[:, 0]
+        first_tk = self.pooler_dense(first_tk)
+        first_tk = self.pooler_af(first_tk)
+
+        return {"last_hidden_state": sequence_output, "pooler_output": first_tk}
