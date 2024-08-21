@@ -19,6 +19,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from transformers import RobertaModel, RobertaTokenizer
+from tokenizer import BertTokenizer
 from bert import BertModel, BertLayer, BertModelWithPAL
 from datasets import (
     SentenceClassificationDataset,
@@ -76,9 +78,26 @@ class MultitaskBERT(nn.Module):
     def __init__(self, config):
         super(MultitaskBERT, self).__init__()
 
-        self.bert = BertModel.from_pretrained(
-            "bert-base-uncased", local_files_only=config.local_files_only
-        )
+        if args.model_name == "roberta-base":
+            self.bert = RobertaModel.from_pretrained(
+                "roberta-base", local_files_only=config.local_files_only
+            )
+            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+
+        elif args.model_name == "bert-large-uncased":
+            self.bert = BertModel.from_pretrained(
+                "bert-large-uncased", local_files_only=config.local_files_only
+            )
+            self.tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
+            config.hidden_size = 1024
+            BERT_HIDDEN_SIZE = 1024
+
+        else:
+            self.bert = BertModel.from_pretrained(
+                "bert-base-uncased", local_files_only=config.local_files_only
+            )
+            self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
         # initialize params
         for param in self.bert.parameters():
             if config.option == "pretrain":
@@ -110,14 +129,15 @@ class MultitaskBERT(nn.Module):
 
     def forward(self, input_ids, attention_mask, task_id):
 
-        if isinstance(self.bert, BertModelWithPAL):
-            bert_output = self.bert(input_ids, attention_mask, task_id)[
-                "last_hidden_state"
-            ]
-        else:
-            _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-            bert_output = all_sequences["last_hidden_state"]
+        # if isinstance(self.bert, BertModelWithPAL):
+        #     bert_output = self.bert(input_ids, attention_mask, task_id)[
+        #         "last_hidden_state"
+        #     ]
+        # else:
+        # _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
+        # bert_output = all_sequences["last_hidden_state"]
 
+        bert_output = self.bert(input_ids, attention_mask)["last_hidden_state"]
         bert_output = self.attention_layer(bert_output)
         bert_output = self.dropout(bert_output)
 
@@ -855,7 +875,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -881,7 +901,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            2e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
@@ -1017,6 +1037,11 @@ def get_args():
         "--use_pal",
         action="store_false",
         help="Use PAL for the model",
+    )
+    parser.add_argument(
+        "--model_name",
+        default="bert-large-uncased",
+        help="Model name to use",
     )
 
     args = parser.parse_args()

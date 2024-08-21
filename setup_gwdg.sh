@@ -24,11 +24,11 @@ install_miniconda() {
 
 # Function to check if conda environment exists
 check_conda_env() {
-    if conda env list | grep -q "dnlp2"; then
-        echo "Conda environment 'dnlp2' already exists."
+    if conda env list | grep -q "dnlp"; then
+        echo "Conda environment 'dnlp' already exists."
     else
-        echo "Conda environment 'dnlp2' does not exist. Creating environment..."
-        conda create -n dnlp2 python=3.10 -y
+        echo "Conda environment 'dnlp' does not exist. Creating environment..."
+        conda create -n dnlp python=3.10 -y
     fi
 }
 
@@ -41,17 +41,18 @@ set -e
 # Initialize Conda for the current shell
 eval "$(conda shell.bash hook)"
 
-echo "Activating conda environment 'dnlp2'..."
-conda activate dnlp2
+echo "Activating conda environment 'dnlp'..."
+module load anaconda3
+source activate dnlp
 
 echo $CONDA_DEFAULT_ENV
 
-# Install packages
-conda install -y pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=12.1 -c pytorch -c nvidia
-conda install -y tqdm==4.66.2 requests==2.31.0 transformers==4.38.2 tensorboard==2.16.2 tokenizers==0.15.1 -c conda-forge -c huggingface
-pip install explainaboard-client==0.1.4 sacrebleu==2.4.0
+## Install packages
+# conda install -y pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=12.1 -c pytorch -c nvidia
+# conda install -y tqdm==4.66.2 requests==2.31.0 transformers==4.38.2 tensorboard==2.16.2 tokenizers==0.15.1 -c conda-forge -c huggingface
+# pip install explainaboard-client==0.1.4 sacrebleu==2.4.0
 
-# Download model on login-node
+## Download model on login-node
 
 python - <<EOF
 from transformers import BertTokenizer, BertModel
@@ -60,11 +61,28 @@ model = BertModel.from_pretrained('bert-base-uncased')
 EOF
 
 python - <<EOF
-from transformers import AutoTokenizer, AutoModel, BartModel
+from transformers import BertTokenizer, BertModel
+tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+model = BertModel.from_pretrained('bert-large-uncased')
+EOF
 
+python - <<EOF
+from transformers import RobertaTokenizer, RobertaModel
+tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+model = RobertaModel.from_pretrained('roberta-base')
+EOF
+
+
+python - <<EOF
+from transformers import AutoTokenizer, AutoModel, BartModel
 tokenizer = AutoTokenizer.from_pretrained('facebook/bart-large')
 model = BartModel.from_pretrained('facebook/bart-large')
 EOF
 
 python -c "from tokenizer import BertTokenizer; from bert import BertModel; BertTokenizer.from_pretrained('bert-base-uncased'); BertModel.from_pretrained('bert-base-uncased')"
+python -c "from tokenizer import BertTokenizer; from bert import BertModel; BertTokenizer.from_pretrained('bert-large-uncased'); BertModel.from_pretrained('bert-large-uncased')"
+# python -c "from transformers import BertTokenizer; BertTokenizer.from_pretrained('bert-large-uncased'); from transformers import BertModel; BertModel.from_pretrained('bert-large-uncased')"
+
+
+python -c "from transformers import RobertaTokenizer; RobertaTokenizer.from_pretrained('roberta-base'); from transformers import RobertaModel; RobertaModel.from_pretrained('roberta-base')"
 python -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('facebook/bart-large'); from transformers import BartModel; BartModel.from_pretrained('facebook/bart-large')"

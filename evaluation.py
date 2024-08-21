@@ -51,7 +51,7 @@ def model_eval_multitask(
         quora_sent_ids = []
 
         # Evaluate paraphrase detection.
-        if task == "qqp" or task == "multitask":
+        if task == "qqp" or task == "para" or task == "multitask":
             for step, batch in enumerate(
                 tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)
             ):
@@ -77,7 +77,7 @@ def model_eval_multitask(
                 quora_y_true.extend(b_labels)
                 quora_sent_ids.extend(b_sent_ids)
 
-        if task == "qqp" or task == "multitask":
+        if task == "qqp" or task == "para" or task == "multitask":
             quora_accuracy = np.mean(np.array(quora_y_pred) == np.array(quora_y_true))
         else:
             print("qqp task not included in the training and evaluation")
@@ -198,7 +198,7 @@ def model_eval_multitask(
             etpc_accuracy = None
             etpc_sent_ids = None
 
-        if task == "qqp" or task == "multitask":
+        if task == "qqp" or task == "para" or task == "multitask":
             print(f"Paraphrase detection accuracy: {quora_accuracy:.3f}")
         if task == "sst" or task == "multitask":
             print(f"Sentiment classification accuracy: {sst_accuracy:.3f}")
@@ -242,7 +242,7 @@ def model_eval_test_multitask(
         quora_y_pred = []
         quora_sent_ids = []
         # Evaluate paraphrase detection.
-        if task == "qqp" or task == "multitask":
+        if task == "qqp" or task == "para" or task == "multitask":
             for step, batch in enumerate(
                 tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)
             ):
@@ -506,7 +506,7 @@ def test_model_multitask(args, model, device):
         else:
             print("your score is lower than the baseline for sst task")
 
-    if task == "qqp" or task == "multitask":
+    if task == "qqp" or task == "para" or task == "multitask":
         print(f"dev paraphrase acc :: {dev_quora_accuracy :.3f}")
 
         if dev_quora_accuracy > 0.806:

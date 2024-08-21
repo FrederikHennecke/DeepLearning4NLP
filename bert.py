@@ -424,8 +424,8 @@ class BertModel(BertPreTrainedModel):
             "pooled_output12": pooled_output12,
         }
 
-        # return {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output}
-        return all_encoded_layers, pooler_output, all_sequences, all_pooled
+        return {"last_hidden_state": last_hidden_state, "pooler_output": pooler_output}
+        # return all_encoded_layers, pooler_output, all_sequences, all_pooled
 
 
 class TaskSpecificAttention(nn.Module):
