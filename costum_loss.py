@@ -5,8 +5,9 @@ from sklearn.metrics import matthews_corrcoef
 import numpy as np
 
 class CustomLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, pos_weight):
         super(CustomLoss, self).__init__()
+        self.pos_weight = pos_weight
 
     def forward(self, logits, labels):
         # Convert logits to binary predictions
@@ -34,11 +35,18 @@ class CustomLoss(nn.Module):
             matthews_coefficients[label_idx] = mcc
 
         # Define weights as a tensor
-        weights = torch.tensor([0.8, 0.5, 0.8, 0.8, 1.5, 1.5, 1.3], dtype=torch.float32, device=logits.device)
+        weights = torch.tensor([0.422, 1.663, 0.428, 0.344, 0.527, 2.011, 1.64], dtype=torch.float32, device=logits.device)
 
         # Calculate the weighted MCC
         weighted_matthews_coefficient = torch.dot(matthews_coefficients, weights) / labels.size(1)
 
-        loss = nn.BCEWithLogitsLoss()
+        # loss = nn.BCEWithLogitsLoss()
+        # print(f"weighted_matthews_coefficient, {weighted_matthews_coefficient:.3f}")
 
-        return -weighted_matthews_coefficient # + 0.00000000005 * loss(logits, labels.float())
+        # pos_weight = torch.tensor([1., 0.3, 1., 1., 1., 0.3, 0.3], device=device) # [2.3696682, 0.6013229, 2.3364486, 2.9069767, 1.8975332, 0.4972650, 0.6097561]
+        # [1., 0.3, 1., 1., 1., 0.3, 0.3]
+        
+        BCE = nn.BCEWithLogitsLoss(pos_weight=self.pos_weight)
+        loss = BCE(logits, labels.float())
+
+        return -weighted_matthews_coefficient  + 0.5 * loss

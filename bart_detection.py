@@ -120,11 +120,11 @@ def train_model(model, train_data, dev_data, device):
     ### TODO
     # raise NotImplementedError
 
-    model = model.to(device)
-    optimizer = SophiaG(model.parameters(), lr=args.lr, betas=(0.965, 0.99), rho=0.01, weight_decay=1e-1)
-    k = 10
-    iter_num = -1
-    loss_fun = costum_loss.CustomLoss() 
+    model = model.to(device) 
+    optimizer = AdamW(model.parameters(), lr=args.lr)
+    pos_weight = torch.tensor([1., args.type_2, 1., 1., 1., args.type_6, args.type_7], device=device)
+    loss_fun = costum_loss.CustomLoss(pos_weight=pos_weight)
+    
 
     # Run for the specified number of epochs
     for epoch in range(args.epochs):
@@ -142,15 +142,11 @@ def train_model(model, train_data, dev_data, device):
             b_mask = b_mask.to(device)
             b_labels = b_labels.to(device)
 
-            
+            optimizer.zero_grad()
             logits = model(b_ids, b_mask)
             loss = loss_fun(logits, b_labels.float())
-            # print(f"loss: {loss}")
             loss.backward()
-            optimizer.step(bs=args.batch_size)
-            optimizer.zero_grad(set_to_none=True)
-            iter_num += 1
-            # scheduler.step() if used with the number of steps in a scheduler like OneCycleLR
+            optimizer.step()
 
             train_loss += loss.item()
             num_batches += 1
@@ -160,25 +156,11 @@ def train_model(model, train_data, dev_data, device):
             preds = logits.round()
             correct_preds += (preds == b_labels).sum().item()
 
-            if iter_num % k != k - 1:
-                continue
-            else:
-                # update hessian EMA
-                logits = model(b_ids, None)
-                samp_dist = torch.distributions.Categorical(logits=logits)
-                y_sample = samp_dist.sample()
-                y_sample_one_hot = F.one_hot(y_sample, num_classes=logits.size(-1)).float()
-                loss_sampled = loss_fun(logits.view(-1, logits.size(-1)), y_sample_one_hot.view(-1, logits.size(-1)))#, ignore_index=-1)
-                loss_sampled.backward()
-                optimizer.update_hessian()
-                optimizer.zero_grad(set_to_none=True)
-                model.zero_grad()
-
         avg_train_loss = train_loss / num_batches
         train_accuracy = correct_preds / total_examples
         dev_accuracy, matthews_coefficient  = evaluate_model(model, dev_data, device)
         print(
-            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | dev matthews_coefficient: {matthews_coefficient:.4f}" 
+            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | matthews_coefficient: {matthews_coefficient:.4f}" 
         )
 
     return model
@@ -301,6 +283,10 @@ def get_args():
         type=str,
         default="data/etpc-paraphrase-detection-test-student.csv",
     )
+    parser.add_argument("--type_2", type=float, default=0.3)
+    parser.add_argument("--type_6", type=float, default=0.3)
+    parser.add_argument("--type_7", type=float, default=0.3)
+    
     args = parser.parse_args()
     return args
 
