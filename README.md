@@ -149,7 +149,7 @@ Explain what member did what in the project:
 We should be able to understand each member's contribution within 5 minutes. 
 
 # AI-Usage Card
-Artificial Intelligence (AI) aided the development of this project. Please add a link to your AI-Usage card [here](https://ai-cards.org/).
+Artificial Intelligence (AI) aided the development of this project. Please add a link to your AI-Usage card [here](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/ai-usage-card.pdf) [here the website to create a new one](https://ai-cards.org/).
 
 
 # References 
