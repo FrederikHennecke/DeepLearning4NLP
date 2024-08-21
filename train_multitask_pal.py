@@ -11,17 +11,26 @@ from types import SimpleNamespace
 import subprocess
 from datetime import datetime
 from itertools import cycle
-
+from contextlib import nullcontext
+import math
+import warnings
+import json
+import uuid
+from filelock import FileLock
+import copy
 import numpy as np
+from tqdm import tqdm
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch.cuda.amp import autocast, GradScaler
-from tqdm import tqdm
 
+from transformers import get_linear_schedule_with_warmup
 from transformers import RobertaModel, RobertaTokenizer
+
 from tokenizer import BertTokenizer
 from bert import BertModel, BertLayer, BertModelWithPAL
 from datasets import (
@@ -44,15 +53,6 @@ from pcgrad import PCGrad
 from gradvac_amp import GradVacAMP
 from pcgrad_amp import PCGradAMP
 from smart_regularization import smart_regularization
-
-from contextlib import nullcontext
-from transformers import get_linear_schedule_with_warmup
-import math
-import warnings
-import json
-import uuid
-from filelock import FileLock
-import copy
 
 warnings.filterwarnings("ignore", category=UserWarning, module="torch.autograd")
 
@@ -830,19 +830,22 @@ def train_multitask(args):
     best_dev_accuracies = {"sst": 0, "para": 0, "sts": 0}
     best_dev_rel_improv = 0
 
+    # Save to tensorboard
     if args.no_tensorboard:
-        path = (
-            args.logdir
-            + "/multitask_classifier/"
-            + (f"{args.tensorboard_subfolder}/" if args.tensorboard_subfolder else "")
-            + args.name
-        )
-        writer = SummaryWriter(log_dir=path)
-        writer.add_hparams(
-            vars(args),
-            {},
-            run_name="hparams",
-        )
+        writer = SummaryWriter(args.log_dir)
+
+        s = 'python train_multitask_pal.py'
+        for arg in vars(args):
+            value = getattr(args, arg)
+            if type(value) == bool:
+                if value:
+                    s += f' --{arg}'
+            else:
+                s += f' --{arg} {value}'
+        print('\n' + 'Command to recreate this run: ' + s + '\n')
+
+        with open(args.logdir + 'command.txt', 'w') as f:
+            f.write(s)
 
     # Infos about the model parameters
     print("\n" + "-" * get_term_width())
@@ -1302,6 +1305,7 @@ def test_model(args):
         print(f"Loaded model to test from {args.filepath}")
         test_model_multitask(args, model, device)
 
+
 def get_args():
     parser = argparse.ArgumentParser()
 
@@ -1331,7 +1335,6 @@ def get_args():
     )
 
     parser.add_argument("--no_tensorboard", action='store_true', help="Dont log to tensorboard")
-    parser.add_argument("--filepath", type=str, default="models/multitask_classifier")
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument(
         "--option",
@@ -1381,6 +1384,12 @@ def get_args():
             "predictions/sts-similarity-test-output.csv"),
     )
 
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    args, _ = parser.parse_known_args()
+
+    parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
+    parser.add_argument("--samples_per_epoch", type=int, default= None if not args.smoketest else 10)
+
     parser.add_argument("--save_loss_acc_logs", type=bool, default=False)
     parser.add_argument("--batch_size", help='This is the simulated batch size using gradient accumulations', type=int, default=128)
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
@@ -1404,6 +1413,63 @@ def get_args():
     parser.add_argument("--use_smart_regularization", action='store_true')
     parser.add_argument("--smart_weight_regularization", type=float, default=1e-2)
 
-    args = parser.parse_args()
+    parser.add_argument('--no_tensorboard', action='store_false')
+    parser.add_argument("--tensorboard_subfolder", type=str, default=None)
+    parser.add_argument("--logdir", type=str, default="logs/")
 
+
+
+    args = parser.parse_args()
     # TODO: apply data augmentation for the low represtented classes
+
+    # Make sure that the actual batch sizes are not too large
+    args.gradient_accumulations_sst = int(np.ceil(args.batch_size / args.max_batch_size_sst))
+    args.gradient_accumulations_para = int(np.ceil(args.batch_size / args.max_batch_size_para))
+    args.gradient_accumulations_sts = int(np.ceil(args.batch_size / args.max_batch_size_sts))
+    args.batch_size_sst = args.batch_size // args.gradient_accumulations_sst
+    args.batch_size_para = args.batch_size // args.gradient_accumulations_para
+    args.batch_size_sts = args.batch_size // args.gradient_accumulations_sts
+
+    if args.use_amp and not args.use_gpu:
+        raise ValueError("AMP requires a GPU")
+
+    # If we are in testing mode, we do not need to train the model
+    if args.option == "test":
+        if args.lr != 1e-5:
+            print("WARNING: " + "Testing mode does not train the model, so the learning rate is not used")
+        if args.epochs != 1:
+            print("WARNING: " + "Testing mode does not train the model, so the number of epochs is not used")
+        if args.num_batches_per_epoch != -1:
+            print("WARNING: " + "Testing mode does not train the model, so num_batches_per_epoch is not used")
+        if args.task_scheduler != "round_robin":
+            print("WARNING: " + "Testing mode does not train the model, so task_scheduler is not used")
+        if args.projection != "none":
+            print("WARNING: " + "Testing mode does not train the model, so projection is not used")
+        if args.hidden_dropout_prob != 0.3:
+            print("WARNING: " + "Testing mode does not train the model, so hidden_dropout_prob is not used")
+        if args.beta_vaccine != 1e-2:
+            print("WARNING: " + "Testing mode does not train the model, so beta_vaccine is not used")
+        if args.patience != 5:
+            print("WARNING: " + "Testing mode does not train the model, so patience is not used")
+        if args.use_amp:
+            print("WARNING: " + "Testing mode does not train the model, so use_amp is not used")
+
+    else:
+        if args.projection != 'vaccine' and args.beta_vaccine != 1e-2:
+            print("WARNING: " + "Beta vaccine is only used when Vaccine is used")
+        if args.task_scheduler != 'none' and args.task.scheduler != 'round_robin':
+            if args.combine_strategy == 'none':
+                print("WARNING: " + "Combine strategy should be specified when using projection and PAL")
+                raise ValueError("Combine strategy should be specified when using projection and PAL")
+            print("[EXPERIMENTAL] PCGRAD & Vaccine use combine strategy")
+
+    return args
+
+if __name__ == "__main__":
+    args = get_args()
+    seed_everything(args.seed)
+    args.name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
+    args.filepath = f"models1/multitask_classifier/{args.name}.pt"  # save path
+
+    train_multitask(args)
+    test_model(args)
