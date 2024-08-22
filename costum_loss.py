@@ -35,7 +35,9 @@ class CustomLoss(nn.Module):
             matthews_coefficients[label_idx] = mcc
 
         # Define weights as a tensor
-        weights = torch.tensor([0.422, 1.663, 0.428, 0.344, 0.527, 2.011, 1.64], dtype=torch.float32, device=logits.device)
+        weights = torch.tensor([2.6425e-01, 1.6713e+00, 2.6901e-01, 2.0537e-01, 3.5322e-01, 2.5138e+00,
+        2.3272e+00], dtype=torch.float32, device=logits.device)
+        # [2.6425e-01, 4.6713e+00, 2.6901e-01, 2.0537e-01, 3.5322e-01, 2.5138e+02, 4.3272e+00]
 
         # Calculate the weighted MCC
         weighted_matthews_coefficient = torch.dot(matthews_coefficients, weights) / labels.size(1)

@@ -122,7 +122,9 @@ def train_model(model, train_data, dev_data, device):
 
     model = model.to(device) 
     optimizer = AdamW(model.parameters(), lr=args.lr)
-    pos_weight = torch.tensor([1., args.type_2, 1., 1., 1., args.type_6, args.type_7], device=device)
+    pos_weight = torch.tensor([3.78436018957346, 0.5, 3.717289719626168, 4.869186046511628, 2.83111954459203, 0.5, 0.36], device=device)
+    # [3.78436018957346, 0.2140709561034275, 3.717289719626168, 4.869186046511628, 2.83111954459203, 0.0039781203381402, 0.2310975609756098]
+    # loss_fun = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     loss_fun = costum_loss.CustomLoss(pos_weight=pos_weight)
     
 
@@ -160,7 +162,7 @@ def train_model(model, train_data, dev_data, device):
         train_accuracy = correct_preds / total_examples
         dev_accuracy, matthews_coefficient  = evaluate_model(model, dev_data, device)
         print(
-            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | matthews_coefficient: {matthews_coefficient:.4f}" 
+            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | dev matthews_coefficient: {matthews_coefficient:.4f}" 
         )
 
     return model
@@ -328,8 +330,8 @@ def finetune_paraphrase_detection(args):
     print("Training finished.")
 
     accuracy, matthews_corr = evaluate_model(model, train_data, device)
-    print(f"The accuracy of the model is: {accuracy:.3f}")
-    print(f"Matthews Correlation Coefficient of the model is: {matthews_corr:.3f}")
+    print(f"The accuracy of the train_data is: {accuracy:.3f}")
+    print(f"Matthews Correlation Coefficient of the train_data is: {matthews_corr:.3f}")
 
     test_ids = test_dataset["id"]
     test_results = test_model(model, test_data, test_ids, device)
