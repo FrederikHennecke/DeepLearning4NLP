@@ -109,13 +109,17 @@ class MultitaskBERT(nn.Module):
             self.bert = RobertaModel.from_pretrained(
                 "roberta-base", local_files_only=config.local_files_only
             )
-            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+            self.tokenizer = RobertaTokenizer.from_pretrained(
+                "roberta-base", local_files_only=config.local_files_only
+            )
 
         elif args.model_name == "bert-large":
             self.bert = BertModel.from_pretrained(
                 "bert-large-uncased", local_files_only=config.local_files_only
             )
-            self.tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
+            self.tokenizer = BertTokenizer.from_pretrained(
+                "bert-large-uncased", local_files_only=config.local_files_only
+            )
             config.hidden_size = 1024
             BERT_HIDDEN_SIZE = 1024
 
@@ -123,7 +127,9 @@ class MultitaskBERT(nn.Module):
             self.bert = BertModel.from_pretrained(
                 "bert-base-uncased", local_files_only=config.local_files_only
             )
-            self.tokenizer = BertTokenizer.from_pretrained("bert-base")
+            self.tokenizer = BertTokenizer.from_pretrained(
+                "bert-base-uncased", local_files_only=config.local_files_only
+            )
 
         # initialize params
         for param in self.bert.parameters():
@@ -133,7 +139,6 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
 
         self.config = config
-        self.attention_layer = AttentionLayer(BERT_HIDDEN_SIZE)
 
         # Dropout for regularization
         self.dropout_sentiment = nn.ModuleList(
@@ -196,8 +201,7 @@ class MultitaskBERT(nn.Module):
         if isinstance(self.bert, BertModelWithPAL):
             bert_output = self.bert(input_ids, attention_mask, task_id)["pooler_output"]
         else:
-            _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-            bert_output = all_sequences["pooler_output"]
+            bert_output = self.bert(input_ids, attention_mask)["pooler_output"]
 
         return bert_output
 
@@ -268,10 +272,10 @@ class MultitaskBERT(nn.Module):
             x = F.relu(self.similarity_linear[i](x))
         x = self.dropout_similarity[-1](x)
         logits = self.similarity_linear[-1](x)
-        # logits = torch.sigmoid(logits) *6 - 0.5 # scale to [-0.5, 0.5]
+        # logits = torch.sigmoid(logits) * 6 - 0.5  # scale to [-0.5, 0.5]
 
-        # if not self.training:
-        #     logits = torch.clamp(logits, 0, 5)
+        ## if not self.training:
+        # logits = torch.clamp(logits, 0, 5)
         return logits
 
     def predict_similarity(
@@ -336,7 +340,7 @@ class Scheduler:
         else:
             raise ValueError(f"Invalid batch name: {name}")
 
-    def process_named_batch(self, objects_group, args, name, apply_optimization):
+    def process_named_batch(self, objects_group, args, name, apply_optimization=True):
         batch = self.get_batch(name)
         process_fn, gradient_accumulations = None, 0
         if name == "sst":
@@ -383,7 +387,9 @@ class RoundRobinScheduler(Scheduler):
     def process_one_batch(self, epoch, num_epochs, objects_group, args):
         name = self.names[self.index]
         self.index = (self.index + 1) % len(self.names)
-        return name, self.process_named_batch(objects_group, args, name)
+        return name, self.process_named_batch(
+            objects_group, args, name, apply_optimization=True
+        )
 
 
 class PalScheduler(Scheduler):
@@ -437,7 +443,7 @@ def process_sentiment_batch(batch, objects_group, args):
 
     with autocast() if args.use_amp else nullcontext():
         b_ids, b_mask, b_labels = (
-            batch["input_ids"].to(device),
+            batch["token_ids"].to(device),
             batch["attention_mask"].to(device),
             batch["labels"].to(device),
         )
@@ -474,12 +480,13 @@ def process_paraphrase_batch(batch, objects_group, args):
 
     with autocast() if args.use_amp else nullcontext():
         b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
-            batch["input_ids_1"].to(device),
+            batch["token_ids_1"].to(device),
             batch["attention_mask_1"].to(device),
-            batch["input_ids_2"].to(device),
+            batch["token_ids_2"].to(device),
             batch["attention_mask_2"].to(device),
             batch["labels"].to(device),
         )
+        # b_labels = b_labels.to(torch.float32)
         embeddings = model.get_similarity_paraphrase_embeddings(
             b_ids_1, b_mask_1, b_ids_2, b_mask_2, task_id=1
         )
@@ -517,9 +524,9 @@ def process_similarity_batch(batch, objects_group, args):
 
     with autocast() if args.use_amp else nullcontext():
         b_ids_1, b_mask_1, b_ids_2, b_mask_2, b_labels = (
-            batch["input_ids_1"].to(device),
+            batch["token_ids_1"].to(device),
             batch["attention_mask_1"].to(device),
-            batch["input_ids_2"].to(device),
+            batch["token_ids_2"].to(device),
             batch["attention_mask_2"].to(device),
             batch["labels"].to(device),
         )
@@ -529,7 +536,7 @@ def process_similarity_batch(batch, objects_group, args):
         logits = model.last_layers_similarity(embeddings)
 
         loss = (
-            F.mse_loss(logits.view(-1), b_labels.view(-1), reduction="sum")
+            F.mse_loss(logits.view(-1), b_labels.view(-1).float(), reduction="sum")
             / args.batch_size
         )
         loss_value = loss.item()
@@ -552,7 +559,7 @@ def process_similarity_batch(batch, objects_group, args):
         return loss
 
 
-def step_optimizer(objects_group, args, step, total_nb_batches):
+def step_optimizer(objects_group, args, step, total_nb_batches=None):
     optimizer, scaler = objects_group.optimizer, objects_group.scaler
     if args.use_amp:
         scaler.step(optimizer)
@@ -616,27 +623,21 @@ def load_model(filepath, model, optimizer, use_gpu, combined_models=False):
 
 
 def train_multitask(args):
-    if isinstance(args, dict):
-        args = SimpleNamespace(**args)
-
-    train_all_datasets = True
-    n_datasets = 3
+    # if isinstance(args, dict):
+    #     args = SimpleNamespace(**args)
 
     # Load data
     # Create the data and its corresponding datasets and dataloader:
     sst_train_data, num_labels, para_train_data, sts_train_data, etpc_train_data = (
         load_multitask_data(
             args.sst_train,
-            args.quora_train,
+            args.para_train,
             args.sts_train,
-            args.etpc_train,
             split="train",
         )
     )
     sst_dev_data, num_labels, para_dev_data, sts_dev_data, etpc_dev_data = (
-        load_multitask_data(
-            args.sst_dev, args.quora_dev, args.sts_dev, args.etpc_dev, split="train"
-        )
+        load_multitask_data(args.sst_dev, args.para_dev, args.sts_dev, split="train")
     )
 
     sst_train_dataloader = None
@@ -716,9 +717,7 @@ def train_multitask(args):
         num_workers=2,
     )
 
-    total_num_batches += math.ceil(args.samples_per_epoch / args.batch_size)
     # Init model
-
     config = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
         "num_labels": num_labels,
@@ -727,13 +726,14 @@ def train_multitask(args):
         "local_files_only": args.local_files_only,
         "hidden_size": BERT_HIDDEN_SIZE,
         "n_hidden_layers": args.n_hidden_layers,
-        'model_name': args.model_name
+        "model_name": args.model_name,
     }
 
-    save_params_dir = args.config_save_dir + args.name + ".json"
-    train_params = pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)})
-
     if args.no_tensorboard:
+        save_params_dir = args.config_save_dir + args.name + ".json"
+        train_params = pformat(
+            {k: v for k, v in vars(args).items() if "csv" not in str(v)}
+        )
         with open(save_params_dir, "w") as f:
             json.dump(train_params, f)
 
@@ -787,28 +787,7 @@ def train_multitask(args):
     model = model.to(device)
 
     lr = args.lr
-    hess_interval = args.hess_interval
-    ctx = (
-        nullcontext()
-        if not args.use_gpu
-        else torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16)
-    )
-
-    if args.optimizer == "adamw":
-        optimizer = AdamW(model.parameters(), lr=lr, weight_decay=args.weight_decay)
-    elif args.optimizer == "sophiah":
-        optimizer = SophiaH(
-            model.parameters(),
-            lr=lr,
-            eps=1e-12,
-            rho=args.rho,
-            betas=(0.985, 0.99),
-            weight_decay=args.weight_decay,
-            update_period=hess_interval,
-        )
-    else:
-        raise ValueError(f"Invalid optimizer: {args.optimizer}")
-
+    optimizer = AdamW(model.parameters(), lr=lr)
     scaler = None if not args.use_amp else GradScaler()
 
     if args.projection == "pcgrad":
@@ -831,20 +810,19 @@ def train_multitask(args):
     best_dev_rel_improv = 0
 
     # Save to tensorboard
+    writer = SummaryWriter(args.logdir)
     if args.no_tensorboard:
-        writer = SummaryWriter(args.log_dir)
-
-        s = 'python train_multitask_pal.py'
+        s = "python train_multitask_pal.py"
         for arg in vars(args):
             value = getattr(args, arg)
             if type(value) == bool:
                 if value:
-                    s += f' --{arg}'
+                    s += f" --{arg}"
             else:
-                s += f' --{arg} {value}'
-        print('\n' + 'Command to recreate this run: ' + s + '\n')
+                s += f" --{arg} {value}"
+        print("\n" + "Command to recreate this run: " + s + "\n")
 
-        with open(args.logdir + 'command.txt', 'w') as f:
+        with open(args.logdir + "command.txt", "w") as f:
             f.write(s)
 
     # Infos about the model parameters
@@ -876,6 +854,7 @@ def train_multitask(args):
         best_dev_acc = -np.inf
 
         for epoch in range(args.epochs):
+            print(f"Epoch {str(epoch)}")
             model.train()
             for i in tqdm(
                 range(args.num_batches_per_epoch),
@@ -912,9 +891,11 @@ def train_multitask(args):
             elif task == "sts":
                 dev_acc, _, _, _, _ = model_eval_sts(sts_dev_dataloader, model, device)
 
-            if dev_acc > best_dev_acc:
+            if args.smoke_test or dev_acc > best_dev_acc:
                 best_dev_acc = dev_acc
                 save_model(model, optimizer, args, config, args.filepath)
+            else:
+                print("dev_acc <= best_dev_acc and model is not saved")
 
             if not args.no_tensorboard:
                 writer.add_scalar(
@@ -1107,17 +1088,21 @@ def train_multitask(args):
     # Finetuning
     num_batches_per_epoch = args.num_batches_per_epoch
     if num_batches_per_epoch <= 0:
-        num_batches_per_epoch = int(len(sst_train_dataloader) / args.gradient_accumulations_sst) + \
-                                 int(len(para_train_dataloader) / args.gradient_accumulations_para) + \
-                                    int(len(sts_train_dataloader) / args.gradient_accumulations_sts)
+        num_batches_per_epoch = (
+            int(len(sst_train_dataloader) / args.gradient_accumulations_sst)
+            + int(len(para_train_dataloader) / args.gradient_accumulations_para)
+            + int(len(sts_train_dataloader) / args.gradient_accumulations_sts)
+        )
 
     last_improv = -1
     n_batches = 0
     total_num_batches = {"sst": 0, "para": 0, "sts": 0}
 
     if not args.no_tensorboard:
-        for name in ['sst', 'sts', 'para']:
-            loss = scheduler.process_named_batch(objects_group, args, name, apply_optimization=False)
+        for name in ["sst", "sts", "para"]:
+            loss = scheduler.process_named_batch(
+                objects_group, args, name, apply_optimization=False
+            )
             writer.add_scalar("Loss " + name, loss.item(), 0)
             writer.add_scalar("Specific Loss " + name, loss.item(), 0)
 
@@ -1126,92 +1111,195 @@ def train_multitask(args):
         train_loss = {"sst": 0, "para": 0, "sts": 0}
         num_batches = {"sst": 0, "para": 0, "sts": 0}
 
-        if args.projection != 'none':
-            if args.task_scheduler == 'pal':
-                if args.combine_strategy == 'none':
+        if args.projection != "none":
+            if args.task_scheduler == "pal":
+                if args.combine_strategy == "none":
                     raise ValueError("PAL scheduler requires a combined strategy")
-                elif args.combine_strategy == 'force':
+                elif args.combine_strategy == "force":
                     nb_batches_per_update = 16
-                    for i in tqdm(range(int(num_batches_per_epoch / nb_batches_per_update)), desc= f'Train {epoch}', disable= TQDM_DISABLE, smoothing= 0):
-                        losses = {'sst': 0, 'para': 0, 'sts': 0}
-                        for task in ['sst', 'para', 'sts']:
-                            loss = scheduler.process_named_batch(objects_group, args, task, apply_optimization=False)
+                    for i in tqdm(
+                        range(int(num_batches_per_epoch / nb_batches_per_update)),
+                        desc=f"Train {epoch}",
+                        disable=TQDM_DISABLE,
+                        smoothing=0,
+                    ):
+                        losses = {"sst": 0, "para": 0, "sts": 0}
+                        for task in ["sst", "para", "sts"]:
+                            loss = scheduler.process_named_batch(
+                                objects_group, args, task, apply_optimization=False
+                            )
                             losses[task] += loss
                             num_batches[task] += 1
                             n_batches += 1
                             if args.no_tensorboard:
-                                writer.add_scalar("Loss " + task, loss.item(), args.batch_size * n_batches)
-                                writer.add_scalar("Specific Loss " + task, loss.item(), args.batch_size * total_num_batches[name])
+                                writer.add_scalar(
+                                    "Loss " + task,
+                                    loss.item(),
+                                    args.batch_size * n_batches,
+                                )
+                                writer.add_scalar(
+                                    "Specific Loss " + task,
+                                    loss.item(),
+                                    args.batch_size * total_num_batches[name],
+                                )
 
-                        for j in range(nb_batches_per_update -3):
-                            task, loss = scheduler.process_one_batch(epoch = epoch + 1, num_epochs= args.epochs, objects_group= objects_group, args= args, apply_optimization= False)
-                            losses[task] += loss    #.item()
+                        for j in range(nb_batches_per_update - 3):
+                            task, loss = scheduler.process_one_batch(
+                                epoch=epoch + 1,
+                                num_epochs=args.epochs,
+                                objects_group=objects_group,
+                                args=args,
+                                apply_optimization=False,
+                            )
+                            losses[task] += loss  # .item()
                             num_batches[task] += 1
                             n_batches += 1
                             if args.no_tensorboard:
-                                writer.add_scalar("Loss " + task, losses[task].item(), args.batch_size * n_batches)
-                                writer.add_scalar("Specific Loss " + task, losses[task].item(), args.batch_size * total_num_batches[name])
+                                writer.add_scalar(
+                                    "Loss " + task,
+                                    losses[task].item(),
+                                    args.batch_size * n_batches,
+                                )
+                                writer.add_scalar(
+                                    "Specific Loss " + task,
+                                    losses[task].item(),
+                                    args.batch_size * total_num_batches[name],
+                                )
 
-                        losses_opt = [losses[task] / num_batches[task] for task in ['sst', 'para', 'sts']]
+                        losses_opt = [
+                            losses[task] / num_batches[task]
+                            for task in ["sst", "para", "sts"]
+                        ]
                         optimizer.backward(losses_opt)
                         optimizer.step()
 
-                elif args.combine_strategy == 'encourage':
+                elif args.combine_strategy == "encourage":
                     nb_batches_per_update = 16
-                    alpha = 0.2 + 0.8 * epoch / (args.epochs -1)
-                    for i in tqdm(range(int(num_batches_per_epoch / nb_batches_per_update)), desc= f'Train {epoch}', disable= TQDM_DISABLE, smoothing= 0):
-                        losses = {'sst': 0, 'para': 0, 'sts': 0}
-                        tasks, losses_tasks = scheduler.process_several_batches_with_control(epoch= epoch + 1, num_epochs= args.epochs, objects_group= objects_group, args= args, num_batches= nb_batches_per_update)
+                    alpha = 0.2 + 0.8 * epoch / (args.epochs - 1 + 1e-12)
+                    for i in tqdm(
+                        range(int(num_batches_per_epoch / nb_batches_per_update)),
+                        desc=f"Train {epoch}",
+                        disable=TQDM_DISABLE,
+                        smoothing=0,
+                    ):
+                        losses = {"sst": 0, "para": 0, "sts": 0}
+                        tasks, losses_tasks = (
+                            scheduler.process_several_batches_with_control(
+                                epoch=epoch + 1,
+                                num_epochs=args.epochs,
+                                objects_group=objects_group,
+                                args=args,
+                                num_batches=nb_batches_per_update,
+                            )
+                        )
                         for j, task in enumerate(tasks):
                             num_batches[task] += 1
                             losses[task] += losses_tasks[j]
                             n_batches += 1
                             if args.no_tensorboard:
-                                writer.add_scalar("Loss " + task, losses[task][j].item(), args.batch_size * n_batches)
-                                writer.add_scalar("Specific Loss " + task, losses[task][j].item(), args.batch_size * total_num_batches[name])
+                                writer.add_scalar(
+                                    "Loss " + task,
+                                    losses[task][j].item(),
+                                    args.batch_size * n_batches,
+                                )
+                                writer.add_scalar(
+                                    "Specific Loss " + task,
+                                    losses[task][j].item(),
+                                    args.batch_size * total_num_batches[name],
+                                )
 
-                        losses = [losses[task] / num_batches[task] **2 for task in ['sst', 'para', 'sts']]
+                        losses = [
+                            losses[task] / num_batches[task] ** alpha
+                            for task in ["sst", "para", "sts"]
+                        ]
+
                         optimizer.backward(losses)
                         optimizer.step()
 
             else:
                 # Gradient Surgery / Vaccine without scheduler
-                for i in tqdm (range(int(num_batches_per_epoch / 3)), desc= f'Train {epoch}', disable= TQDM_DISABLE, smoothing= 0):
+                for i in tqdm(
+                    range(int(num_batches_per_epoch / 3)),
+                    desc=f"Train {epoch}",
+                    disable=TQDM_DISABLE,
+                    smoothing=0,
+                ):
                     losses = []
-                    for j , name in enumerate(['sst', 'para', 'sts']):
-                        losses.append(scheduler.process_named_batch(objects_group, args, name, apply_optimization= False))
+                    for j, name in enumerate(["sst", "para", "sts"]):
+
+                        loss = scheduler.process_named_batch(
+                            objects_group, args, name, apply_optimization=False
+                        )
+                        losses.append(loss)
+
                         n_batches += 1
                         train_loss[name] += losses[-1].item()
                         num_batches[name] += 1
                         total_num_batches[name] += 1
+
                         if args.no_tensorboard:
-                            writer.add_scalar("Loss " + name, losses[-1].item(), args.batch_size * n_batches)
-                            writer.add_scalar("Specific Loss " + name, losses[-1].item(), args.batch_size * total_num_batches[name])
+                            writer.add_scalar(
+                                "Loss " + name,
+                                losses[-1].item(),
+                                args.batch_size * n_batches,
+                            )
+                            writer.add_scalar(
+                                "Specific Loss " + name,
+                                losses[-1].item(),
+                                args.batch_size * total_num_batches[name],
+                            )
 
                     optimizer.backward(losses)
                     optimizer.step()
 
         else:
             # Scheduler without projection
-            for i in tqdm(range(num_batches_per_epoch), desc= f'Train {epoch}', disable= TQDM_DISABLE, smoothing=0):
-                task, loss = scheduler.process_one_batch(epoch= epoch + 1, num_epochs= args.epochs, objects_group= objects_group, args= args)
+            for i in tqdm(
+                range(num_batches_per_epoch),
+                desc=f"Train {epoch}",
+                disable=TQDM_DISABLE,
+                smoothing=0,
+            ):
+                task, loss = scheduler.process_one_batch(
+                    epoch=epoch + 1,
+                    num_epochs=args.epochs,
+                    objects_group=objects_group,
+                    args=args,
+                )
                 n_batches += 1
                 train_loss[task] += loss.item()
                 num_batches[task] += 1
                 total_num_batches[task] += 1
                 if args.no_tensorboard:
-                    writer.add_scalar("Loss " + task, loss.item(), args.batch_size * n_batches)
-                    writer.add_scalar("Specific Loss " + task, loss.item(), args.batch_size * total_num_batches[task])
+                    writer.add_scalar(
+                        "Loss " + task, loss.item(), args.batch_size * n_batches
+                    )
+                    writer.add_scalar(
+                        "Specific Loss " + task,
+                        loss.item(),
+                        args.batch_size * total_num_batches[task],
+                    )
 
         # Compute average train loss
         for task in train_loss:
-            train_loss[task] = 0 if num_batches[task] == 0 else train_loss[task] / num_batches[task]
+            train_loss[task] = (
+                0 if num_batches[task] == 0 else train_loss[task] / num_batches[task]
+            )
             train_loss_logs_epochs[task].append(train_loss[task])
 
         # Evaluation on dev set
-        (paraphrase_accuracy, _, _,
-        sentiment_accuracy, _, _,
-        sts_corr, _, _) = model_eval_multitask(sst_dev_dataloader, para_dev_dataloader, sts_dev_dataloader, model, device, writer= writer, epoch= epoch, tensorboard= args.no_tensorboard)
+        (paraphrase_accuracy, _, _, sentiment_accuracy, _, _, sts_corr, _, _) = (
+            model_eval_multitask(
+                sst_dev_dataloader,
+                para_dev_dataloader,
+                sts_dev_dataloader,
+                model,
+                device,
+                writer=writer,
+                epoch=epoch,
+                tensorboard=args.no_tensorboard,
+            )
+        )
 
         # Keep track of the accuracies for each task and each epoch
         dev_acc_logs_epochs["sst"].append(sentiment_accuracy)
@@ -1227,24 +1315,36 @@ def train_multitask(args):
             writer.add_scalar("Dev Accuracy Para", paraphrase_accuracy, epoch)
             writer.add_scalar("Dev Accuracy STS", sts_corr, epoch)
             writer.add_scalar("Mean Dev Accuracy", mean_dev_acc, epoch)
-            writer.add_scalar('Num Batches SST', num_batches['sst'], epoch)
-            writer.add_scalar('Num Batches Para', num_batches['para'], epoch)
-            writer.add_scalar('Num Batches STS', num_batches['sts'], epoch)
-            if epoch ==0:
-                writer.add_scalar('Dev Accuracy SST', sentiment_accuracy, 0)
-                writer.add_scalar('Dev Accuracy Para', paraphrase_accuracy, 0)
-                writer.add_scalar('Dev Accuracy STS', sts_corr, 0)
-                writer.add_scalar('Mean Dev Accuracy', mean_dev_acc, 0)
-                writer.add_scalar('Num Batches SST', num_batches['sst'], 0)
-                writer.add_scalar('Num Batches Para', num_batches['para'], 0)
-                writer.add_scalar('Num Batches STS', num_batches['sts'], 0)
-            writer.add_scalar('Dev Accuracy SST', sentiment_accuracy, args.batch_size * n_batches)
-            writer.add_scalar('Dev Accuracy Para', paraphrase_accuracy, args.batch_size * n_batches)
-            writer.add_scalar('Dev Accuracy STS', sts_corr, args.batch_size * n_batches)
-            writer.add_scalar('Mean Dev Accuracy', mean_dev_acc, args.batch_size * n_batches)
-            writer.add_scalar('Num Batches SST', num_batches['sst'], args.batch_size * n_batches)
-            writer.add_scalar('Num Batches Para', num_batches['para'], args.batch_size * n_batches)
-            writer.add_scalar('Num Batches STS', num_batches['sts'], args.batch_size * n_batches)
+            writer.add_scalar("Num Batches SST", num_batches["sst"], epoch)
+            writer.add_scalar("Num Batches Para", num_batches["para"], epoch)
+            writer.add_scalar("Num Batches STS", num_batches["sts"], epoch)
+            if epoch == 0:
+                writer.add_scalar("Dev Accuracy SST", sentiment_accuracy, 0)
+                writer.add_scalar("Dev Accuracy Para", paraphrase_accuracy, 0)
+                writer.add_scalar("Dev Accuracy STS", sts_corr, 0)
+                writer.add_scalar("Mean Dev Accuracy", mean_dev_acc, 0)
+                writer.add_scalar("Num Batches SST", num_batches["sst"], 0)
+                writer.add_scalar("Num Batches Para", num_batches["para"], 0)
+                writer.add_scalar("Num Batches STS", num_batches["sts"], 0)
+            writer.add_scalar(
+                "Dev Accuracy SST", sentiment_accuracy, args.batch_size * n_batches
+            )
+            writer.add_scalar(
+                "Dev Accuracy Para", paraphrase_accuracy, args.batch_size * n_batches
+            )
+            writer.add_scalar("Dev Accuracy STS", sts_corr, args.batch_size * n_batches)
+            writer.add_scalar(
+                "Mean Dev Accuracy", mean_dev_acc, args.batch_size * n_batches
+            )
+            writer.add_scalar(
+                "Num Batches SST", num_batches["sst"], args.batch_size * n_batches
+            )
+            writer.add_scalar(
+                "Num Batches Para", num_batches["para"], args.batch_size * n_batches
+            )
+            writer.add_scalar(
+                "Num Batches STS", num_batches["sts"], args.batch_size * n_batches
+            )
 
         # Save the model if the mean accuracy is the best
         if mean_dev_acc > best_dev_acc:
@@ -1261,17 +1361,20 @@ def train_multitask(args):
         print(f'Num batches SST: {num_batches["sst"]}')
         print(f'Num batches Para: {num_batches["para"]}')
         print(f'Num batches STS: {num_batches["sts"]}')
+        print("")
         print(f"Train Loss SST: {train_loss['sst']}")
         print(f"Train Loss Para: {train_loss['para']}")
         print(f"Train Loss STS: {train_loss['sts']}")
+        print("")
         print(f"Dev Accuracy SST: {sentiment_accuracy}")
         print(f"Dev Accuracy Para: {paraphrase_accuracy}")
         print(f"Dev Accuracy STS: {sts_corr}")
+        print("")
         print(f"Mean Dev Accuracy: {mean_dev_acc}")
         print(f"Best Dev Accuracy: {best_dev_acc}")
-        print(f'best_dev_accuracies: {best_dev_accuracies['sst']}')
-        print(f'best_dev_accuracies: {best_dev_accuracies['para']}')
-        print(f'best_dev_accuracies: {best_dev_accuracies['sts']}')
+        print(f'best_dev_accuracies: {best_dev_accuracies["sst"]}')
+        print(f'best_dev_accuracies: {best_dev_accuracies["para"]}')
+        print(f'best_dev_accuracies: {best_dev_accuracies["sts"]}')
         print(f"Last improvement: {last_improv}")
         print("")
 
@@ -1282,12 +1385,12 @@ def train_multitask(args):
 
     # Write train loss logs epochs and dev acc logs epochs to files
     if args.save_loss_acc_logs:
-        with open(args.logdir + ' /train_loss.txt', 'w') as f:
+        with open(args.logdir + " /train_loss.txt", "w") as f:
             for key, value in train_loss_logs_epochs.items():
-                f.write(f'{key}: {value}\n')
-        with open(args.logdir + '/dev_acc.txt', 'w') as f:
+                f.write(f"{key}: {value}\n")
+        with open(args.logdir + "/dev_acc.txt", "w") as f:
             for key, value in dev_acc_logs_epochs.items():
-                f.write(f'{key}: {value}\n')
+                f.write(f"{key}: {value}\n")
 
 
 def test_model(args):
@@ -1319,9 +1422,7 @@ def get_args():
     parser.add_argument(
         "--para_train", type=str, default="data/quora-paraphrase-train.csv"
     )
-    parser.add_argument(
-        "--para_dev", type=str, default="data/quora-paraphrase-dev.csv"
-    )
+    parser.add_argument("--para_dev", type=str, default="data/quora-paraphrase-dev.csv")
     parser.add_argument(
         "--para_test", type=str, default="data/quora-paraphrase-test-student.csv"
     )
@@ -1333,99 +1434,179 @@ def get_args():
     parser.add_argument(
         "--sts_test", type=str, default="data/sts-similarity-test-student.csv"
     )
-
-    parser.add_argument("--no_tensorboard", action='store_true', help="Dont log to tensorboard")
     parser.add_argument("--seed", type=int, default=11711)
     parser.add_argument(
         "--option",
         type=str,
-        choices=("pretrain", "finetune", 'test', 'individual_pretrain', 'optimize'),
+        choices=("pretrain", "finetune", "test", "individual_pretrain", "optimize"),
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
     parser.add_argument("--local_files_only", action="store_true")
-    parser.add_argument("--model_name", choices=('bert-base', 'roberta-base', 'bert-large'), default="bert-base")
-
     parser.add_argument(
-        "--sst_dev_out",
-        type=str,
-        default=(
-            f"predictions/sst-sentiment-dev-output.csv")
-            )
-    parser.add_argument(
-        "--sst_test_out",
-        type=str,
-        default=(
-            f"predictions/sst-sentiment-test-output.csv")
-    )
-
-    parser.add_argument(
-        "--para_dev_out",
-        type=str,
-        default=(
-            "predictions/quora-paraphrase-dev-output.csv")
-    )
-    parser.add_argument(
-        "--para_test_out",
-        type=str,
-        default=(
-            "predictions/quora-paraphrase-test-output.csv")
-    )
-    parser.add_argument(
-        "--sts_dev_out",
-        type=str,
-        default=(
-            "predictions/sts-similarity-dev-output.csv")
-    )
-    parser.add_argument(
-        "--sts_test_out",
-        type=str,
-        default=(
-            "predictions/sts-similarity-test-output.csv"),
+        "--model_name",
+        choices=("bert-base", "roberta-base", "bert-large"),
+        default="bert-base",
     )
 
     parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
     args, _ = parser.parse_known_args()
 
     parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
-    parser.add_argument("--samples_per_epoch", type=int, default= None if not args.smoketest else 10)
+    parser.add_argument(
+        "--samples_per_epoch", type=int, default=None if not args.smoketest else 10
+    )
 
     parser.add_argument("--save_loss_acc_logs", type=bool, default=False)
-    parser.add_argument("--batch_size", help='This is the simulated batch size using gradient accumulations', type=int, default=128)
+    parser.add_argument(
+        "--batch_size",
+        help="This is the simulated batch size using gradient accumulations",
+        type=int,
+        default=128 if not args.smoketest else 256,
+    )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
-    parser.add_argument("--n_hidden_layers", type=int, default=2, help="Number of hidden layers for the classifier")
-    parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
-                        default=1e-5)
-    parser.add_argument("--num_batches_per_epoch", type=int, default=-1)
-    parser.add_argument("--task_scheduler", type=str, choices=('random', 'round_robin', 'pal', 'para', 'sts', 'sst'), default="round_robin")
+    parser.add_argument(
+        "--n_hidden_layers",
+        type=int,
+        default=1 if not args.smoketest else 1,
+        help="Number of hidden layers for the classifier",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
+        default=5e-6,
+    )
+    parser.add_argument(
+        "--num_batches_per_epoch", type=int, default=300 if not args.smoketest else 10
+    )
+    parser.add_argument(
+        "--task_scheduler",
+        type=str,
+        choices=("random", "round_robin", "pal", "para", "sts", "sst"),
+        default="pal",
+    )
 
     # Optimizations
-    parser.add_argument("--use_pal", action='store_true', help="Use additionnal PAL in BERT layers")
-    parser.add_argument("--no_train_classifier", action='store_false')
-    parser.add_argument("--combine_strategy", type=str, choices=('none', 'encourage', 'force'), default="force")
-    parser.add_argument("--use_amp", action='store_true')
-    parser.add_argument("--max_batch_size_sst", type=int, default=32)
-    parser.add_argument("--max_batch_size_para", type=int, default=16)
-    parser.add_argument("--max_batch_size_sts", type=int, default=32)
-    parser.add_argument("--projection", type=str, choices=('none', 'pcgrad', 'vaccine'), default="pcgrad")
+    parser.add_argument(
+        "--use_pal", action="store_false", help="Use additionnal PAL in BERT layers"
+    )
+    parser.add_argument("--no_train_classifier", action="store_false")
+    parser.add_argument(
+        "--combine_strategy",
+        type=str,
+        choices=("none", "encourage", "force"),
+        default="encourage",
+    )
+    parser.add_argument("--use_amp", action="store_true")
+    parser.add_argument(
+        "--max_batch_size_sst", type=int, default=32 if not args.smoketest else 64
+    )
+    parser.add_argument(
+        "--max_batch_size_para", type=int, default=16 if not args.smoketest else 64
+    )
+    parser.add_argument(
+        "--max_batch_size_sts", type=int, default=32 if not args.smoketest else 64
+    )
+    parser.add_argument(
+        "--projection",
+        type=str,
+        choices=("none", "pcgrad", "vaccine"),
+        default="vaccine",
+    )
     parser.add_argument("--beta_vaccine", type=float, default=1e-2)
-    parser.add_argument("--patience", type=int, help="Number maximum of epochs without improvement", default=5)
-    parser.add_argument("--use_smart_regularization", action='store_true')
+    parser.add_argument(
+        "--patience",
+        type=int,
+        help="Number maximum of epochs without improvement",
+        default=5 if not args.smoketest else 1,
+    )
+    parser.add_argument("--use_smart_regularization", action="store_true")
     parser.add_argument("--smart_weight_regularization", type=float, default=1e-2)
 
-    parser.add_argument('--no_tensorboard', action='store_false')
+    parser.add_argument("--no_tensorboard", action="store_false")
     parser.add_argument("--tensorboard_subfolder", type=str, default=None)
     parser.add_argument("--logdir", type=str, default="logs/")
 
+    args, _ = parser.parse_known_args()
 
+    record_time = datetime.now().strftime("%m%d-%H%M%S")
+    path = f"{record_time}-{args.projection}-{args.epochs}-{args.batch_size}-{args.use_pal}-{args.combine_strategy}-{args.task_scheduler}"
+
+    predictions_path = f"./predictions/bert/pal_multitask/{path}"
+    if not os.path.exists(predictions_path):
+        os.makedirs(predictions_path, exist_ok=True)
+
+    parser.add_argument(
+        "--sst_dev_out",
+        type=str,
+        default=(
+            "predictions/sst-sentiment-dev-output.csv"
+            if args.smoketest
+            else f"{predictions_path}/sst-sentiment-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--sst_test_out",
+        type=str,
+        default=(
+            "predictions/sst-sentiment-test-output.csv"
+            if args.smoketest
+            else f"{predictions_path}/sst-sentiment-test-output.csv"
+        ),
+    )
+
+    parser.add_argument(
+        "--para_dev_out",
+        type=str,
+        default=(
+            "predictions/quora-paraphrase-dev-output.csv"
+            if args.smoketest
+            else f"{predictions_path}/quora-paraphrase-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--para_test_out",
+        type=str,
+        default=(
+            "predictions/quora-paraphrase-test-output.csv"
+            if args.smoketest
+            else f"{predictions_path}/quora-paraphrase-test-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--sts_dev_out",
+        type=str,
+        default=(
+            "predictions/sts-similarity-dev-output.csv"
+            if args.smoketest
+            else f"{predictions_path}/sts-similarity-dev-output.csv"
+        ),
+    )
+    parser.add_argument(
+        "--sts_test_out",
+        type=str,
+        default=(
+            "predictions/sts-similarity-test-output.csv"
+            if args.smoketest
+            else f"{predictions_path}/sts-similarity-test-output.csv"
+        ),
+    )
 
     args = parser.parse_args()
+
     # TODO: apply data augmentation for the low represtented classes
 
     # Make sure that the actual batch sizes are not too large
-    args.gradient_accumulations_sst = int(np.ceil(args.batch_size / args.max_batch_size_sst))
-    args.gradient_accumulations_para = int(np.ceil(args.batch_size / args.max_batch_size_para))
-    args.gradient_accumulations_sts = int(np.ceil(args.batch_size / args.max_batch_size_sts))
+    args.gradient_accumulations_sst = int(
+        np.ceil(args.batch_size / args.max_batch_size_sst)
+    )
+    args.gradient_accumulations_para = int(
+        np.ceil(args.batch_size / args.max_batch_size_para)
+    )
+    args.gradient_accumulations_sts = int(
+        np.ceil(args.batch_size / args.max_batch_size_sts)
+    )
     args.batch_size_sst = args.batch_size // args.gradient_accumulations_sst
     args.batch_size_para = args.batch_size // args.gradient_accumulations_para
     args.batch_size_sts = args.batch_size // args.gradient_accumulations_sts
@@ -1436,39 +1617,74 @@ def get_args():
     # If we are in testing mode, we do not need to train the model
     if args.option == "test":
         if args.lr != 1e-5:
-            print("WARNING: " + "Testing mode does not train the model, so the learning rate is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so the learning rate is not used"
+            )
         if args.epochs != 1:
-            print("WARNING: " + "Testing mode does not train the model, so the number of epochs is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so the number of epochs is not used"
+            )
         if args.num_batches_per_epoch != -1:
-            print("WARNING: " + "Testing mode does not train the model, so num_batches_per_epoch is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so num_batches_per_epoch is not used"
+            )
         if args.task_scheduler != "round_robin":
-            print("WARNING: " + "Testing mode does not train the model, so task_scheduler is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so task_scheduler is not used"
+            )
         if args.projection != "none":
-            print("WARNING: " + "Testing mode does not train the model, so projection is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so projection is not used"
+            )
         if args.hidden_dropout_prob != 0.3:
-            print("WARNING: " + "Testing mode does not train the model, so hidden_dropout_prob is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so hidden_dropout_prob is not used"
+            )
         if args.beta_vaccine != 1e-2:
-            print("WARNING: " + "Testing mode does not train the model, so beta_vaccine is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so beta_vaccine is not used"
+            )
         if args.patience != 5:
-            print("WARNING: " + "Testing mode does not train the model, so patience is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so patience is not used"
+            )
         if args.use_amp:
-            print("WARNING: " + "Testing mode does not train the model, so use_amp is not used")
+            print(
+                "WARNING: "
+                + "Testing mode does not train the model, so use_amp is not used"
+            )
 
     else:
-        if args.projection != 'vaccine' and args.beta_vaccine != 1e-2:
+        if args.projection != "vaccine" and args.beta_vaccine != 1e-2:
             print("WARNING: " + "Beta vaccine is only used when Vaccine is used")
-        if args.task_scheduler != 'none' and args.task.scheduler != 'round_robin':
-            if args.combine_strategy == 'none':
-                print("WARNING: " + "Combine strategy should be specified when using projection and PAL")
-                raise ValueError("Combine strategy should be specified when using projection and PAL")
+        if args.task_scheduler != "none" and args.task_scheduler != "round_robin":
+            if args.combine_strategy == "none":
+                print(
+                    "WARNING: "
+                    + "Combine strategy should be specified when using projection and PAL"
+                )
+                raise ValueError(
+                    "Combine strategy should be specified when using projection and PAL"
+                )
             print("[EXPERIMENTAL] PCGRAD & Vaccine use combine strategy")
 
     return args
 
+
 if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
-    args.name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
+    args.name = (
+        f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}"
+    )
     args.filepath = f"models1/multitask_classifier/{args.name}.pt"  # save path
 
     train_multitask(args)

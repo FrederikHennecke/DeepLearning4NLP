@@ -4,7 +4,7 @@ import os
 import zipfile
 
 # Collect predictions
-predictions_dir = "predictions/bert/multitask/train_multitask_alldata_STS_QQP_improve"
+predictions_dir = "./logs/predictions/"
 required_files = []
 
 for files in os.listdir(predictions_dir):
@@ -15,10 +15,10 @@ print(f"len(required_files): {len(required_files)}")
 
 
 def main():
-    aid = "alldata_multitask_STS_QQP_improvement"
+    aid = "multitask-vaccine-smart-regularization"
     with zipfile.ZipFile(f"{aid}.zip", "w") as zz:
         for file in required_files:
-            zz.write(file, os.path.join(".", file))
+            zz.write(file, os.path.join("predictions-zip", file))
     print(f"Submission zip file created: {aid}.zip")
 
 
