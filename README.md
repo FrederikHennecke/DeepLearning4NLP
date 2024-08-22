@@ -56,37 +56,39 @@ Alternatively, you can run the `run_train.sh` script which also has the option t
 
 There are lots of parameters to set. To see all of them, run `python <filename> --help`. Theses are most important ones in the `train_multitask.py` and `train_multitask_pal.py` file. Please note that parameters from branches other than the main are included as well:
 
-| **Parameter**                           | **Description**                                                                                                   |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `--additional_input`                    | Activates the usage for POS and NER tags for the input of BERT                                                    |
-| `--batch_size`                          | Batch size.                                                                                                       |
-| `--clip`                                | Gradient clipping value.                                                                                          |
-| `--epochs`                              | Number of epochs.                                                                                                 |
-| `--hidden_dropout_prob`                 | Dropout probability for hidden layers.                                                                            |
-| `--hpo_trials`                          | Number of trials for hyperparameter optimization.                                                                 |
-| `--hpo`                                 | Activate hyperparameter optimization.                                                                             |
-| `--lr`                                  | Learning rate.                                                                                                    |
-| `--optimizer`                           | Optimizer to use. Options are `AdamW` and `SophiaH`.                                                              |
-| `--option`                              | Determines if BERT parameters are frozen (`pretrain`) or updated (`finetune`).                                    |
-| `--samples_per_epoch`                   | Number of samples per epoch.                                                                                      |
-| `--scheduler`                           | Learning rate scheduler to use. Options are `plateau`, `cosine`, `linear_warmup` or `None` for non schedulers     |
-| `--unfreeze_interval`                   | Number of epochs until the next BERT layer is unfrozen                                                            |
-| `--use_gpu`                             | Whether to use the GPU.                                                                                           |
-| `--weight_decay`                        | Weight decay for optimizer.                                                                                       |
-| `--smoketest`                           | to test the code implementation and debug it before the actual run                                                |
-| `--pooling`                             | add a pooling layer before the classifier                                                                         |
-| `--layers`                              | select more layers from the model to train                                                                        |
-| `--add_layers`                          | add more linear layers to train before the classifier for the SST task                                            |
-| `--combined_models`                     | use combined BERT models to train                                                                                 |
-| `--train_mode`                          | specifies if train the last hidden state, the pooler output or certain layers of the model                        |
-| `--max_length`                          | the maximum length of tekens to chunk                                                                             |
-| `--n_hidden_layers`                     | number of hidden layers to use                                                                                    |
-| `--task_scheduler`                      | choose how to schedule the task during training. Options are `random`, `round_robin`, `pal`, `para`, `sts`, `sst` |
-| `--projection`                          | how to handle competing gradients from different tasks. Options are `pcgrad`, `vaccine`, `none`                   |
-| `--combine_strategy`                    | needed in case of using projection. Options are `encourage`, `force`, `none`                                      |
-| `--use_pal`                             | add projected attention layers on top of BERT                                                                     |
-| `--patience`                            | number of epochs to wait without improvement before the training stops                                            |
-| `--write_summary` or `--no_tensorboard` | whether to save training logs for later view on tensorboard                                                       |
+| **Parameter**                           | **Description**                                                                                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--additional_input`                    | Activates the usage for POS and NER tags for the input of BERT                                                                                             |
+| `--batch_size`                          | Batch size.                                                                                                                                                |
+| `--clip`                                | Gradient clipping value.                                                                                                                                   |
+| `--epochs`                              | Number of epochs.                                                                                                                                          |
+| `--hidden_dropout_prob`                 | Dropout probability for hidden layers.                                                                                                                     |
+| `--hpo_trials`                          | Number of trials for hyperparameter optimization.                                                                                                          |
+| `--hpo`                                 | Activate hyperparameter optimization.                                                                                                                      |
+| `--lr`                                  | Learning rate.                                                                                                                                             |
+| `--optimizer`                           | Optimizer to use. Options are `AdamW` and `SophiaH`.                                                                                                       |
+| `--option`                              | Determines if BERT parameters are frozen (`pretrain`) or updated (`finetune`).                                                                             |
+| `--samples_per_epoch`                   | Number of samples per epoch.                                                                                                                               |
+| `--scheduler`                           | Learning rate scheduler to use. Options are `plateau`, `cosine`, `linear_warmup` or `None` for non schedulers                                              |
+| `--unfreeze_interval`                   | Number of epochs until the next BERT layer is unfrozen                                                                                                     |
+| `--use_gpu`                             | Whether to use the GPU.                                                                                                                                    |
+| `--weight_decay`                        | Weight decay for optimizer.                                                                                                                                |
+| `--smoketest`                           | To test the code implementation and debug it before the actual run                                                                                         |
+| `--pooling`                             | Add a pooling layer before the classifier                                                                                                                  |
+| `--layers`                              | Select more layers from the model to train                                                                                                                 |
+| `--add_layers`                          | Add more linear layers to train before the classifier for the SST task                                                                                     |
+| `--combined_models`                     | Use combined BERT models to train                                                                                                                          |
+| `--train_mode`                          | Specifies if train the last hidden state, the pooler output or certain layers of the model. Options are `all_pooled`, `last_hidden_state`, `single_layers` |
+| `--max_length`                          | Maximum length of tekens to chunk                                                                                                                          |
+| `--n_hidden_layers`                     | Number of hidden layers to use                                                                                                                             |
+| `--task_scheduler`                      | Choose how to schedule the task during training. Options are `random`, `round_robin`, `pal`, `para`, `sts`, `sst`                                          |
+| `--projection`                          | How to handle competing gradients from different tasks. Options are `pcgrad`, `vaccine`, `none`                                                            |
+| `--combine_strategy`                    | Needed in case of using projection. Options are `encourage`, `force`, `none`                                                                               |
+| `--use_pal`                             | Add projected attention layers on top of BERT                                                                                                              |
+| `--patience`                            | Number of epochs to wait without improvement before the training stops                                                                                     |
+| `--use_smart_regularization`            | Implemented pytorch package to regularize the weights and reduce overfitting                                                                               |
+| `--write_summary` or `--no_tensorboard` | Whether to save training logs for later view on tensorboard                                                                                                |
+| `--model_name`                          | Choose the model to pretrain or fine-tune                                                                                                                  |
 
 ## Evaluation
 
@@ -129,11 +131,35 @@ Paraphrases are “rewordings of something written or spoken by someone else”;
 detection thus essentially seeks to determine whether particular words or phrases convey
 the same semantic meaning. This task measures how well systems can understand fine-grained notions of semantic meaning.
 
-| Model name                    | Description                    | Accuracy | link to slurm                                                                                                                                                |
-| ----------------------------- | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Augmented Attention Multitask | Attention layer on top of BERT | 84.4%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out) |
-| BiLSTM-Multitask              | BiLSTM layer on top of BERT    | 83.9%    |
-| Baseline (single task)        |                                | 80.6%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                           |
+| Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
+| ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pcgrad projection             | Projected gradient descent with round robin scheduler | 86.4%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 85.9%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
+| Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
+| Augmented Attention Multitask | Attention layer on top of BERT                        | 84.4%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
+| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
+| Bert-large                    | use bert-large model for multitasking                 | 82.4%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
+| Max pooling                   | Max of the last hidden states' sequence               | 81.9%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
+| Baseline (single task)        | Single task training                                  | 80.6%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+
+### [Sentiment Classification on Stanford Sentiment Treebank (SST)](https://paperswithcode.com/sota/sentiment-analysis-on-sst-5-fine-grained)
+
+A basic task in understanding a given text is classifying its polarity (i.e., whether the expressed
+opinion in a text is positive, negative, or neutral). Sentiment analysis can be utilized to
+determine individual feelings towards particular products, politicians, or within news reports.
+Each phrase has a label of negative, somewhat negative,
+neutral, somewhat positive, or positive.
+
+| Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
+| ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pcgrad projection             | Projected gradient descent with round robin scheduler | 86.4%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 85.9%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
+| Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
+| Augmented Attention Multitask | Attention layer on top of BERT                        | 84.4%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
+| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
+| Bert-large                    | use bert-large model for multitasking                 | 82.4%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
+| Max pooling                   | Max of the last hidden states' sequence               | 81.9%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
+| Baseline (single task)        | Single task training                                  | 52.2%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
 
 Explain how we can run your code in this section. We should be able to reproduce the results you've obtained.
 
