@@ -152,6 +152,24 @@ neutral, somewhat positive, or positive.
 
 | Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
 | ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 53.0%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-sst-classifier-1360936.out)              |
+| Max pooling                   | Max of the last hidden states' sequence               | 52.8%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sst-single.out)                                   |
+| Baseline (single task)        | Single task training                                  | 52.2%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+| Bert-large                    | use bert-large model for multitasking                 | 51.2%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
+| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 50.4%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
+| Augmented Attention Multitask | Attention layer on top of BERT                        | 50.2%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
+| Combined BERT models          | 3 BERT models combined with a gating network          | 49.1%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
+| Pcgrad projection             | Projected gradient descent with round robin scheduler | 47.9%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+
+### [Semantic Textual Similarity on STS](https://paperswithcode.com/sota/semantic-textual-similarity-on-sts-benchmark)
+
+The semantic textual similarity (STS) task seeks to capture the notion that some texts are
+more similar than others; STS seeks to measure the degree of semantic equivalence [Agirre
+et al., 2013]. STS differs from paraphrasing in it is not a yes or no decision; rather it
+allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
+
+| Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
+| ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Pcgrad projection             | Projected gradient descent with round robin scheduler | 86.4%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
 | Vaccine projection            | Surgery of the gradient with round robin scheduler    | 85.9%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
 | Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
@@ -159,7 +177,7 @@ neutral, somewhat positive, or positive.
 | BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
 | Bert-large                    | use bert-large model for multitasking                 | 82.4%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
 | Max pooling                   | Max of the last hidden states' sequence               | 81.9%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
-| Baseline (single task)        | Single task training                                  | 52.2%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+| Baseline (single task)        | Single task training                                  | 41.4%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
 
 Explain how we can run your code in this section. We should be able to reproduce the results you've obtained.
 
