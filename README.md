@@ -64,15 +64,22 @@ For each experiment answer briefly the questions:
 - Discuss the results. Why did improvement _A_ perform better/worse compared to other improvements? Did the outcome match your expectations? Can you recognize any trends or patterns?
 
 **BART paraphrase detection:**
-SophiaG
-learning rate scheduler
-costumloss
+
 - What experiments are you executing? Don't forget to tell how you are evaluating things.
+A costumloss function to benchmarked against the mcc.  
+  
 - What were your expectations for this experiment?
+To match the baseline results.
+
 - What have you changed compared to the base model (or to previous experiments, if you run experiments on top of each other)?
+found weights and used a combination of an mcc per class loss and the BCEWithLogistLoss
+
 - What were the results?
-- Add relevant metrics and plots that describe the outcome of the experiment well. 
+The mcc did improve. 
+
 - Discuss the results. Why did improvement _A_ perform better/worse compared to other improvements? Did the outcome match your expectations? Can you recognize any trends or patterns?
+The discrepancy between the train and dev data accuracy points to overfitting. 
+
 
 ## Results 
 Summarize all the results of your experiments in tables:
@@ -98,11 +105,11 @@ Summarize all the results of your experiments in tables:
 |Improvement 2        |52.11%|...|
 |...        |...|...|
 
-| **Paraphrase Type Detection (PTD)** | **Metric 1** |**Metric n** |
+| **Paraphrase Type Detection (PTD)** | **MCC** |**Metric n** |
 |----------------|-----------|------- |
-|Baseline |45.23%           |...            | 
-|Improvement 1          |58.56%            |...          
-|Improvement 2        |52.11%|...|
+|Baseline |13.3%           |...            | 
+|BCEWithLogitLoss and weights|20.32%            |...          
+|Improvement 2        |...|...|
 |...        |...|...|
 
 | **Paraphrase Type Generation (PTG)** | **Metric 1** |**Metric n** |
@@ -118,9 +125,13 @@ Results should have three-digit precision.
  
 
 ### Hyperparameter Optimization 
+
 Describe briefly how you found your optimal hyperparameter. If you focussed strongly on Hyperparameter Optimization, you can also include it in the Experiment section. 
 
 _Note: Random parameter optimization with no motivation/discussion is not interesting and will be graded accordingly_
+
+**Paraphrase Type Generation (PTG)**
+A mixture of grid search for some hyperparameter, intuition for others and rule of thumb found in the the pytroch documentation.
 
 ## Visualizations 
 Add relevant graphs of your experiments here. Those graphs should show relevant metrics (accuracy, validation loss, etc.) during the training. Compare the  different training processes of your improvements in those graphs. 
@@ -139,7 +150,7 @@ Explain what member did what in the project:
 
 -   **Group member 2:** Aly, Mohamed
 
--   **Group member 3:** Tillmann, Arne implemented the costum loss function for the paraphrase type detection task. He also implemented the grid search to optimize the hyperparameters (weights).
+-   **Group member 3:** Tillmann, Arne implemented the costum loss function for the paraphrase type detection task. He used SophiaG optimizer and a learningrate scheduler. 
 
 -   **Group member 4:** Chang, Yue
 
