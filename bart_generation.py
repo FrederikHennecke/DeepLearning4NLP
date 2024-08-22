@@ -10,7 +10,6 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, BartForConditionalGeneration
 
 from optimizer import AdamW
-from bart_detection import get_args
 
 TQDM_DISABLE = False
 
@@ -29,14 +28,18 @@ def transform_data(dataset, shuffle, max_length=256, target_encoding=True):
     inputs = []
     targets = []
 
+    SEP_token = "<SEP>"
+    tokenizer.add_tokens([SEP_token])
+    tokenizer.sep_token = SEP_token
+
     for idx, row in dataset.iterrows():
         if target_encoding:
-            input_text = row['sentence1'] + " SEP " + row['sentence1_segment_location'] + " SEP " + row['paraphrase_types']
+            input_text = row['sentence1'] + SEP_token + row['sentence1_segment_location'] + SEP_token + row['paraphrase_types']
             target_text = row['sentence2']
             inputs.append(input_text)
             targets.append(target_text)
         else:
-            input_text = row['sentence1'] + " SEP " + row['sentence1_segment_location'] + " SEP " + row['paraphrase_types']
+            input_text = row['sentence1'] + SEP_token + row['sentence1_segment_location'] + SEP_token + row['paraphrase_types']
             inputs.append(input_text)
 
     encodings = tokenizer(inputs, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
@@ -48,10 +51,35 @@ def transform_data(dataset, shuffle, max_length=256, target_encoding=True):
 
     dataloader = DataLoader(dataset, shuffle=shuffle)
 
-    return dataloader
+    return dataloader, tokenizer
 
 
-def train_model(model, train_data, dev_data, device, tokenizer):
+def custom_loss_function(logits, labels, input_ids, model, tokenizer,  similarity_weight=0.0, dissimilarity_weight=0.0, copy_penalty_weight=0.0):
+    loss_fct = torch.nn.CrossEntropyLoss()
+    cross_entropy_loss = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1))
+
+    with torch.no_grad():
+        input_embeddings = model.model.encoder(input_ids).last_hidden_state.mean(dim=1)
+        output_ids = logits.argmax(dim=-1)
+        output_embeddings = model.model.encoder(output_ids).last_hidden_state.mean(dim=1)
+        
+    # cosine similarity
+    cosine_sim = torch.nn.functional.cosine_similarity(input_embeddings, output_embeddings, dim=-1)
+    similarity_loss = 1 - cosine_sim.mean()
+    dissimilarity_loss = cosine_sim.mean()
+
+    # penalty if sentences are simple copies
+    input_ids_expanded = input_ids.unsqueeze(1).expand(-1, labels.size(1), -1)
+    target_ids_expanded = labels.unsqueeze(2)
+    match = (target_ids_expanded == input_ids_expanded).float()
+    copy_penalty = match.mean(dim=2).sum(dim=1) / input_ids.size(1)
+    copy_penalty = copy_penalty.mean()
+    
+    loss = cross_entropy_loss + similarity_weight * similarity_loss + dissimilarity_weight * dissimilarity_loss + copy_penalty_weight * copy_penalty
+
+    return loss
+
+def train_model(model, train_data, dev_data, device, tokenizer, args):
     """
     Train the model. Return and save the model.
     """
@@ -77,7 +105,8 @@ def train_model(model, train_data, dev_data, device, tokenizer):
             logits = model(
                 input_ids=input_ids, attention_mask=attention_mask, labels=target_ids
             )
-            loss = logits.loss
+            #loss = logits.loss
+            loss = custom_loss_function(logits.logits , target_ids, input_ids, model=model, tokenizer=tokenizer)
             loss.backward()
             optimizer.step()
 
@@ -101,7 +130,13 @@ def train_model(model, train_data, dev_data, device, tokenizer):
                     attention_mask=attention_mask,
                     labels=target_ids,
                 )
-                dev_loss += outputs.loss.item()
+
+                # Calculate dev loss using the same custom loss function
+                #loss = outputs.loss
+                logits = outputs.logits
+                loss = custom_loss_function(logits , target_ids, input_ids, model=model, tokenizer=tokenizer)
+
+                dev_loss += loss.item()
                 num_batches += 1
 
         avg_dev_loss = dev_loss / num_batches
@@ -162,14 +197,14 @@ def test_model(test_data, test_ids, device, model, tokenizer):
 def evaluate_model(model, test_data, device, tokenizer):
     """
     You can use your train/validation set to evaluate models performance with the BLEU score.
-    test_data is a Pandas Dataframe, the column "sentence1" contains all input sentence and
+    test_data is a Pandas Dataframe, the column "sentence1" contains all input sentence and 
     the column "sentence2" contains all target sentences
     """
     model.eval()
     bleu = BLEU()
     predictions = []
 
-    dataloader = transform_data(test_data, shuffle=False)
+    dataloader, _ = transform_data(test_data, shuffle=False)
     with torch.no_grad():
         for batch in dataloader:
             input_ids, attention_mask, _ = batch
@@ -264,11 +299,13 @@ def finetune_paraphrase_generation(args):
     # You might do a split of the train data into train/validation set here
     # in the Main function
 
-    train_data = transform_data(train_dataset, shuffle=True, target_encoding=True)
-    dev_data = transform_data(dev_dataset, shuffle=False, target_encoding=True)
-    test_data = transform_data(test_dataset, shuffle=False, target_encoding=False)
+    train_data, tokenizer = transform_data(train_dataset, shuffle=True, target_encoding=True)
+    dev_data, _ = transform_data(dev_dataset, shuffle=False, target_encoding=True)
+    test_data, _ = transform_data(test_dataset, shuffle=False, target_encoding=False)
 
-    model = train_model(model, train_data, dev_data, device, tokenizer)
+    model.resize_token_embeddings(len(tokenizer))
+
+    model = train_model(model, train_data, dev_data, device, tokenizer, args)
 
     print("Training finished.")
 
@@ -283,6 +320,26 @@ def finetune_paraphrase_generation(args):
         sep="\t",
     )
 
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=11711)
+    parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument(
+        "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
+    )
+    parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
+    parser.add_argument(
+        "--etpc_test",
+        type=str,
+        default="data/etpc-paraphrase-detection-test-student.csv",
+    )
+    parser.add_argument("--similarity_weight", type=float, default=0.)
+    parser.add_argument("--dissimilarity_weight", type=float, default=0.)
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == "__main__":
