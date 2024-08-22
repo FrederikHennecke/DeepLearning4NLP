@@ -913,7 +913,7 @@ def get_args():
         "--scheduler",
         type=str,
         default="plateau",
-        choices=("plateau", "cosine", "none"),
+        choices=("plateau", "cosine", "linear_warmup"),
     )
     parser.add_argument(
         "--hpo", action="store_false", help="Activate hyperparameter optimization"
