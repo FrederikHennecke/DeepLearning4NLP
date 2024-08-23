@@ -131,16 +131,17 @@ Paraphrases are “rewordings of something written or spoken by someone else”;
 detection thus essentially seeks to determine whether particular words or phrases convey
 the same semantic meaning. This task measures how well systems can understand fine-grained notions of semantic meaning.
 
-| Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
-| ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Pcgrad projection             | Projected gradient descent with round robin scheduler | 86.4%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
-| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 85.9%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
-| Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
-| Augmented Attention Multitask | Attention layer on top of BERT                        | 84.4%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
-| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
-| Bert-large                    | use bert-large model for multitasking                 | 82.4%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
-| Max pooling                   | Max of the last hidden states' sequence               | 81.9%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
-| Baseline (single task)        | Single task training                                  | 80.6%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+| **Model name**                | **Description**                                       | **Accuracy** | **link to slurm**                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pcgrad projection             | Projected gradient descent with round robin scheduler | 86.4%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 85.9%        | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
+| Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
+| Augmented Attention Multitask | Attention layer on top of BERT                        | 84.4%        | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
+| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%        | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
+| Sophia with additional inputs | Sophia optimizer with POS and NER inputs              | 82.5%        | [sophia with additional inputs](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-sophia-add-input-multitask.out)          |
+| Bert-large                    | use bert-large model for multitasking                 | 82.4%        | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
+| Max pooling                   | Max of the last hidden states' sequence               | 81.9%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
+| Baseline (single task)        | Single task training                                  | 80.6%        | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
 
 ### [Sentiment Classification on Stanford Sentiment Treebank (SST)](https://paperswithcode.com/sota/sentiment-analysis-on-sst-5-fine-grained)
 
@@ -150,16 +151,17 @@ determine individual feelings towards particular products, politicians, or withi
 Each phrase has a label of negative, somewhat negative,
 neutral, somewhat positive, or positive.
 
-| Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
-| ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 53.0%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-sst-classifier-1360936.out)              |
-| Max pooling                   | Max of the last hidden states' sequence               | 52.8%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sst-single.out)                                   |
-| Baseline (single task)        | Single task training                                  | 52.2%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
-| Bert-large                    | use bert-large model for multitasking                 | 51.2%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
-| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 50.4%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
-| Augmented Attention Multitask | Attention layer on top of BERT                        | 50.2%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
-| Combined BERT models          | 3 BERT models combined with a gating network          | 49.1%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
-| Pcgrad projection             | Projected gradient descent with round robin scheduler | 47.9%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| **Model name**                | **Description**                                       | **Accuracy** | **link to slurm**                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 53.0%        | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-sst-classifier-1360936.out)              |
+| Max pooling                   | Max of the last hidden states' sequence               | 52.8%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sst-single.out)                                   |
+| Baseline (single task)        | Single task training                                  | 52.2%        | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+| Bert-large                    | use bert-large model for multitasking                 | 51.2%        | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
+| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 50.4%        | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
+| Augmented Attention Multitask | Attention layer on top of BERT                        | 50.2%        | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
+| Combined BERT models          | 3 BERT models combined with a gating network          | 49.1%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
+| Sophia with additional inputs | Sophia optimizer with POS and NER inputs              | 48.8%        | [sophia with additional inputs](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-sophia-add-input-multitask.out)          |
+| Pcgrad projection             | Projected gradient descent with round robin scheduler | 47.9%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
 
 ### [Semantic Textual Similarity on STS](https://paperswithcode.com/sota/semantic-textual-similarity-on-sts-benchmark)
 
@@ -168,32 +170,59 @@ more similar than others; STS seeks to measure the degree of semantic equivalenc
 et al., 2013]. STS differs from paraphrasing in it is not a yes or no decision; rather it
 allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
 
-| Model name                    | Description                                           | Accuracy | link to slurm                                                                                                                                                      |
-| ----------------------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Pcgrad projection             | Projected gradient descent with round robin scheduler | 86.4%    | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
-| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 85.9%    | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
-| Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%    | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
-| Augmented Attention Multitask | Attention layer on top of BERT                        | 84.4%    | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
-| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%    | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
-| Bert-large                    | use bert-large model for multitasking                 | 82.4%    | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
-| Max pooling                   | Max of the last hidden states' sequence               | 81.9%    | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
-| Baseline (single task)        | Single task training                                  | 41.4%    | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+| **Model name**                | **Description**                                       | **Accuracy** | **link to slurm**                                                                                                                                                  |
+| ----------------------------- | ----------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vaccine projection            | Surgery of the gradient with round robin scheduler    | 89.3%        | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
+| Pcgrad projection             | Projected gradient descent with round robin scheduler | 89.0%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| Augmented Attention Multitask | Attention layer on top of BERT                        | 85.8%        | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
+| Bert-large                    | use bert-large model for multitasking                 | 85.3%        | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
+| Combined BERT models          | 3 BERT models combined with a gating network          | 85.1%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
+| Sophia with additional inputs | Sophia optimizer with POS and NER inputs              | 84.3%        | [sophia with additional inputs](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-sophia-add-input-multitask.out)          |
+| BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 80.7%        | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
+| Max pooling                   | Max of the last hidden states' sequence               | 53.4%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sts-single.out)                                   |
+| Baseline (single task)        | Single task training                                  | 41.4%        | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
 
-Explain how we can run your code in this section. We should be able to reproduce the results you've obtained.
+## Methodology
 
-In addition, if you used libraries that were not included in the conda environment 'dnlp' explain the exact installation instructions or provide a `.sh` file for the installation.
+In this section we will describe the methods we used to obtain our results for the given tasks.
 
-Which files do we have to execute to train/evaluate your models? Write down the command which you used to execute the experiments. We should be able to reproduce the experiments/results.
+---
 
-_Hint_: At the end of the project you can set up a new environment and follow your setup instructions making sure they are sufficient and if you can reproduce your results.
+### POS and NER Tag Embeddings
 
-Run `bash setup_gwdg.sh` and `sbatch gwdg_run.sh`
+Enriching the corpus with subword embeddings can enhance the model's understanding of language as reported by T. Mikolov, et al.[Distributed Representations of Words and Phrases and their Compositionality](https://arxiv.org/pdf/1310.4546) and P. Bojanowski et al. [Enriching Word Vectors with Subword Information](https://arxiv.org/pdf/1607.04606). We used [spaCy](https://spacy.io/) package for that purpose to extract the POS and NER tags from the input text and feed their embeddings to the model together with the input sequence.
 
-# Methodology
+- **POS:** Identifying the grammatical category of words (noun, verb, adjective, etc.) helps the model understand the structure of a sentence and disambiguate meanings which then results in better capturing the relationships between words.
 
-In this section explain what and how you did your project.
+- **NER:** Recognizing named entities (names, organizations, etc.) makes the model focus on relevant words and therefore better sentiment analysis of the text.
 
-If you are unsure how this is done, check any research paper. They all describe their methods/processes. Describe briefly the ideas that you implemented to improve the model. Make sure to indicate how are you using existing ideas and extending them. We should be able to understand your project's contribution.
+Adding such semantic information can make the model robust and therefore better generalization to unseen data.
+
+#### Experimental Results
+
+In contrast to our expectations, adding POS and NER tags to the model did not improve the performance, rather it made the training too slow and consumed lots of computational resources without an actual benefit. The reason for the high training costs is that we train all the available data and indeed extracting the tags from each word, computing the embeddings and feeding them to the model is quite expensive.
+
+#### Explanation of Results
+
+The reason why including additional inputs did not enhance the performance is that Large Language Models (LLMs) like Bert are pretrained on massive corpora whose embeddings are contextual, meaning that the representation of a word depends on the context around it in the specified window which allows the model to capture information relevant to POS and NER from the text. Researchers have conducted studies where they probe the hidden layers to asses the amount of syntactic or semantic information encoded in the layers. ([A Structural Probe for Finding Syntax in Word Representations](https://aclanthology.org/N19-1419.pdf), [BERT Rediscovers the Classical NLP Pipeline](https://arxiv.org/pdf/1905.05950)).
+
+---
+
+### Sophia
+
+Sophia is a **S**econd-**O**rder Cli**p**ped Stoc**h**astic Optimiz**a**tion method that uses. It uses the Hessian matrix as an approximation of second-order information to represent the curvature of the loss function which can lead to faster convergence and better generalization. Sophia incorporates an adaptive learning rate mechanism, adjusting the step size based on the curvature of the loss landscape and uses clipping to control the worst-case update size. in all directions, safeguarding against the negative impact of inaccurate Hessian estimates. Thanks to the light weight diagonal Hessian estimate, the speed-up in the number of steps translates to a speed-up in total compute wall-clock time.
+
+#### Implementation
+
+We used the Hutchinson's unbiased estimator of the Hessian diagonal in our implementaion, which is to sample from the spherical Gaussian distribution. It can be activated in the training script by setting the `--optimizer` option to `sophiah`. The estimator can be used for all tasks including classification and regression, and requires only a Hessian vector product instead of the full Hessian matrix. It also has efficient implementation in PyTorch and JAX as mentioned in the original paper by H. Liu, et al. [Sophia: A Scalable Stochastic Second-order Optimizer for Language Model Pre-training](https://arxiv.org/pdf/2305.14342).
+
+#### Experimental Results
+
+The implementation of Sophiah did not actually improve the performance compared to AdamW, rather it showed a slightly lower or comparable performance. Most importantly it did not converge faster as expected, rather it was slower than AdamW.
+
+#### Explanation of Results
+
+Sophia optimizer is basically designed to be computationally feasible for pre-training large scale language models, which is different from the frame in which we used it (fine tuning of a relatively small corpus than usual).
 
 **BART paraphrase detection:**
 Arne implemented a new lossfunction based on the new metric (mcc) and the old loss BCEWithLogitLoss. The penalizing weights were determined by a gridsearch.
