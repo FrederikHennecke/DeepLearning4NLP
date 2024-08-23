@@ -1497,7 +1497,7 @@ def get_args():
         "--combine_strategy",
         type=str,
         choices=("none", "encourage", "force"),
-        default="force",
+        default="encourage",
     )
     parser.add_argument("--use_amp", action="store_true")
     parser.add_argument(
@@ -1513,7 +1513,7 @@ def get_args():
         "--projection",
         type=str,
         choices=("none", "pcgrad", "vaccine"),
-        default="none",
+        default="pcgrad",
     )
     parser.add_argument("--beta_vaccine", type=float, default=1e-2)
     parser.add_argument(

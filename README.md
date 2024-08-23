@@ -44,6 +44,16 @@ bash setup_gwdg.sh
 
 This will download and install miniconda on your machine, create the project's conda environment and activate it. It will also download the models used through the project and the POS and NER tags from spacy.
 
+## Data
+
+We describe the datasets we used in the following table
+
+| **Dataset**                       | **Task**                            | **Description**                                                                                                                               | **Size**                                                 |
+| --------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Quora Dataset (QQP)               | Paraphrase detection                | Two sentences are given as input and a binary label (0, 1) is output indicating if sentences are paraphrases of one another                   | Train: 121, 620 <br /> Dev: 40, 540 <br /> Test: 40, 540 |
+| Stanford Sentiment Treebank (SST) | Sentiment analysis (classification) | One sentence is given as input to be classified on a scale from 0 (most negative) to 5 (most positive)                                        | Train: 7, 111 <br /> Dev: 2, 365 <br /> Test: 2, 371     |
+| SemEval STS Benchmark Dataset     | Textual Similarity (regression)     | Two sentences are given as input and their mutual relation is to be evaluated on continuous labels from 0 (least similar) to 5 (most similar) | Train: 5, 149 <br /> Dev: 1, 709 <br /> Test: 1, 721     |
+
 ## Training
 
 To train the multitask BERT, you need to activate the environment and run
@@ -265,7 +275,47 @@ Schedulers in general are mechanisms that help adjusting the learning rate dynam
 
 #### Linear Warmup
 
-The idea behind it is to start with a small learning rate so that the basic features of the data are learned, then gradually increase it in a linear way over a predefined number of steps or epochs. After the warmup period, the learning rate transits to another schedule such as constant rate or a decay rate. Linear warmup has the benefits of stabilizing the training and avoiding exploding gradients in case of using large batch sizes, large models or large dataset. Therefore, it was used by the state-of-the-art LLM research ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding:](https://arxiv.org/pdf/1810.04805), [Attention Is All You Need](https://arxiv.org/pdf/1706.03762)).
+The idea behind it is to start with a small learning rate so that the basic features of the data are learned, then gradually increase it in a linear way over a predefined number of steps or epochs. After the warmup period, the learning rate transits to another schedule such as constant rate or a decay rate. Linear warmup has the benefits of stabilizing the training and avoiding exploding gradients in case of using large batch sizes, large models or large dataset. Therefore, it was used by the state-of-the-art LLM research ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding:](https://arxiv.org/pdf/1810.04805), [Attention Is All You Need](https://arxiv.org/pdf/1706.03762)). We implemented the hyperparameters parameters of the scheduler from the first link (Delvin, et al.).
+
+#### Plateau
+
+The plateau scheduler reduces the learning rate when a specific metric (validation loss or accuracy) plateaus, namely renmins unchanged for specific number of training steps or epochs. This helps with fine-tuning the model by keeping the learning rate high when the model still learning effectively. and then reducing it when it comes to complex structures in the data (when improvement stops). The amount of reducing the learning rate is pre-determined by a factor that defaults to 0.1. The number of epochs to wait on the plateau is pre-determined by the patience parameter which we set to 2 for faster training, and we monitor the validation accuracy.
+
+#### Cosine
+
+The basic idea behind the cosine annealing scheduler is to reduce the learning rate following a cosine function rather than a step-wise or exponential decay. This can lead to more effective training because it smoothly decreases the learning rate in a way that can help the model escape local minima and explore the loss landscape more effectively. I. Loshchilov and F. Hutter ([SGDR: STOCHASTIC GRADIENT DESCENT WITH
+WARM RESTARTS](https://arxiv.org/pdf/1608.03983)) proposed a warm restart technique, meaning that the learning rate is set periodically to the maximum value and then follows the cosine annealing schedule. They applied their methodology on CIFAR-10 and CIFAR-100 in the computer vision scheme.
+
+#### Round Robin
+
+This algorithm is basically implemented by process and network schedulers in computing in which time slices (from 10 to 100 milliseconds) are assigned to each process in equal portions and in circular order, namely cycling trough the different tasks one after the other. The problem with round robin scheduler technique is that if the dataset contains more instances of one task than another (e.g QQP and SST), it will repeat several times all the examples of the task with few data points before it repeats all the examples of the other task. This will lead to overfitting for the task that repeats a lot and underfitting for the other one. To this end Stickland and Murray ([BERT and PALs: Projected Attention Layers for
+Efficient Adaptation in Multi-Task Learning](https://arxiv.org/pdf/1902.02671)) proposed a novel method for scheduling training. At first the tasks are sampled proportionally to their training set size but then to avoid interferences, the weighting is reduced to have tasks sampled more uniformly.
+
+##### Exprimental results
+
+We implemented the round robin schedulers with the gradient surgery algorithm and showed a high performance. However, we need to turn off the other optimization methods to have a rough estimate of the effect of the scheduler on the training in terms of score and convergence speed.
+
+#### PAL
+
+The PAL (Performance and Locality) scheduler was developed by R. Jain, et al ([PAL: A Variability-Aware Policy for Scheduling ML Workloads in GPU Clusters](https://arxiv.org/pdf/2408.11919v1)) to address the issue of performance variability in large-scale computing environments and to handle machine Learning workloads in GPU clusters. Thus, this method aims at harnessing the performance variability by redesigning scheduling policies for GPU clusters to consider performance variability. First, the authors identified which GPUs exhibit similar performance variability and the used K-Means clustering to group them. Then they extend their novel algorithm by including also locality of GPUs that are widely distributed on the cluster.
+
+##### Exprimental results
+
+We used the PAL scheduler without vaccine and showed relatively good performance on the STS and QQP tasks. However, we could not run it with the Gradient surgery algorithms due to memory issues on the GWDG cluster.
+
+#### Random
+
+Random scheduler is included for the case of single task training, where at each step of the training the data of the selected task will be sampled randomly to be more robust against overfitting.
+
+### Regularization
+
+The optimization methods mentioned above apply aggressive fine-tuning techniques to force the model learn the data patterns and accelerate training, however it sometimes leads to overfitting as well and thus failure to generalize to unseen data. Regularization comes into play to mitigate this issue by introducing additional constraints or penalities on the model's parameters during training, which helps simplify the model and improves its generalization.
+
+#### SMART Regularizer
+
+Sharpness-Aware Minimization with Robustness Techniques (SMART) is one of the efficient regularization techniques developed by H. Jiang, et al. ([SMART: Robust and Efficient Fine-Tuning for Pre-trained Natural Language Models through Principled Regularized Optimization](https://aclanthology.org/2020.acl-main.197.pdf)). SMART is built on top of SAM introduced by P.Foret et al. ([SHARPNESS-AWARE MINIMIZATION FOR EFFICIENTLY IMPROVING GENERALIZATION](https://arxiv.org/pdf/2010.01412v3)) which was originally proposed to simultaneously minimize loss values and loss sharpness. the sharpness refers to how much the loss value changes when there are small perturbation in the model parameters and the goal of SAM functions is to optimize the parameters that both minimize the loss as well as produce a flat loss landscape around the minimum.
+
+---
 
 **BART paraphrase detection:**
 Arne implemented a new lossfunction based on the new metric (mcc) and the old loss BCEWithLogitLoss. The penalizing weights were determined by a gridsearch.
