@@ -1112,6 +1112,7 @@ def train_multitask(args):
         num_batches = {"sst": 0, "para": 0, "sts": 0}
 
         if args.projection != "none":
+            ####### Gradient Surgery / Vaccine with scheduler #######
             if args.task_scheduler == "pal":
                 if args.combine_strategy == "none":
                     raise ValueError("PAL scheduler requires a combined strategy")
@@ -1217,7 +1218,7 @@ def train_multitask(args):
                         optimizer.step()
 
             else:
-                # Gradient Surgery / Vaccine without scheduler
+                ####### Gradient Surgery / Vaccine without scheduler #######
                 for i in tqdm(
                     range(int(num_batches_per_epoch / 3)),
                     desc=f"Train {epoch}",
@@ -1253,7 +1254,7 @@ def train_multitask(args):
                     optimizer.step()
 
         else:
-            # Scheduler without projection
+            ####### Scheduler without projection / No Vaccine #######
             for i in tqdm(
                 range(num_batches_per_epoch),
                 desc=f"Train {epoch}",
@@ -1462,7 +1463,7 @@ def get_args():
         "--batch_size",
         help="This is the simulated batch size using gradient accumulations",
         type=int,
-        default=128 if not args.smoketest else 256,
+        default=32 if not args.smoketest else 256,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.2)
     parser.add_argument(
@@ -1496,23 +1497,23 @@ def get_args():
         "--combine_strategy",
         type=str,
         choices=("none", "encourage", "force"),
-        default="encourage",
+        default="force",
     )
     parser.add_argument("--use_amp", action="store_true")
     parser.add_argument(
-        "--max_batch_size_sst", type=int, default=32 if not args.smoketest else 64
+        "--max_batch_size_sst", type=int, default=16 if not args.smoketest else 64
     )
     parser.add_argument(
         "--max_batch_size_para", type=int, default=16 if not args.smoketest else 64
     )
     parser.add_argument(
-        "--max_batch_size_sts", type=int, default=32 if not args.smoketest else 64
+        "--max_batch_size_sts", type=int, default=16 if not args.smoketest else 64
     )
     parser.add_argument(
         "--projection",
         type=str,
         choices=("none", "pcgrad", "vaccine"),
-        default="vaccine",
+        default="none",
     )
     parser.add_argument("--beta_vaccine", type=float, default=1e-2)
     parser.add_argument(

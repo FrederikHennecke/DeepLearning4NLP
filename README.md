@@ -118,13 +118,13 @@ For the multitask training, we used the following parameters:
 - weight decay: `0.05`
 - samples per epoch: `20000`
 
-This allowed us to set a standard training framework and try with other options for the sake of further improvement. For furher hyperparameter choices, see the default values in the [training script](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/train_multitask.py)or in the corresponding [slurm file](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-alldata-multitask-STS-QQP-improve.out).
+This allowed us to set a standard training framework and try with other options for the sake of further improvement. The training parameters used as well as the branch where the related scripts exist can be found in the corresponding slurm file.
 
 ---
 
 We achieved the following results
 
-### [Paraphrase Identification on Quora Question Pairs](https://paperswithcode.com/sota/paraphrase-identification-on-quora-question)
+### [Paraphrase Identification on Quora Question Pairs (QQP)](https://paperswithcode.com/sota/paraphrase-identification-on-quora-question)
 
 Paraphrase Detection is the task of finding paraphrases of texts in a large corpus of passages.
 Paraphrases are “rewordings of something written or spoken by someone else”; paraphrase
@@ -138,6 +138,7 @@ the same semantic meaning. This task measures how well systems can understand fi
 | Combined BERT models          | 3 BERT models combined with a gating network          | 85.7%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
 | Augmented Attention Multitask | Attention layer on top of BERT                        | 84.4%        | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
 | BiLSTM-Multitask              | BiLSTM layer on top of BERT                           | 83.9%        | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
+| Pal scheduler without vaccine | apply pal scheduler only                              | 83.1%        | [pal no vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-pal-scheduler-no-vaccine.out)                           |
 | Sophia with additional inputs | Sophia optimizer with POS and NER inputs              | 82.5%        | [sophia with additional inputs](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-sophia-add-input-multitask.out)          |
 | Bert-large                    | use bert-large model for multitasking                 | 82.4%        | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
 | Max pooling                   | Max of the last hidden states' sequence               | 81.9%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
@@ -162,6 +163,7 @@ neutral, somewhat positive, or positive.
 | Combined BERT models          | 3 BERT models combined with a gating network          | 49.1%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
 | Sophia with additional inputs | Sophia optimizer with POS and NER inputs              | 48.8%        | [sophia with additional inputs](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-sophia-add-input-multitask.out)          |
 | Pcgrad projection             | Projected gradient descent with round robin scheduler | 47.9%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| Pal scheduler without vaccine | apply pal scheduler only                              | 45.0%        | [pal no vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-pal-scheduler-no-vaccine.out)                           |
 
 ### [Semantic Textual Similarity on STS](https://paperswithcode.com/sota/semantic-textual-similarity-on-sts-benchmark)
 
@@ -174,6 +176,7 @@ allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
 | ----------------------------- | ----------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Vaccine projection            | Surgery of the gradient with round robin scheduler    | 89.3%        | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
 | Pcgrad projection             | Projected gradient descent with round robin scheduler | 89.0%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
+| Pal scheduler without vaccine | apply pal scheduler only                              | 86.5%        | [pal no vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-pal-scheduler-no-vaccine.out)                           |
 | Augmented Attention Multitask | Attention layer on top of BERT                        | 85.8%        | [attention multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-alldata-multitask-STS-QQP-improve.out)       |
 | Bert-large                    | use bert-large model for multitasking                 | 85.3%        | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
 | Combined BERT models          | 3 BERT models combined with a gating network          | 85.1%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
@@ -200,7 +203,7 @@ Adding such semantic information can make the model robust and therefore better 
 
 #### Experimental Results
 
-In contrast to our expectations, adding POS and NER tags to the model did not improve the performance, rather it made the training too slow and consumed lots of computational resources without an actual benefit. The reason for the high training costs is that we train all the available data and indeed extracting the tags from each word, computing the embeddings and feeding them to the model is quite expensive.
+In contrast to our expectations, adding POS and NER tags to the model combined with the baseline AdamW optimizer did not improve the performance too much, rather it made the training too slow and consumed lots of computational resources without an actual benefit. The reason for the high training costs is that we train all the available data and indeed extracting the tags from each word, computing the embeddings and feeding them to the model is quite expensive.
 
 #### Explanation of Results
 
@@ -208,21 +211,61 @@ The reason why including additional inputs did not enhance the performance is th
 
 ---
 
-### Sophia
+### Optimizers
+
+**TODO** Add AdamW
+
+#### Sophia
 
 Sophia is a **S**econd-**O**rder Cli**p**ped Stoc**h**astic Optimiz**a**tion method that uses. It uses the Hessian matrix as an approximation of second-order information to represent the curvature of the loss function which can lead to faster convergence and better generalization. Sophia incorporates an adaptive learning rate mechanism, adjusting the step size based on the curvature of the loss landscape and uses clipping to control the worst-case update size. in all directions, safeguarding against the negative impact of inaccurate Hessian estimates. Thanks to the light weight diagonal Hessian estimate, the speed-up in the number of steps translates to a speed-up in total compute wall-clock time.
 
-#### Implementation
+##### Implementation
 
 We used the Hutchinson's unbiased estimator of the Hessian diagonal in our implementaion, which is to sample from the spherical Gaussian distribution. It can be activated in the training script by setting the `--optimizer` option to `sophiah`. The estimator can be used for all tasks including classification and regression, and requires only a Hessian vector product instead of the full Hessian matrix. It also has efficient implementation in PyTorch and JAX as mentioned in the original paper by H. Liu, et al. [Sophia: A Scalable Stochastic Second-order Optimizer for Language Model Pre-training](https://arxiv.org/pdf/2305.14342).
 
-#### Experimental Results
+##### Experimental Results
 
-The implementation of Sophiah did not actually improve the performance compared to AdamW, rather it showed a slightly lower or comparable performance. Most importantly it did not converge faster as expected, rather it was slower than AdamW.
+The implementation of Sophiah with additional inputs from Spacy did actually improve the performance for the QQP and STS tasks compared to the baseline AdamW, however it did not improve the SST task. Running Sophiah without POS and NER tags, we observed that the convergence is slower than AdamW.
 
-#### Explanation of Results
+##### Explanation of Results
 
-Sophia optimizer is basically designed to be computationally feasible for pre-training large scale language models, which is different from the frame in which we used it (fine tuning of a relatively small corpus than usual).
+Sophia optimizer is basically designed to be computationally feasible for pre-training large scale language models, which is different from the frame in which we used it (fine tuning of a relatively small corpus than usual). J.Kaddour, et al. ([No Train No Gain: Revisiting Efficient Training Algorithms For Transformer-based Language Models](https://arxiv.org/pdf/2307.06440)) have applied the Sophia optimizer using the Gauss-Newton-Barlett method for downstream tasks and observed that it achieves comparable performance as AdamW.
+
+### Gradient Optimization (Projectors)
+
+It is an optimization technique to handle the conflicting gradients during multitask-training. Since we train the model on all the data simultaneously, the gradients from these tasks might diverge when the gradients from tasks under training point in different directions. That indeed could lead to suboptimal performance and slowing down the training as well.
+
+#### Pcgrad
+
+T. Yu et al. ([Gradient Surgery for Multi-Task Learning](https://arxiv.org/pdf/2001.06782)) proposed the Projected Gradient Descent or Pcgrad method which is a form of gradient surgery. They do the surgery by projecting the gradients of each task onto the normal plane of the gradient of any other task. if the projection is large, then the gradients are conflicting. At the end the projected gradients are summed up and used to update the model. This method proved to effectevely reduce the conflict between gradients and enhance the converging speed of the model.
+
+##### Exprimental results
+
+PCgrad achieved a high performance on the QQP (first rank) and the STS (second rank) tasks, however it worsened the SST (lower than the baseline).
+
+##### Explanation of Results
+
+Our hypothesis is that the pair sequence tasks (STS, QQP) are complicated and they have conflicting gradients, which is why they benefited from Pcgrad technique. Unlike the SST task which includes only one sequence and its gradients are less likely to conflict which is why the benefits of surgery are less pronounced for that task. Following that hypothesis, D. Saykin and K. Dolev ([Gradient Descent in Multi-Task Learning](https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1244/final-projects/DavidSaykinKfirShmuelDolev.pdf)) reported that training the SST task separately with using the Pcgrad surgery achieves better results than in multitask-training framework.
+
+#### GradVac
+
+GradVac stands for Gradient Vaccine which was originally proposed by Z. Wang, et al. ([GRADIENT VACCINE: INVESTIGATING AND IMPROVING MULTI-TASK OPTIMIZATION IN MASSIVELY MULTILINGUAL MODELS](https://arxiv.org/pdf/2010.05874)). This technique was developed to mitigate the negative effects of conflict gradients in multitask-training. It works the same as Pcgrad, but involoves a process of first clipping the gradients before aligning them, which adds computational overhead, however it is still efficient and scalable to large models and corpora.
+
+##### Exprimental results
+
+It achieved relatively comparable results to Pcgrad, additionally it performed better on the SST task.
+
+##### Explanation of Results
+
+The additional clipping introduced in GradVac can prevent the model from making overly aggressive updates that could lead to instability. Therefore it helps stabilize the training, especially in case of noisy gradients due to class imbalance, as for the SST data, which could lead to an improvement as we obtained.
+
+### Schedulers
+
+Schedulers in general are mechanisms that help adjusting the learning rate dynamically during training, which can lead to better performance and faster convergence. Schedulers are useful for escaping the local minima by momentarily increasing the learning rate, preventing overfitting, and efficient training. There are lots of schedule algorithms and we will consider some of them.
+
+#### Linear Warmup
+
+The idea behind it is to start with a small learning rate so that the basic features of the data are learned, then gradually increase it in a linear way over a predefined number of steps or epochs. After the warmup period, the learning rate transits to another schedule such as constant rate or a decay rate. Linear warmup has the benefits of stabilizing the training and avoiding exploding gradients in case of using large batch sizes, large models or large dataset. Therefore, it was used by the state-of-the-art LLM research ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding:](https://arxiv.org/pdf/1810.04805), [Attention Is All You Need](https://arxiv.org/pdf/1706.03762)).
 
 **BART paraphrase detection:**
 Arne implemented a new lossfunction based on the new metric (mcc) and the old loss BCEWithLogitLoss. The penalizing weights were determined by a gridsearch.

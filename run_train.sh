@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=train-multitask_classifier
 #SBATCH -t 15:00:00                  # estimated time # TODO: adapt to your needs
-#SBATCH -p grete:shared                     # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
-#SBATCH -G A100:1                    # take 1 GPU, see https://docs.hpc.gwdg.de/compute_partitions/gpu_partitions/index.html for more options
+#SBATCH -p grete                     # the partition you are training on (i.e., which nodes), for nodes see sinfo -p grete:shared --format=%N,%G
+#SBATCH -G A100:2                    # take 1 GPU, see https://docs.hpc.gwdg.de/compute_partitions/gpu_partitions/index.html for more options
 #SBATCH --mem-per-gpu=8G             # setting the right constraints for the splitted gpu partitions
 #SBATCH --nodes=1                    # total number of nodes
 #SBATCH --ntasks=1                   # total number of tasks
-#SBATCH --cpus-per-task=8            # number cores per task
-#SBATCH --mail-type=END,FAIL              # send mail when job begins and ends
+#SBATCH --cpus-per-task=32            # number cores per task
+#SBATCH --mail-type=END              # send mail when job begins and ends
 #SBATCH --mail-user=mohamed.aly@stud.uni-goettingen.de
 #SBATCH --output=./slurm_files/slurm-%x-%j.out     # where to write output, %x give job name, %j names job id
 #SBATCH --error=./slurm_files/slurm-%x-%j.err      # where to write slurm error
@@ -38,4 +38,5 @@ echo -e "Uncommitted Changes: $(git status --porcelain | wc -l)\n"
 
 # Run the script:
 # python -u train_multitask.py --use_gpu --local_files_only --option finetune --task multitask --hpo --smoketest --additional_inputs --profiler --sst --sts --para
-python -u single_classify.py --use_gpu --local_files_only --option finetune --task sst
+# python -u single_classify.py --use_gpu --local_files_only --option finetune --task sst
+python -u train_multitask_pal.py --option finetune --use_gpu --local_files_only --smoketest --no_tensorboard --no_train_classifier --use_smart_regularization --use_pal --use_amp
