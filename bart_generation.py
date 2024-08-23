@@ -54,6 +54,33 @@ def transform_data(dataset, shuffle, max_length=256, target_encoding=True):
     return dataloader, tokenizer
 
 
+def add_noise_to_sentence(sentence, noise_level=0.2, tokenizer=None):
+    words = sentence.split()
+    num_words = len(words)
+    num_noisy_words = int(noise_level * num_words)
+
+    for _ in range(num_noisy_words):
+        num_words = len(words)
+        noise_type = random.randint(0, 2)
+        idx = random.randint(0, num_words - 1)
+
+        # swap words
+        if noise_type == 0 and num_words > 1:
+            idx2 = (idx + 1) % num_words
+            words[idx], words[idx2] = words[idx2], words[idx]
+
+        # delete words
+        elif noise_type == 1:
+            words.pop(idx)
+
+        # replace words with token
+        elif noise_type == 2:
+            words[idx] = tokenizer.mask_token
+
+    noisy_sentence = " ".join(words)
+    return noisy_sentence
+
+
 def custom_loss_function(logits, labels, input_ids, model, tokenizer,  similarity_weight=0.0, dissimilarity_weight=0.0, copy_penalty_weight=0.0):
     loss_fct = torch.nn.CrossEntropyLoss()
     cross_entropy_loss = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1))
@@ -79,7 +106,7 @@ def custom_loss_function(logits, labels, input_ids, model, tokenizer,  similarit
 
     return loss
 
-def train_model(model, train_data, dev_data, device, tokenizer, args):
+def train_model(model, train_data, dev_data, device, tokenizer, args, noise_level=0.2):
     """
     Train the model. Return and save the model.
     """
@@ -101,9 +128,17 @@ def train_model(model, train_data, dev_data, device, tokenizer, args):
             attention_mask = attention_mask.to(device)
             target_ids = target_ids.to(device)
 
+            # Decode the input_ids to text, apply noise, then re-encode
+            original_sentences = tokenizer.batch_decode(input_ids, skip_special_tokens=True)
+            noisy_sentences = [add_noise_to_sentence(sentence, noise_level=noise_level, tokenizer=tokenizer) for sentence in original_sentences]
+            noisy_encodings = tokenizer(noisy_sentences, padding=True, truncation=True, max_length=input_ids.size(1), return_tensors="pt")
+            
+            noisy_input_ids = noisy_encodings.input_ids.to(device)
+            noisy_attention_mask = noisy_encodings.attention_mask.to(device)
+
             optimizer.zero_grad()
             logits = model(
-                input_ids=input_ids, attention_mask=attention_mask, labels=target_ids
+                input_ids=noisy_input_ids, attention_mask=noisy_attention_mask, labels=target_ids
             )
             #loss = logits.loss
             loss = custom_loss_function(logits.logits , target_ids, input_ids, model=model, tokenizer=tokenizer)
