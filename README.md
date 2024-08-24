@@ -359,7 +359,11 @@ We share the BERT layers among all the datasets and build a classifier on top th
 
 ### Augmented Attention
 
+We add an attention layer on top of the BERT model to refine the model's focus on certain parts of the input sequence, iproving its ability to capture relevant contextual information for the downstream tasks. It is important for the model to give more attention to certain tokens in the input sequence (great, amazing, terrible, bad, etc.) to better classify it or the relations between sequence pairs to decide if they are actually paraphrased. For that purpose we apply an attention mechanism inspired by A. Vaswani, et al. ([Attention Is All You Need](https://arxiv.org/pdf/1706.03762)) that takes in the last hidden state of the model and apply a weighted sum mechanism to enhance the importance of specific tokens and ignores the others. Also, G. Limaye et al. ([BertNet : Combining BERT language representation with Attention and CNN for Reading Comprehension](https://web.stanford.edu/class/archive/cs/cs224n/cs224n.1194/reports/default/15783457.pdf)) implemented a Query-Context attention layer for the question answering task (English-Arabic-English) and proved a significant performance on "difficult" questions.
+
 ### BiLSTM
+
+We added 3 Bidirectional Long-Short Term Memory (BiLSTM) layers on top of BERT to further capture long sequential dependencies and richer contextual information. A BiLSTM processes the sequence in both forward and backward directions to capture sequence relations across time steps. We looked through a hidden size of 128 sequence length of the last hidden state of BERT. We also added a dropout and an average pooling layer to avoid overfitting. The model however was still overfitting which therefore we then reduced the BiLSTM layers to one.
 
 ### Unfreeze Layers
 
@@ -373,7 +377,7 @@ We share the BERT layers among all the datasets and build a classifier on top th
 
 ### PAL
 
-### Extract More Features
+### Extract More Features (token type ids)
 
 ---
 
