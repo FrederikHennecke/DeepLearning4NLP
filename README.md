@@ -199,8 +199,6 @@ allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
 
 In this section we will describe the methods we used to obtain our results for the given tasks.
 
----
-
 ### POS and NER Tag Embeddings
 
 Enriching the corpus with subword embeddings can enhance the model's understanding of language as reported by T. Mikolov, et al.[Distributed Representations of Words and Phrases and their Compositionality](https://arxiv.org/pdf/1310.4546) and P. Bojanowski et al. [Enriching Word Vectors with Subword Information](https://arxiv.org/pdf/1607.04606). We used [spaCy](https://spacy.io/) package for that purpose to extract the POS and NER tags from the input text and feed their embeddings to the model together with the input sequence.
@@ -223,8 +221,6 @@ The reason why including additional inputs did not enhance the performance is th
 
 ### Optimizers
 
-**TODO** Add AdamW
-
 #### Sophia
 
 Sophia is a **S**econd-**O**rder Cli**p**ped Stoc**h**astic Optimiz**a**tion method that uses. It uses the Hessian matrix as an approximation of second-order information to represent the curvature of the loss function which can lead to faster convergence and better generalization. Sophia incorporates an adaptive learning rate mechanism, adjusting the step size based on the curvature of the loss landscape and uses clipping to control the worst-case update size. in all directions, safeguarding against the negative impact of inaccurate Hessian estimates. Thanks to the light weight diagonal Hessian estimate, the speed-up in the number of steps translates to a speed-up in total compute wall-clock time.
@@ -240,6 +236,8 @@ The implementation of Sophiah with additional inputs from Spacy did actually imp
 ##### Explanation of Results
 
 Sophia optimizer is basically designed to be computationally feasible for pre-training large scale language models, which is different from the frame in which we used it (fine tuning of a relatively small corpus than usual). J.Kaddour, et al. ([No Train No Gain: Revisiting Efficient Training Algorithms For Transformer-based Language Models](https://arxiv.org/pdf/2307.06440)) have applied the Sophia optimizer using the Gauss-Newton-Barlett method for downstream tasks and observed that it achieves comparable performance as AdamW.
+
+---
 
 ### Gradient Optimization (Projectors)
 
@@ -269,6 +267,8 @@ It achieved relatively comparable results to Pcgrad, additionally it performed b
 
 The additional clipping introduced in GradVac can prevent the model from making overly aggressive updates that could lead to instability. Therefore it helps stabilize the training, especially in case of noisy gradients due to class imbalance, as for the SST data, which could lead to an improvement as we obtained.
 
+---
+
 ### Schedulers
 
 Schedulers in general are mechanisms that help adjusting the learning rate dynamically during training, which can lead to better performance and faster convergence. Schedulers are useful for escaping the local minima by momentarily increasing the learning rate, preventing overfitting, and efficient training. There are lots of schedule algorithms and we will consider some of them.
@@ -276,6 +276,10 @@ Schedulers in general are mechanisms that help adjusting the learning rate dynam
 #### Linear Warmup
 
 The idea behind it is to start with a small learning rate so that the basic features of the data are learned, then gradually increase it in a linear way over a predefined number of steps or epochs. After the warmup period, the learning rate transits to another schedule such as constant rate or a decay rate. Linear warmup has the benefits of stabilizing the training and avoiding exploding gradients in case of using large batch sizes, large models or large dataset. Therefore, it was used by the state-of-the-art LLM research ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding:](https://arxiv.org/pdf/1810.04805), [Attention Is All You Need](https://arxiv.org/pdf/1706.03762)). We implemented the hyperparameters parameters of the scheduler from the first link (Delvin, et al.).
+
+##### Exprimental results
+
+We applied the linear warmup scheduler on the single SST task combined with a Bidirectional LSTM (BiLSTM) layer on top of BERT. We set the scheduler hyperparameters `num_train_steps = len(sst_train_dataloader) * num_train_epochs` and `num_warmup_steps = 0` as the default. This achieved a relatively higher performance than the baseline.
 
 #### Plateau
 
@@ -307,13 +311,69 @@ We used the PAL scheduler without vaccine and showed relatively good performance
 
 Random scheduler is included for the case of single task training, where at each step of the training the data of the selected task will be sampled randomly to be more robust against overfitting.
 
+---
+
 ### Regularization
 
-The optimization methods mentioned above apply aggressive fine-tuning techniques to force the model learn the data patterns and accelerate training, however it sometimes leads to overfitting as well and thus failure to generalize to unseen data. Regularization comes into play to mitigate this issue by introducing additional constraints or penalities on the model's parameters during training, which helps simplify the model and improves its generalization.
+Due to the limited data from the target tasks/domain and the extremely high complexity of the pre-trained open domain models, aggressive fine-tuning often makes the adapted model overfit the training data of the target task/domain and therefore does not generalize well to unseen data. Regularization comes into play to mitigate this issue by introducing additional constraints or penalities on the model's parameters during training, which helps simplify the model and improves its generalization.
 
-#### SMART Regularizer
+#### SMART
 
-Sharpness-Aware Minimization with Robustness Techniques (SMART) is one of the efficient regularization techniques developed by H. Jiang, et al. ([SMART: Robust and Efficient Fine-Tuning for Pre-trained Natural Language Models through Principled Regularized Optimization](https://aclanthology.org/2020.acl-main.197.pdf)). SMART is built on top of SAM introduced by P.Foret et al. ([SHARPNESS-AWARE MINIMIZATION FOR EFFICIENTLY IMPROVING GENERALIZATION](https://arxiv.org/pdf/2010.01412v3)) which was originally proposed to simultaneously minimize loss values and loss sharpness. the sharpness refers to how much the loss value changes when there are small perturbation in the model parameters and the goal of SAM functions is to optimize the parameters that both minimize the loss as well as produce a flat loss landscape around the minimum.
+Sharpness-Aware Minimization with Robustness Techniques (SMART) is one of the efficient regularization techniques developed by H. Jiang, et al. ([SMART: Robust and Efficient Fine-Tuning for Pre-trained Natural Language Models through Principled Regularized Optimization](https://aclanthology.org/2020.acl-main.197.pdf)). SMART is built on top of SAM introduced by P.Foret et al. ([SHARPNESS-AWARE MINIMIZATION FOR EFFICIENTLY IMPROVING GENERALIZATION](https://arxiv.org/pdf/2010.01412v3)) which was originally proposed to simultaneously minimize loss values and loss sharpness. The sharpness refers to how much the loss value changes when there are small perturbation in the model parameters and the goal of SAM functions is to optimize the parameters that both minimize the loss as well as produce a flat loss landscape around the minimum. SMART icludes more robustness techniques for better generalization. The first one is smoothness-inducing adversarial regularization which manages the complexity of the model. Its role is to encourage the output of the model not to change much, when injecting a small perturbation to the input and therefore enforces the smothness of the model and controls its capacity.
+The second is Bregman proximal point optimization which can prevent aggressive updating by only updating the model within a small neighborhood region of the previous iterate and hence controls aggressive updating and stabilizes the training.
+
+##### Exprimental results
+
+We implemented the SMART regularization in our gradient surgery training (Pcgrad and vaccine) as well as with using PAL scheduler, where the performance is high especially for the STS and QQP tasks. In order to spot the focus only on SMART, we would then need to switch off the optimization methods to estimate its impact on the baseline.
+
+---
+
+## Details
+
+### Data Imbalance
+
+The dataset we worked is imbalanced, either inside the individual datasets, such as the imbalanced classes of SST or in terms of the size of the datasets of different tasks when it comes to multi-tasking. Such effects of data imbalance can misguide the model to the majorioty classes at the expense of the minor ones and therefore incorrect predictions on test data. There are two solutions to overcome this:
+
+- **Fixed samples per epoch:** Is to select a fixed number of samples randomly from the dataloader of each task in each epoch. We ran our experiment with 10000 and 20000, but did not find a significant differtence on performance. In that case 10000 samples will be better for computational reaseons. This strategy is somehow simple and does not actually solve the problem since we still cannot balance the classes to mitigate overfitting, especially for the SST task.
+
+- **Data augmentation:** J. Wei and K. Zou ([EDA: Easy Data Augmentation Techniques for Boosting Performance on Text Classification Tasks](https://arxiv.org/pdf/1901.11196)) came up with the idea of doing Easy Data Augmentation (EDA) for boosting performance on text classification tasks. EDA consists of four operations:
+
+  - Synonym replacement: Randomly choose _n_ words from the sentence that are not stop words. Replace each of these words with one of its synonymschosen at random.
+  - Random insertion: Find a random synonym of a random word in the sentence that is not a stop word. Insert that synonym into a random position in the sentence. Do this _n_ times.
+  - Random swap: Randomly choose two words in the sentence and swap their positions. Do this _n_ times.
+  - Random deletion: Randomly remove each word in the sentence with probability $p$
+
+  It is adequate for small datasets. It also saves computation costs since the authors reported that they achieved the same accuracy with only 50% of the training set as with the full available data. There is also another **spaCy** integrated package of data augmentation ([augmenty](https://github.com/KennethEnevoldsen/augmenty)) that was developed by K. Enevoldsen ([AUGMENTY: A PYTHON LIBRARY FOR STRUCTURED TEXT AUGMENTATION](https://arxiv.org/pdf/2312.05520)) that serves the same purpose.
+
+Although, the data augmentation approach seems more promising, we unfortunately came about its idea a bit late in the project's schedule, which is why we only implement the first approach and leave the latter for further investigations.
+
+### Classifier Architecture
+
+We share the BERT layers among all the datasets and build a classifier on top that is characteristic for each task. We tried many different architectures to improve the performance of both single and multitask training. We use the first token of the sequence **[CLS]** of the last hidden state that encodes all the learned parameters of the model during the open domain pre-training phase and feed it to the classifiers, as already described in these research studies ([Devlin et al. ](https://arxiv.org/pdf/1810.04805), [Sun et al.](https://arxiv.org/pdf/1905.05583#page=9&zoom=100,402,290), [Karimi et al.](https://arxiv.org/pdf/2001.11316)). The classifiers we build are:
+
+- **Sentiment Analysis Classifier:** At first we build three fully connected layers of size `768 * 768` each, with `relu` activation applied after each layer. Then the last layer which is of size `hidden size * num_classes`. These layers refine the BERT embeddings into logits corresponding to each class. We take the softamx and compute the loss betwee the predicted labels and the ground truth using the cross enropy function from PyTorch.
+
+- **Semantic Textual Similarity Regressor:** We compute the embeddings for the sequence pair and the cosine similarity between the embeddings vectors. The cosine similarity distance is an estimate of how semantically similar the two sentences are. The output is then multiplied by 5 to scale it against the true labels. Since it is a regression task, we use the Mean Square Error (MSE) to compute the loss.
+
+- **Paraphrase Detection Classifier:** We first generate the emnbeddings for each pair, then apply a fully connected layer of size `768 * 768` to both embedding vectors. We take the absolute sum and difference between the two vectors and concatenate them. The concatenated vector of dimension `2 * 768` is fed to two linear layers and then the to the binary classifier. We again applied the `relu`activation after each of the connected layers in the last processing phase. At the end, we take the sigmoid function to get the predicted probabilities (logits) and compare them with the true labels through the cross entropy loss function.
+
+### Augmented Attention
+
+### BiLSTM
+
+### Unfreeze Layers
+
+### Hierarchical BERT
+
+### CNN BERT
+
+### Combined Models
+
+### BERT-Large
+
+### PAL
+
+### Extract More Features
 
 ---
 
