@@ -906,7 +906,7 @@ def get_args():
 
     args, _ = parser.parse_known_args()
 
-    parser.add_argument("--epochs", type=int, default=20 if not args.smoketest else 1)
+    parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
 
     # hyper parameters
     parser.add_argument(
@@ -920,7 +920,7 @@ def get_args():
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
     )
 
     parser.add_argument(
