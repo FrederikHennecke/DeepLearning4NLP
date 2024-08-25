@@ -365,9 +365,13 @@ We add an attention layer on top of the BERT model to refine the model's focus o
 
 We added 3 Bidirectional Long-Short Term Memory (BiLSTM) layers on top of BERT to further capture long sequential dependencies and richer contextual information. A BiLSTM processes the sequence in both forward and backward directions to capture sequence relations across time steps. We looked through a hidden size of 128 sequence length of the last hidden state of BERT. We also added a dropout and an average pooling layer to avoid overfitting. The model however was still overfitting which therefore we then reduced the BiLSTM layers to one.
 
-### Unfreeze Layers
+### Feed more Sequences
+
+We set a `train_mode`option to include contexual information from some of the most top BERT layers instead of the last hidden state only. We first tried with all the 12 layers sequences, but that worsened the performance. Inspired from ([Adversarial Training for Aspect-Based Sentiment Analysis with BERT](https://arxiv.org/pdf/2001.11316)) Then we took the **[CLS]** output from the last four layers and took the average pooling over them. That approach has reduced overfitting and enhanced the performance, espcially for the SST task.
 
 ### Hierarchical BERT
+
+We tried to investigate the hirarchical structure in the input sequences by chunking the input up to a maximum length and investigate the relation between the chunks and the sentence as a whole. This method is designed to process text at multiple levels granularity to capture both local and global contexts. Although this approach has improved the STS and QQP scores, it is particularly desgined to handle long text sequences as reported by J. Lu, et al. ([A Sentence-level Hierarchical BERT Model for Document Classification with Limited Labelled Data](https://arxiv.org/pdf/2106.06738)), which does not apply perfectly to our small sequence data.
 
 ### CNN BERT
 
