@@ -371,9 +371,11 @@ We set a `train_mode`option to include contexual information from some of the mo
 
 ### Hierarchical BERT
 
-We tried to investigate the hirarchical structure in the input sequences by chunking the input up to a maximum length and investigate the relation between the chunks and the sentence as a whole. This method is designed to process text at multiple levels granularity to capture both local and global contexts. Although this approach has improved the STS and QQP scores, it is particularly desgined to handle long text sequences as reported by J. Lu, et al. ([A Sentence-level Hierarchical BERT Model for Document Classification with Limited Labelled Data](https://arxiv.org/pdf/2106.06738)), which does not apply perfectly to our small sequence data.
+We tried to investigate the hirarchical structure in the input sequences by chunking the input with a segment length of 34 and investigating the relation between the chunks and the sentence as a whole. This method is designed to process text at multiple levels granularity to capture both local and global contexts. Although this approach has improved the STS and QQP scores, it is particularly desgined to handle long text sequences as reported by J. Lu, et al. ([A Sentence-level Hierarchical BERT Model for Document Classification with Limited Labelled Data](https://arxiv.org/pdf/2106.06738)), which does not apply perfectly to our small sequence data.
 
 ### CNN BERT
+
+Seeking improvements, we tried to add Convolution Network (CNN) layers on top of BERT. CNN is known for its ability to scan features to a high depth and capture complex relations in the input, which we thought it could be useful for the sentiment analysis.
 
 ### Combined Models
 
