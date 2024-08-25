@@ -458,3 +458,5 @@ if __name__ == "__main__":
     args.etpc_dev_filename = "data/etpc-paraphrase-dev.csv"
     seed_everything(args.seed)
     finetune_paraphrase_generation(args)
+
+# python -u bart_generation.py --use_gpu --epochs 1 --lr 1e-5 --similarity_weight 0.2 --dissimilarity_weight 0.6 --copy_penalty_weight 1.5 --noise 0.2 --synonym_prob 0.3
