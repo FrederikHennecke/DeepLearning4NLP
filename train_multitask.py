@@ -78,9 +78,10 @@ class MultitaskBERT(nn.Module):
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
-        self.conv1 = nn.Conv1d(BERT_HIDDEN_SIZE, HIDDEN_DIM, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv1d(HIDDEN_DIM, 128, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv1d(128, 64, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv1d(BERT_HIDDEN_SIZE, HIDDEN_DIM, kernel_size=5, padding=1)
+        self.conv2 = nn.Conv1d(HIDDEN_DIM, 256, kernel_size=5, padding=1)
+        self.conv3 = nn.Conv1d(256, 128, kernel_size=5, padding=1)
+        self.conv4 = nn.Conv1d(128, 64, kernel_size=5, padding=1)
 
         # initialize params
         for param in self.bert.parameters():
@@ -113,6 +114,7 @@ class MultitaskBERT(nn.Module):
         hidden_states = F.relu(self.conv1(hidden_states))
         hidden_states = F.relu(self.conv2(hidden_states))
         hidden_states = F.relu(self.conv3(hidden_states))
+        hidden_states = F.relu(self.conv4(hidden_states))
         hidden_states = F.max_pool1d(hidden_states, hidden_states.size(2)).squeeze(2)
 
         bilstm_output = self.dropout(hidden_states)
@@ -186,7 +188,7 @@ def save_model(model, optimizer, args, config, filepath):
     }
 
     if not config.combined_models:
-        print(f"Saving the model to {filepath}.")
+        print(f"Saving the model to {filepath}")
         torch.save(save_info, filepath)
 
     else:
@@ -844,7 +846,7 @@ def get_args():
 
     args, _ = parser.parse_known_args()
 
-    parser.add_argument("--epochs", type=int, default=20 if not args.smoketest else 1)
+    parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
 
     # hyper parameters
     parser.add_argument(
@@ -858,7 +860,7 @@ def get_args():
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
     )
 
     parser.add_argument(

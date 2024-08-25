@@ -97,7 +97,6 @@ class SentenceClassificationDataset(Dataset):
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.p.max_length,
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -172,7 +171,6 @@ class SentenceClassificationTestDataset(Dataset):
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.p.max_length,
         )
         token_ids = torch.LongTensor(encoding["input_ids"])
         attention_mask = torch.LongTensor(encoding["attention_mask"])
@@ -248,14 +246,12 @@ class SentencePairDataset(Dataset):
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.p.max_length,
         )
         encoding2 = self.tokenizer(
             sent2,
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.p.max_length,
         )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
@@ -386,14 +382,12 @@ class SentencePairTestDataset(Dataset):
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.p.max_length,
         )
         encoding2 = self.tokenizer(
             sent2,
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=self.p.max_length,
         )
 
         token_ids = torch.LongTensor(encoding1["input_ids"])
