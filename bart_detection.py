@@ -5,6 +5,7 @@ import pandas as pd
 import csv
 import torch
 from torch import nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, BartModel
@@ -12,7 +13,11 @@ from multitask_classifier import split_csv
 
 from sklearn.metrics import matthews_corrcoef
 from optimizer import AdamW
+from sophia import SophiaG
 from datasets import preprocess_string
+import costum_loss
+
+from bart_generation import add_synonyms_to_dataframe, add_noise_to_sentence
 
 TQDM_DISABLE = False
 
@@ -101,10 +106,9 @@ def transform_data(
         dataset = TensorDataset(input_ids, attention_mask)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-    return dataloader
+    return dataloader, tokenizer
 
-
-def train_model(model, train_data, dev_data, device):
+def train_model(model, train_data, dev_data, device, tokenizer, args):
     """
     Train the model. You can use any training loop you want. We recommend starting with
     AdamW as your optimizer. You can take a look at the SST training loop for reference.
@@ -118,9 +122,13 @@ def train_model(model, train_data, dev_data, device):
     ### TODO
     # raise NotImplementedError
 
-    model = model.to(device)
+    model = model.to(device) 
     optimizer = AdamW(model.parameters(), lr=args.lr)
-    loss_fun = nn.BCEWithLogitsLoss()
+    pos_weight = torch.tensor([3.78436018957346, 0.5, 3.717289719626168, 4.869186046511628, 2.83111954459203, 0.5, 0.36], device=device)
+    # [3.78436018957346, 0.2140709561034275, 3.717289719626168, 4.869186046511628, 2.83111954459203, 0.0039781203381402, 0.2310975609756098]
+    # loss_fun = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    loss_fun = costum_loss.CustomLoss(pos_weight=pos_weight)
+    
 
     # Run for the specified number of epochs
     for epoch in range(args.epochs):
@@ -138,8 +146,16 @@ def train_model(model, train_data, dev_data, device):
             b_mask = b_mask.to(device)
             b_labels = b_labels.to(device)
 
+            # Decode the input_ids to text, apply noise, then re-encode
+            original_sentences = tokenizer.batch_decode(b_ids, skip_special_tokens=True)
+            noisy_sentences = [add_noise_to_sentence(sentence, noise_level=args.noise, tokenizer=tokenizer) for sentence in original_sentences]
+            noisy_encodings = tokenizer(noisy_sentences, padding=True, truncation=True, max_length=b_ids.size(1), return_tensors="pt")
+            
+            noisy_b_ids = noisy_encodings.input_ids.to(device)
+            noisy_b_mask = noisy_encodings.attention_mask.to(device)
+
             optimizer.zero_grad()
-            logits = model(b_ids, b_mask)
+            logits = model(noisy_b_ids, noisy_b_mask)
             loss = loss_fun(logits, b_labels.float())
             loss.backward()
             optimizer.step()
@@ -156,7 +172,7 @@ def train_model(model, train_data, dev_data, device):
         train_accuracy = correct_preds / total_examples
         dev_accuracy, matthews_coefficient  = evaluate_model(model, dev_data, device)
         print(
-            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | matthews_coefficient: {matthews_coefficient:.4f}" 
+            f"Epoch {epoch+1:02} | Train Loss: {avg_train_loss:.4f} | Train Accuracy: {train_accuracy:.4f} | Dev Accuracy: {dev_accuracy:.4f} | dev matthews_coefficient: {matthews_coefficient:.4f}" 
         )
 
     return model
@@ -175,6 +191,7 @@ def test_model(model, test_data, test_ids, device):
     model.to(device)
     model.eval()
     all_preds = []
+    all_logits = []
 
     with torch.no_grad():
         for batch in tqdm(test_data, desc="test", disable=TQDM_DISABLE):
@@ -186,9 +203,15 @@ def test_model(model, test_data, test_ids, device):
             preds = logits.round().cpu().numpy()
             all_preds.extend(preds)
 
+            logits = logits.cpu().numpy()
+            all_logits.extend(logits)
+
     pred_paraphrase_types = [[int(x) for x in pred] for pred in all_preds]
+
+    logit_paraphrase_types = [[float(x) for x in logit] for logit in all_logits]
+    
     df_test_results = pd.DataFrame(
-        {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types}
+        {"id": test_ids, "Predicted_Paraphrase_Types": pred_paraphrase_types, "logits": logit_paraphrase_types}
     )
     return df_test_results
 
@@ -262,15 +285,23 @@ def get_args():
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=1e-5)
+    # parser.add_argument("--lr_steps", type=int, default=10)
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
-    )
+    ) 
     parser.add_argument("--etpc_dev", type=str, default="data/etpc-paraphrase-dev.csv")
     parser.add_argument(
         "--etpc_test",
         type=str,
         default="data/etpc-paraphrase-detection-test-student.csv",
     )
+    parser.add_argument("--type_2", type=float, default=0.3)
+    parser.add_argument("--type_6", type=float, default=0.3)
+    parser.add_argument("--type_7", type=float, default=0.3)
+
+    parser.add_argument("--noise", type=float, default=0.)
+    parser.add_argument("--synonym_prob", type=float, default=0.)
+    
     args = parser.parse_args()
     return args
 
@@ -302,18 +333,19 @@ def finetune_paraphrase_detection(args):
     # (or in the csv files directly)
 
     # Already Done before!
+    train_dataset = add_synonyms_to_dataframe(train_dataset, prob=args.synonym_prob)
 
-    train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
-    dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
-    test_data = transform_data(test_dataset, args.batch_size, shuffle=False)
+    train_data, tokenizer = transform_data(train_dataset, args.batch_size, shuffle=True)
+    dev_data, _ = transform_data(dev_dataset, args.batch_size, shuffle=False)
+    test_data, _ = transform_data(test_dataset, args.batch_size, shuffle=False)
 
-    model = train_model(model, train_data, dev_data, device)
+    model = train_model(model, train_data, dev_data, device, tokenizer, args)
 
     print("Training finished.")
 
     accuracy, matthews_corr = evaluate_model(model, train_data, device)
-    print(f"The accuracy of the model is: {accuracy:.3f}")
-    print(f"Matthews Correlation Coefficient of the model is: {matthews_corr:.3f}")
+    print(f"The accuracy of the train_data is: {accuracy:.3f}")
+    print(f"Matthews Correlation Coefficient of the train_data is: {matthews_corr:.3f}")
 
     test_ids = test_dataset["id"]
     test_results = test_model(model, test_data, test_ids, device)
