@@ -20,7 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from bert import BertModel
-from datasets import (
+from datasets_pal_processing import (
     SentenceClassificationDataset,
     SentencePairDataset,
     load_multitask_data,
@@ -864,7 +864,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -875,7 +875,7 @@ def get_args():
         "--batch_size",
         help="sst: 64 can fit a 12GB GPU",
         type=int,
-        default=32 if not args.smoketest else 64,
+        default=64 if not args.smoketest else 64,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
@@ -901,7 +901,7 @@ def get_args():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="cosine",
+        default="plateau",
         choices=("plateau", "cosine", "linear_warmup", "none"),
     )
     parser.add_argument(
