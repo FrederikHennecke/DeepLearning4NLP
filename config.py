@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Union, Tuple, Dict
 
 from utils import CONFIG_NAME, cached_path, hf_bucket_url, is_remote_url
 
@@ -13,7 +14,9 @@ class PretrainedConfig(object):
         self.return_dict = kwargs.pop("return_dict", True)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
-        self.torchscript = kwargs.pop("torchscript", False)  # Only used by PyTorch models
+        self.torchscript = kwargs.pop(
+            "torchscript", False
+        )  # Only used by PyTorch models
         self.use_bfloat16 = kwargs.pop("use_bfloat16", False)
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -40,7 +43,9 @@ class PretrainedConfig(object):
         self.repetition_penalty = kwargs.pop("repetition_penalty", 1.0)
         self.length_penalty = kwargs.pop("length_penalty", 1.0)
         self.no_repeat_ngram_size = kwargs.pop("no_repeat_ngram_size", 0)
-        self.encoder_no_repeat_ngram_size = kwargs.pop("encoder_no_repeat_ngram_size", 0)
+        self.encoder_no_repeat_ngram_size = kwargs.pop(
+            "encoder_no_repeat_ngram_size", 0
+        )
         self.bad_words_ids = kwargs.pop("bad_words_ids", None)
         self.num_return_sequences = kwargs.pop("num_return_sequences", 1)
         self.chunk_size_feed_forward = kwargs.pop("chunk_size_feed_forward", 0)
@@ -56,7 +61,9 @@ class PretrainedConfig(object):
         self.label2id = kwargs.pop("label2id", None)
         if self.id2label is not None:
             kwargs.pop("num_labels", None)
-            self.id2label = dict((int(key), value) for key, value in self.id2label.items())
+            self.id2label = dict(
+                (int(key), value) for key, value in self.id2label.items()
+            )
             # Keys are always strings in JSON so convert ids to int here.
         else:
             self.num_labels = kwargs.pop("num_labels", 2)
@@ -92,19 +99,21 @@ class PretrainedConfig(object):
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path: str | os.PathLike, **kwargs
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
     ) -> "PretrainedConfig":
-        config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls.get_config_dict(
+            pretrained_model_name_or_path, **kwargs
+        )
         return cls.from_dict(config_dict, **kwargs)
 
     @classmethod
-    def _dict_from_json_file(cls, json_file: str | os.PathLike):
+    def _dict_from_json_file(cls, json_file: Union[str, os.PathLike]):
         with open(json_file, "r", encoding="utf-8") as reader:
             text = reader.read()
         return json.loads(text)
 
     @classmethod
-    def from_dict(cls, config_dict: str | object, **kwargs) -> "PretrainedConfig":
+    def from_dict(cls, config_dict: Union[str, object], **kwargs) -> "PretrainedConfig":
         return_unused_kwargs = kwargs.pop("return_unused_kwargs", False)
 
         config = cls(**config_dict)
@@ -130,8 +139,8 @@ class PretrainedConfig(object):
 
     @classmethod
     def get_config_dict(
-        cls, pretrained_model_name_or_path: str | os.PathLike, **kwargs
-    ) -> tuple[dict[str, object], dict[str, object]]:
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> Tuple[Dict[str, object], Dict[str, object]]:
         cache_dir = kwargs.pop("cache_dir", None)
         force_download = kwargs.pop("force_download", False)
         resume_download = kwargs.pop("resume_download", False)
@@ -149,7 +158,10 @@ class PretrainedConfig(object):
             config_file = pretrained_model_name_or_path
         else:
             config_file = hf_bucket_url(
-                pretrained_model_name_or_path, filename=CONFIG_NAME, revision=revision, mirror=None
+                pretrained_model_name_or_path,
+                filename=CONFIG_NAME,
+                revision=revision,
+                mirror=None,
             )
 
         try:
@@ -208,6 +220,9 @@ class BertConfig(PretrainedConfig):
         gradient_checkpointing=False,
         position_embedding_type="absolute",
         use_cache=True,
+        additional_inputs=False,
+        low_rank_size=3,
+        num_tasks=3,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -226,4 +241,7 @@ class BertConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.gradient_checkpointing = gradient_checkpointing
         self.position_embedding_type = position_embedding_type
-        self.use_cache = use_cache
+        self.use_cache = (use_cache,)
+        self.additional_inputs = additional_inputs
+        self.low_rank_size = low_rank_size
+        self.num_tasks = num_tasks

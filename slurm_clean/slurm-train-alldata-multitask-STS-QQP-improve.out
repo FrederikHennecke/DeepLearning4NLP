@@ -1,0 +1,440 @@
+Submitting job with sbatch from directory: /home/mohamed.aly/u11448/DeepLearning4NLP
+Home directory: /user/mohamed.aly/u11448
+Working directory: /home/mohamed.aly/u11448/DeepLearning4NLP
+Current node: ggpu112
+Python 3.10.14
+Collecting environment information...
+PyTorch version: 2.2.0
+Is debug build: False
+CUDA used to build PyTorch: 12.1
+ROCM used to build PyTorch: N/A
+
+OS: Rocky Linux 8.8 (Green Obsidian) (x86_64)
+GCC version: (GCC) 8.5.0 20210514 (Red Hat 8.5.0-18)
+Clang version: Could not collect
+CMake version: version 3.27.4
+Libc version: glibc-2.28
+
+Python version: 3.10.14 (main, May  6 2024, 19:42:50) [GCC 11.2.0] (64-bit runtime)
+Python platform: Linux-4.18.0-477.21.1.el8_8.x86_64-x86_64-with-glibc2.28
+Is CUDA available: True
+CUDA runtime version: Could not collect
+CUDA_MODULE_LOADING set to: LAZY
+GPU models and configuration: 
+GPU 0: NVIDIA A100-SXM4-40GB
+GPU 1: NVIDIA A100-SXM4-40GB
+GPU 2: NVIDIA A100-SXM4-40GB
+GPU 3: NVIDIA A100-SXM4-40GB
+
+Nvidia driver version: 535.104.12
+cuDNN version: Probably one of the following:
+/usr/lib64/libcudnn.so.8.9.5
+/usr/lib64/libcudnn_adv_infer.so.8.9.5
+/usr/lib64/libcudnn_adv_train.so.8.9.5
+/usr/lib64/libcudnn_cnn_infer.so.8.9.5
+/usr/lib64/libcudnn_cnn_train.so.8.9.5
+/usr/lib64/libcudnn_ops_infer.so.8.9.5
+/usr/lib64/libcudnn_ops_train.so.8.9.5
+HIP runtime version: N/A
+MIOpen runtime version: N/A
+Is XNNPACK available: True
+
+CPU:
+Architecture:        x86_64
+CPU op-mode(s):      32-bit, 64-bit
+Byte Order:          Little Endian
+CPU(s):              128
+On-line CPU(s) list: 0-127
+Thread(s) per core:  2
+Core(s) per socket:  32
+Socket(s):           2
+NUMA node(s):        8
+Vendor ID:           AuthenticAMD
+CPU family:          25
+Model:               1
+Model name:          AMD EPYC 7513 32-Core Processor
+Stepping:            1
+CPU MHz:             2600.000
+CPU max MHz:         3681.6399
+CPU min MHz:         1500.0000
+BogoMIPS:            5199.85
+Virtualization:      AMD-V
+L1d cache:           32K
+L1i cache:           32K
+L2 cache:            512K
+L3 cache:            32768K
+NUMA node0 CPU(s):   0-7,64-71
+NUMA node1 CPU(s):   8-15,72-79
+NUMA node2 CPU(s):   16-23,80-87
+NUMA node3 CPU(s):   24-31,88-95
+NUMA node4 CPU(s):   32-39,96-103
+NUMA node5 CPU(s):   40-47,104-111
+NUMA node6 CPU(s):   48-55,112-119
+NUMA node7 CPU(s):   56-63,120-127
+Flags:               fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local clzero irperf xsaveerptr wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm
+
+Versions of relevant libraries:
+[pip3] numpy==1.26.4
+[pip3] torch==2.2.0
+[pip3] torch-tb-profiler==0.4.3
+[pip3] torchaudio==2.2.0
+[pip3] torchvision==0.17.0
+[pip3] triton==2.2.0
+[conda] blas                      1.0                         mkl  
+[conda] ffmpeg                    4.3                  hf484d3e_0    pytorch
+[conda] libjpeg-turbo             2.0.0                h9bf148f_0    pytorch
+[conda] mkl                       2023.1.0         h213fc3f_46344  
+[conda] mkl-fft                   1.3.8                    pypi_0    pypi
+[conda] mkl-random                1.2.4                    pypi_0    pypi
+[conda] mkl-service               2.4.0                    pypi_0    pypi
+[conda] mkl_fft                   1.3.8           py310h5eee18b_0  
+[conda] mkl_random                1.2.4           py310hdb19cb5_0  
+[conda] numpy                     1.26.4                   pypi_0    pypi
+[conda] numpy-base                1.26.4          py310hb5e798b_0  
+[conda] pytorch                   2.2.0           py3.10_cuda12.1_cudnn8.9.2_0    pytorch
+[conda] pytorch-cuda              12.1                 ha16c6d3_5    pytorch
+[conda] pytorch-mutex             1.0                        cuda    pytorch
+[conda] torch                     2.2.0                    pypi_0    pypi
+[conda] torch-tb-profiler         0.4.3                    pypi_0    pypi
+[conda] torchaudio                2.2.0                    pypi_0    pypi
+[conda] torchtriton               2.2.0                     py310    pytorch
+[conda] torchvision               0.17.0                   pypi_0    pypi
+[conda] triton                    2.2.0                    pypi_0    pypi
+
+Current Branch: train_multitask_all_data-Aly
+Latest Commit: 1faf762
+Uncommitted Changes: 10
+
+Loaded 7111 train examples from data/sst-sentiment-train.csv
+Loaded 121620 train examples from data/quora-paraphrase-train.csv
+Loaded 5149 train examples from data/sts-similarity-train.csv
+Loaded 2019 train examples from data/etpc-paraphrase-train.csv
+Loaded 2365 train examples from data/sst-sentiment-dev.csv
+Loaded 40540 train examples from data/quora-paraphrase-dev.csv
+Loaded 1709 train examples from data/sts-similarity-dev.csv
+Loaded 505 train examples from data/etpc-paraphrase-dev.csv
+------------------------------
+    Multitask BERT Model Configuration
+------------------------------
+{'additional_inputs': False,
+ 'batch_size': 64,
+ 'checkpoint': None,
+ 'clip': 0.25,
+ 'config_save_dir': './config_params/bert/multitask/',
+ 'epochs': 20,
+ 'filepath': 'models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt',
+ 'hess_interval': 10,
+ 'hidden_dropout_prob': 0.3,
+ 'hpo': False,
+ 'hpo_trials': 20,
+ 'local_files_only': True,
+ 'logdir': 'logdir',
+ 'lr': 8e-05,
+ 'optimizer': 'adamw',
+ 'option': 'finetune',
+ 'para': True,
+ 'profiler': True,
+ 'rho': 0.05,
+ 'samples_per_epoch': 20000,
+ 'scheduler': 'plateau',
+ 'seed': 11711,
+ 'smoketest': False,
+ 'sst': True,
+ 'sts': True,
+ 'task': 'multitask',
+ 'tensorboard_subfolder': None,
+ 'unfreeze_interval': None,
+ 'use_gpu': True,
+ 'weight_decay': 0.05}
+------------------------------
+Git Branch: train_multitask_all_data-Aly
+Git Hash: 1faf7620 (!)
+------------------------------------------------------------
+Command: train_multitask.py --use_gpu --local_files_only --option finetune --task multitask --hpo --smoketest --additional_input --profiler --sst --sts --para
+------------------------------
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.764
+Sentiment classification accuracy: 0.416
+Semantic Textual Similarity correlation: 0.878
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.765
+Sentiment classification accuracy: 0.405
+Semantic Textual Similarity correlation: 0.805
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 0: Avg Train Loss :: 1.148, Avg Train Acc :: 0.686, Avg Dev Acc :: 0.658
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.803
+Sentiment classification accuracy: 0.549
+Semantic Textual Similarity correlation: 0.947
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.801
+Sentiment classification accuracy: 0.477
+Semantic Textual Similarity correlation: 0.830
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 1: Avg Train Loss :: 0.738, Avg Train Acc :: 0.766, Avg Dev Acc :: 0.703
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.807
+Sentiment classification accuracy: 0.629
+Semantic Textual Similarity correlation: 0.959
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.798
+Sentiment classification accuracy: 0.475
+Semantic Textual Similarity correlation: 0.827
+
+
+Epoch 2: Avg Train Loss :: 0.569, Avg Train Acc :: 0.798, Avg Dev Acc :: 0.700
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.813
+Sentiment classification accuracy: 0.647
+Semantic Textual Similarity correlation: 0.964
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.800
+Sentiment classification accuracy: 0.460
+Semantic Textual Similarity correlation: 0.832
+
+
+Epoch 3: Avg Train Loss :: 0.478, Avg Train Acc :: 0.808, Avg Dev Acc :: 0.697
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.826
+Sentiment classification accuracy: 0.794
+Semantic Textual Similarity correlation: 0.969
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.812
+Sentiment classification accuracy: 0.486
+Semantic Textual Similarity correlation: 0.833
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 4: Avg Train Loss :: 0.421, Avg Train Acc :: 0.863, Avg Dev Acc :: 0.710
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.844
+Sentiment classification accuracy: 0.819
+Semantic Textual Similarity correlation: 0.972
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.827
+Sentiment classification accuracy: 0.476
+Semantic Textual Similarity correlation: 0.831
+
+
+Epoch 5: Avg Train Loss :: 0.373, Avg Train Acc :: 0.878, Avg Dev Acc :: 0.711
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.846
+Sentiment classification accuracy: 0.837
+Semantic Textual Similarity correlation: 0.976
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.825
+Sentiment classification accuracy: 0.480
+Semantic Textual Similarity correlation: 0.835
+
+
+Epoch 6: Avg Train Loss :: 0.317, Avg Train Acc :: 0.886, Avg Dev Acc :: 0.714
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.849
+Sentiment classification accuracy: 0.903
+Semantic Textual Similarity correlation: 0.978
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.826
+Sentiment classification accuracy: 0.486
+Semantic Textual Similarity correlation: 0.835
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 7: Avg Train Loss :: 0.283, Avg Train Acc :: 0.910, Avg Dev Acc :: 0.716
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.853
+Sentiment classification accuracy: 0.921
+Semantic Textual Similarity correlation: 0.979
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.828
+Sentiment classification accuracy: 0.489
+Semantic Textual Similarity correlation: 0.838
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 8: Avg Train Loss :: 0.268, Avg Train Acc :: 0.918, Avg Dev Acc :: 0.718
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.857
+Sentiment classification accuracy: 0.938
+Semantic Textual Similarity correlation: 0.978
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.828
+Sentiment classification accuracy: 0.486
+Semantic Textual Similarity correlation: 0.839
+
+
+Epoch 9: Avg Train Loss :: 0.239, Avg Train Acc :: 0.924, Avg Dev Acc :: 0.718
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.866
+Sentiment classification accuracy: 0.936
+Semantic Textual Similarity correlation: 0.978
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.834
+Sentiment classification accuracy: 0.485
+Semantic Textual Similarity correlation: 0.831
+
+
+Epoch 10: Avg Train Loss :: 0.222, Avg Train Acc :: 0.927, Avg Dev Acc :: 0.717
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.869
+Sentiment classification accuracy: 0.958
+Semantic Textual Similarity correlation: 0.977
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.836
+Sentiment classification accuracy: 0.479
+Semantic Textual Similarity correlation: 0.833
+
+
+Epoch 11: Avg Train Loss :: 0.212, Avg Train Acc :: 0.935, Avg Dev Acc :: 0.716
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.866
+Sentiment classification accuracy: 0.978
+Semantic Textual Similarity correlation: 0.984
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.833
+Sentiment classification accuracy: 0.501
+Semantic Textual Similarity correlation: 0.838
+
+
+Epoch 12: Avg Train Loss :: 0.174, Avg Train Acc :: 0.942, Avg Dev Acc :: 0.724
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.877
+Sentiment classification accuracy: 0.980
+Semantic Textual Similarity correlation: 0.987
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.842
+Sentiment classification accuracy: 0.496
+Semantic Textual Similarity correlation: 0.839
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 13: Avg Train Loss :: 0.152, Avg Train Acc :: 0.948, Avg Dev Acc :: 0.725
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.873
+Sentiment classification accuracy: 0.986
+Semantic Textual Similarity correlation: 0.989
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.838
+Sentiment classification accuracy: 0.498
+Semantic Textual Similarity correlation: 0.840
+
+
+Epoch 14: Avg Train Loss :: 0.142, Avg Train Acc :: 0.950, Avg Dev Acc :: 0.725
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.881
+Sentiment classification accuracy: 0.994
+Semantic Textual Similarity correlation: 0.990
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.844
+Sentiment classification accuracy: 0.502
+Semantic Textual Similarity correlation: 0.840
+
+
+Saving the model to models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt.
+Epoch 15: Avg Train Loss :: 0.137, Avg Train Acc :: 0.955, Avg Dev Acc :: 0.729
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.877
+Sentiment classification accuracy: 0.995
+Semantic Textual Similarity correlation: 0.991
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.839
+Sentiment classification accuracy: 0.496
+Semantic Textual Similarity correlation: 0.841
+
+
+Epoch 16: Avg Train Loss :: 0.125, Avg Train Acc :: 0.954, Avg Dev Acc :: 0.725
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.883
+Sentiment classification accuracy: 0.996
+Semantic Textual Similarity correlation: 0.992
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.843
+Sentiment classification accuracy: 0.504
+Semantic Textual Similarity correlation: 0.841
+
+
+Epoch 17: Avg Train Loss :: 0.124, Avg Train Acc :: 0.957, Avg Dev Acc :: 0.729
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.888
+Sentiment classification accuracy: 0.996
+Semantic Textual Similarity correlation: 0.992
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.848
+Sentiment classification accuracy: 0.500
+Semantic Textual Similarity correlation: 0.840
+
+
+Epoch 18: Avg Train Loss :: 0.118, Avg Train Acc :: 0.959, Avg Dev Acc :: 0.730
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.884
+Sentiment classification accuracy: 0.998
+Semantic Textual Similarity correlation: 0.993
+
+
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.843
+Sentiment classification accuracy: 0.503
+Semantic Textual Similarity correlation: 0.841
+
+
+Epoch 19: Avg Train Loss :: 0.115, Avg Train Acc :: 0.958, Avg Dev Acc :: 0.729
+Loaded model to test from models1/multitask_classifier/0812-2023-finetune-20-20000-64-adamw-8e-05-plateau-multitask.pt
+Loaded 2371 test examples from data/sst-sentiment-test-student.csv
+Loaded 40540 test examples from data/quora-paraphrase-test-student.csv
+Loaded 1721 test examples from data/sts-similarity-test-student.csv
+Loaded 574 test examples from data/etpc-paraphrase-detection-test-student.csv
+Loaded 2365 dev examples from data/sst-sentiment-dev.csv
+Loaded 40540 dev examples from data/quora-paraphrase-dev.csv
+Loaded 1709 dev examples from data/sts-similarity-dev.csv
+Loaded 505 dev examples from data/etpc-paraphrase-dev.csv
+etpc task not included in the multitask training and evaluation
+Paraphrase detection accuracy: 0.844
+Sentiment classification accuracy: 0.502
+Semantic Textual Similarity correlation: 0.858
+
+
+etpc task not included in the multitask training and evaluation
+dev sentiment acc :: 0.502
+dev paraphrase acc :: 0.844
+dev sts corr :: 0.858
