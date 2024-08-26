@@ -17,6 +17,8 @@ from sophia import SophiaG
 from datasets import preprocess_string
 import costum_loss
 
+from bart_generation import add_synonyms_to_dataframe, add_noise_to_sentence
+
 TQDM_DISABLE = False
 
 
@@ -104,9 +106,9 @@ def transform_data(
         dataset = TensorDataset(input_ids, attention_mask)
 
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-    return dataloader
+    return dataloader, tokenizer
 
-def train_model(model, train_data, dev_data, device):
+def train_model(model, train_data, dev_data, device, tokenizer, args):
     """
     Train the model. You can use any training loop you want. We recommend starting with
     AdamW as your optimizer. You can take a look at the SST training loop for reference.
@@ -144,8 +146,16 @@ def train_model(model, train_data, dev_data, device):
             b_mask = b_mask.to(device)
             b_labels = b_labels.to(device)
 
+            # Decode the input_ids to text, apply noise, then re-encode
+            original_sentences = tokenizer.batch_decode(b_ids, skip_special_tokens=True)
+            noisy_sentences = [add_noise_to_sentence(sentence, noise_level=args.noise, tokenizer=tokenizer) for sentence in original_sentences]
+            noisy_encodings = tokenizer(noisy_sentences, padding=True, truncation=True, max_length=b_ids.size(1), return_tensors="pt")
+            
+            noisy_b_ids = noisy_encodings.input_ids.to(device)
+            noisy_b_mask = noisy_encodings.attention_mask.to(device)
+
             optimizer.zero_grad()
-            logits = model(b_ids, b_mask)
+            logits = model(noisy_b_ids, noisy_b_mask)
             loss = loss_fun(logits, b_labels.float())
             loss.backward()
             optimizer.step()
@@ -288,6 +298,9 @@ def get_args():
     parser.add_argument("--type_2", type=float, default=0.3)
     parser.add_argument("--type_6", type=float, default=0.3)
     parser.add_argument("--type_7", type=float, default=0.3)
+
+    parser.add_argument("--noise", type=float, default=0.)
+    parser.add_argument("--synonym_prob", type=float, default=0.)
     
     args = parser.parse_args()
     return args
@@ -320,12 +333,13 @@ def finetune_paraphrase_detection(args):
     # (or in the csv files directly)
 
     # Already Done before!
+    train_dataset = add_synonyms_to_dataframe(train_dataset, prob=args.synonym_prob)
 
-    train_data = transform_data(train_dataset, args.batch_size, shuffle=True)
-    dev_data = transform_data(dev_dataset, args.batch_size, shuffle=False)
-    test_data = transform_data(test_dataset, args.batch_size, shuffle=False)
+    train_data, tokenizer = transform_data(train_dataset, args.batch_size, shuffle=True)
+    dev_data, _ = transform_data(dev_dataset, args.batch_size, shuffle=False)
+    test_data, _ = transform_data(test_dataset, args.batch_size, shuffle=False)
 
-    model = train_model(model, train_data, dev_data, device)
+    model = train_model(model, train_data, dev_data, device, tokenizer, args)
 
     print("Training finished.")
 
