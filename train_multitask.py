@@ -650,10 +650,7 @@ def train_multitask(args):
             train_loss += full_loss.item()
             num_batches += 1
 
-            if args.scheduler == "linear_warmup":
-                scheduler.step()
-
-            if args.scheduler == "cosine":
+            if args.scheduler == "cosine" or args.scheduler == "linear_warmup":
                 scheduler.step(epoch + num_batches / total_num_batches)
             writer.add_scalar(
                 "Loss/train", full_loss.item(), epoch * total_num_batches + num_batches
@@ -864,7 +861,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
@@ -875,7 +872,7 @@ def get_args():
         "--batch_size",
         help="sst: 64 can fit a 12GB GPU",
         type=int,
-        default=32 if not args.smoketest else 64,
+        default=64 if not args.smoketest else 64,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
@@ -901,7 +898,7 @@ def get_args():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="cosine",
+        default="plateau",
         choices=("plateau", "cosine", "linear_warmup", "none"),
     )
     parser.add_argument(
