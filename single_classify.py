@@ -464,6 +464,8 @@ def train_multitask(args):
 
                 train_loss += loss.item()
                 num_batches += 1
+                if args.scheduler is not None:
+                    scheduler.step()
 
         if args.task == "qqp" or args.task == "multitask":
             # Trains the model on the qqp dataset
@@ -494,6 +496,8 @@ def train_multitask(args):
 
                 train_loss += loss.item()
                 num_batches += 1
+                if args.scheduler is not None:
+                    scheduler.step()
 
         if args.task == "etpc" or args.task == "multitask":
             # Trains the model on the etpc dataset
@@ -537,6 +541,9 @@ def train_multitask(args):
 
                 train_loss += loss.item()
                 num_batches += 1
+
+                if args.scheduler is not None:
+                    scheduler.step()
 
         train_loss = train_loss / num_batches
 
@@ -666,14 +673,11 @@ def get_args():
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
     parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
-    parser.add_argument(
-        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
-    )
 
     # Dataset paths
     parser.add_argument("--sst_train", type=str, default="data/sst-sentiment-train.csv")

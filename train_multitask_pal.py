@@ -1450,7 +1450,7 @@ def get_args():
         default="bert-base",
     )
 
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
     args, _ = parser.parse_known_args()
 
     parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
@@ -1469,7 +1469,7 @@ def get_args():
     parser.add_argument(
         "--n_hidden_layers",
         type=int,
-        default=1 if not args.smoketest else 1,
+        default=2 if not args.smoketest else 1,
         help="Number of hidden layers for the classifier",
     )
     parser.add_argument(

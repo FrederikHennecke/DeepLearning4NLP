@@ -834,7 +834,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_true")
+    parser.add_argument("--additional_inputs", action="store_false")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -861,7 +861,7 @@ def get_args():
         default=10,
         help="Hessian update interval for SophiaH",
     )
-    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
 
