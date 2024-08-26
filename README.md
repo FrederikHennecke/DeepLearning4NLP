@@ -350,6 +350,9 @@ The dataset we worked is imbalanced, either inside the individual datasets, such
 
 Although, the data augmentation approach seems more promising, we unfortunately came about its idea a bit late in the project's schedule, which is why we only implement the first approach and leave the latter for further investigations.
 
+<details>
+  <summary>A lot more about the model architecture and the approaches we used.</summary>
+
 ### Classifier Architecture
 
 We share the BERT layers among all the datasets and build a classifier on top that is characteristic for each task. We tried many different architectures to improve the performance of both single and multitask training. We use the first token of the sequence **[CLS]** of the last hidden state that encodes all the learned parameters of the model during the open domain pre-training phase and feed it to the classifiers, as already described in these research studies ([Devlin et al. ](https://arxiv.org/pdf/1810.04805), [Sun et al.](https://arxiv.org/pdf/1905.05583#page=9&zoom=100,402,290), [Karimi et al.](https://arxiv.org/pdf/2001.11316)). The classifiers we build are:
@@ -378,7 +381,7 @@ We tried to investigate the hirarchical structure in the input sequences by chun
 
 ### CNN BERT
 
-Seeking improvements, we tried to add Convolution Network (CNN) layers on top of BERT. CNN is known for its ability to scan features to a high depth and capture complex relations in the input, which we thought it could be useful for our tasks. We added threee 1-dimensional CNN layers with input channel of size 768 (embeddings size or number of features per input token) and an output dimension of 512 (size of the feature map for each token). We implemented convolutional filters of size $5 \times 5$ meaning that the filter will consider five adjacent tokens at a timeas it slides along the sequence. We used a paddine of one to ensure that the output sequence has the same length as the input.
+Seeking improvements, we tried to add Convolution Network (CNN) layers on top of BERT. CNN is known for its ability to scan features to a high depth and capture complex relations in the input, which we thought it could be useful for our tasks. We added threee 1-dimensional CNN layers with input channel of size 768 (embeddings size or number of features per input token) and an output dimension of 512 (size of the feature map for each token). We implemented convolutional filters of size $5 \times 5$ meaning that the filter will consider five adjacent tokens at a timeas it slides along the sequence. We used a paddine of one to ensure that the output sequence has the same length as the input. Unexpectedly, this approach showed a degradation in performance, which we decided to drop it.
 
 ### Combined Models
 
@@ -388,16 +391,15 @@ Here we use a way of combined BERT models called Mixture of Experts (MoE) which 
 
 We tried to run BERT-Large on our multitask training, which has a larger embeddings dimension than minBERT and therefore able to encode more contextual information. However, we did not perform pre-training, which needs a much large corpus than that we have. That' why model's performance was comparable and did not show any improvement.
 
-### PAL
+### PALs
 
-### Extract More Features (token type ids)
+Projected Attention Layers (PALs) are a novel technique introduced by ([BERT and PALs: Projected Attention Layers for Efficient Adaptation in Multi-Task Learning](https://proceedings.mlr.press/v97/stickland19a/stickland19a.pdf)) to efficiently adapt LLMs to new tasks without the need to pre-train the model. This can be done by introducing multi-head attention layers parallel to the BERT layers. The additional layers can be fine-tuned separately from the base model. The attention layers project the input into task-specific subspace and only the parameters of the PALs get updated, while keeping the parameters of the base model unchanged or frozen which saves computational costs. Also, PAls allow for sharing parameters among layers in multitask-learning which could have a high positive impact on the performance. Although, We integrated the PAls functions into our framework in branch [BERT_PALs-Aly](https://github.com/FrederikHennecke/DeepLearning4NLP/tree/BERT_PALs-Aly), we haven't measured its performance yet, since we still have to complete processing and debuging its implementation. We leave that part to further investigations of the project.
+
+</details>
 
 ---
 
-**BART paraphrase detection:**
-Arne implemented a new lossfunction based on the new metric (mcc) and the old loss BCEWithLogitLoss. The penalizing weights were determined by a gridsearch.
-
-# Experiments
+## Experiments
 
 Keep track of your experiments here. What are the experiments? Which tasks and models are you considering?
 
