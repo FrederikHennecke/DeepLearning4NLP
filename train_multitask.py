@@ -20,7 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from bert import BertModel
-from datasets_pal_processing import (
+from datasets import (
     SentenceClassificationDataset,
     SentencePairDataset,
     load_multitask_data,
@@ -650,10 +650,7 @@ def train_multitask(args):
             train_loss += full_loss.item()
             num_batches += 1
 
-            if args.scheduler == "linear_warmup":
-                scheduler.step()
-
-            if args.scheduler == "cosine":
+            if args.scheduler == "cosine" or args.scheduler == "linear_warmup":
                 scheduler.step(epoch + num_batches / total_num_batches)
             writer.add_scalar(
                 "Loss/train", full_loss.item(), epoch * total_num_batches + num_batches

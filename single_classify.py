@@ -614,7 +614,7 @@ def test_model(args):
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
 
-        test_model_multitask(args, model, device)
+        test_model_multitask(args, model, device, config)
 
 
 def split_csv(split=0.8):

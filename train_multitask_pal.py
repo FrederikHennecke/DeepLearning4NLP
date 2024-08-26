@@ -32,7 +32,7 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import RobertaModel, RobertaTokenizer
 
 from tokenizer import BertTokenizer
-from bert import BertModel, BertLayer, BertModelWithPAL
+from bert_pal import BertModel, BertLayer, BertModelWithPAL
 from datasets_pal_processing import (
     SentenceClassificationDataset,
     SentencePairDataset,
@@ -1450,7 +1450,7 @@ def get_args():
         default="bert-base",
     )
 
-    parser.add_argument("--smoketest", action="store_false", help="Run a smoke test")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
     args, _ = parser.parse_known_args()
 
     parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
@@ -1479,13 +1479,13 @@ def get_args():
         default=5e-6,
     )
     parser.add_argument(
-        "--num_batches_per_epoch", type=int, default=300 if not args.smoketest else 10
+        "--num_batches_per_epoch", type=int, default=1800 if not args.smoketest else 10
     )
     parser.add_argument(
         "--task_scheduler",
         type=str,
         choices=("random", "round_robin", "pal", "para", "sts", "sst"),
-        default="pal",
+        default="round_robin",
     )
 
     # Optimizations
@@ -1497,7 +1497,7 @@ def get_args():
         "--combine_strategy",
         type=str,
         choices=("none", "encourage", "force"),
-        default="encourage",
+        default="none",
     )
     parser.add_argument("--use_amp", action="store_true")
     parser.add_argument(
