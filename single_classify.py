@@ -29,7 +29,7 @@ from bert import BertLayer
 from transformers import get_linear_schedule_with_warmup
 
 
-TQDM_DISABLE = True
+TQDM_DISABLE = False
 
 
 # fix the random seed
@@ -46,7 +46,7 @@ def seed_everything(seed=11711):
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
-MAX_POSITION_EMBEDDINGS = 128
+HIDDEN_DIM = 128
 
 
 class AttentionLayer(nn.Module):
@@ -84,33 +84,22 @@ class MultitaskBERT(nn.Module):
         self.bert = BertModel.from_pretrained(
             "bert-base-uncased", local_files_only=config.local_files_only
         )
-        # self.bert_layers = nn.ModuleList(
-        #     [BertLayer(config) for _ in range(config.num_hidden_layers)]
-        # )
+
+        # BILSTM layer
+        self.bilstm = torch.nn.LSTM(
+            input_size=config.hidden_size,
+            hidden_size=config.hidden_dim,
+            num_layers=1,
+            bidirectional=True,
+            batch_first=True,
+        )
+        bilstm_output_dim = config.hidden_dim * 2
+
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
             elif config.option == "finetune":
                 param.requires_grad = True
-
-        if config.layers[0] == -2 and config.train_mode == "last_layer":
-            self.layers = []
-        elif config.layers[0] != -2 and config.train_mode == "single_layers":
-            self.layers = [i for i in range(config.num_hidden_layers)]
-        else:
-            self.layers = []
-
-        self.sentiment_classifier = nn.Linear(
-            config.hidden_size
-            * max(1, len(self.layers) if config.pooling is None else 1),
-            N_SENTIMENT_CLASSES,
-        )
-
-        # self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
-        self.paraphrase_classifier = nn.Linear(
-            3 * BERT_HIDDEN_SIZE, 1
-        )  # WARN Not needed anymore
-        self.similarity_classifier = nn.Linear(3 * BERT_HIDDEN_SIZE, 1)
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -118,95 +107,45 @@ class MultitaskBERT(nn.Module):
         # attention layer
         self.attention_layer = AttentionLayer(config.hidden_size)
 
-        # more layers
-        self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
-        self.sentiment_linear1 = torch.nn.Linear(config.hidden_size, config.hidden_size)
-        self.sentiment_linear2 = torch.nn.Linear(config.hidden_size, config.hidden_size)
+        if config.add_layers:
+            # more layers
+            self.sentiment_linear = torch.nn.Linear(
+                bilstm_output_dim, config.hidden_size
+            )
+            self.sentiment_linear1 = torch.nn.Linear(
+                config.hidden_size, config.hidden_size
+            )
+            self.sentiment_linear2 = torch.nn.Linear(
+                config.hidden_size, bilstm_output_dim
+            )
+            self.sentiment_classifier = nn.Linear(
+                bilstm_output_dim, N_SENTIMENT_CLASSES
+            )
+        else:
+            self.sentiment_classifier = nn.Linear(
+                bilstm_output_dim, N_SENTIMENT_CLASSES
+            )
 
-        self.d_a = 128
-        self.attn_heads = 1
-
-        self.linear_first = torch.nn.Linear(config.hidden_size, self.d_a)
-        self.linear_first.bias.data.fill_(0)
-        self.linear_second = torch.nn.Linear(self.d_a, self.attn_heads)
-        self.linear_second.bias.data.fill_(0)
+        self.paraphrase_classifier = nn.Linear(3 * bilstm_output_dim, 2)
 
     def forward(self, input_ids, attention_mask):
         """Takes a batch of sentences and produces embeddings for them."""
 
-        # The final BERT embedding is the hidden state of [CLS] token (the first token).
-        # See BertModel.forward() for more details.
-        # Here, you can start by just returning the embeddings straight from BERT.
-        # When thinking of improvements, you can later try modifying this
-        # (e.g., by adding other layers).
-
-        all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
-            input_ids, attention_mask
-        )
-        if self.config.train_mode == "all_pooled":
-            pooler_output = self.dropout(all_pooled["pooler_output"]).unsqueeze(0)
-            pooled_output2 = self.dropout(all_pooled["pooled_output2"]).unsqueeze(0)
-            pooled_output3 = self.dropout(all_pooled["pooled_output3"]).unsqueeze(0)
-            pooled_output4 = self.dropout(all_pooled["pooled_output4"]).unsqueeze(0)
-            pooled_output5 = self.dropout(all_pooled["pooled_output5"]).unsqueeze(0)
-            pooled_output6 = self.dropout(all_pooled["pooled_output6"]).unsqueeze(0)
-            pooled_output7 = self.dropout(all_pooled["pooled_output7"]).unsqueeze(0)
-            pooled_output8 = self.dropout(all_pooled["pooled_output8"]).unsqueeze(0)
-            pooled_output9 = self.dropout(all_pooled["pooled_output9"]).unsqueeze(0)
-            pooled_output10 = self.dropout(all_pooled["pooled_output10"]).unsqueeze(0)
-            pooled_output11 = self.dropout(all_pooled["pooled_output11"]).unsqueeze(0)
-            pooled_output12 = self.dropout(all_pooled["pooled_output12"]).unsqueeze(
-                0
-            )  # 12, batchsize, hidden_dim
-            pooled_output = torch.cat(
-                (
-                    pooler_output,
-                    pooled_output2,
-                    pooled_output3,
-                    pooled_output4,
-                    # pooled_output5,
-                    # pooled_output6,
-                    # pooled_output7,
-                    # pooled_output8,
-                    # pooled_output9,
-                    # pooled_output10,
-                    # pooled_output11,
-                    # pooled_output12,
-                ),
-                0,
-            )
-
-            seq_len, batch_size, hidden_dim = pooled_output.size()
-
-            add_layer = self.linear_first(
-                pooled_output
-            )  # seq_len. batchsize. hidden_dim
-            add_layer = F.tanh(add_layer)
-            add_layer = self.linear_second(add_layer)
-            add_layer = F.softmax(add_layer, dim=0)
-
-            b = []
-            y = []
-            for i in range(self.attn_heads):
-                b.append(add_layer[:, :, i])
-                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
-                y.append((b[i] * pooled_output).sum(dim=0))  #  batchsize, hidden_dim
-            hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
-
-        else:
-            hidden_states = pooled_output
-
-        # attention_results = self.attention_layer(hidden_states)
-        attention_results = hidden_states
+        _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
+        hidden_states = all_sequences["last_hidden_state"]
+        bilstm_output, _ = self.bilstm(hidden_states)
+        bilstm_output = self.dropout(bilstm_output)
 
         if self.config.pooling == None:
-            pooled_output = attention_results
+            pooled_output = bilstm_output
+
         elif self.config.pooling == "max":
-            # pooled_output, _ = torch.max(attention_results, dim=1)
-            pooled_output = nn.MaxPool1d(1)(attention_results).squeeze(-1)
+            pooled_output, _ = torch.max(bilstm_output, dim=1)
+            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
+
         elif self.config.pooling == "mean":
-            # pooled_output = torch.mean(attention_results, dim=1)
-            pooled_output = nn.AvgPool1d(1)(attention_results).squeeze(-1)
+            pooled_output = torch.mean(bilstm_output, dim=1)
+            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(bilstm_output).squeeze(-1)
 
         return pooled_output
 
@@ -223,11 +162,11 @@ class MultitaskBERT(nn.Module):
             sentiment_logits = F.relu(self.sentiment_linear(sentiment_logits))
             sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
             sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
+            sentiment_logits = self.sentiment_classifier(sentiment_logits)
 
-        if self.config.dropout:
-            sentiment_logits = self.dropout(sentiment_logits)
+        else:
+            sentiment_logits = self.sentiment_classifier(sentiment_logits)[:, -1, :]
 
-        sentiment_logits = self.sentiment_classifier(sentiment_logits)
         return sentiment_logits
 
     def predict_paraphrase(
@@ -258,30 +197,9 @@ class MultitaskBERT(nn.Module):
         """
         embeddings_1 = self.forward(input_ids_1, attention_mask_1)
         embeddings_2 = self.forward(input_ids_2, attention_mask_2)
-        combined_embeddings = torch.cat(
-            [embeddings_1, embeddings_2, torch.abs(embeddings_1 - embeddings_2)], dim=-1
-        )
-        similarity_logits = self.similarity_classifier(combined_embeddings).squeeze(-1)
-        similarity_logits = torch.sigmoid(similarity_logits) * 5.0
-        return similarity_logits
+        similarity_logits = F.cosine_similarity(embeddings_1, embeddings_2)
 
-    def predict_paraphrase_types(
-        self, input_ids_1, attention_mask_1, input_ids_2, attention_mask_2
-    ):
-        """
-        Given a batch of pairs of sentences, outputs logits for detecting the paraphrase types.
-        There are 7 different types of paraphrases.
-        Thus, your output should contain 7 unnormalized logits for each sentence. It will be passed to the sigmoid function
-        during evaluation, and handled as a logit by the appropriate loss function.
-        Dataset: ETPC
-        """
-        embeddings_1 = self.forward(input_ids_1, attention_mask_1)
-        embeddings_2 = self.forward(input_ids_2, attention_mask_2)
-        combined_embeddings = torch.cat(
-            [embeddings_1, embeddings_2, torch.abs(embeddings_1 - embeddings_2)], dim=-1
-        )
-        paraphrase_type_logits = self.paraphrase_type_classifier(combined_embeddings)
-        return paraphrase_type_logits
+        return similarity_logits * 5
 
 
 def save_model(model, optimizer, args, config, filepath):
@@ -301,7 +219,6 @@ def save_model(model, optimizer, args, config, filepath):
 
 def train_multitask(args):
     device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
-
     # Load data
     # Create the data and its corresponding datasets and dataloader:
     sst_train_data, _, quora_train_data, sts_train_data, etpc_train_data = (
@@ -396,9 +313,9 @@ def train_multitask(args):
         )
 
     # Init model
-    global config_dict
+    # global config_dict
 
-    config_dict = {
+    config = {
         "hidden_dropout_prob": args.hidden_dropout_prob,
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
@@ -408,13 +325,11 @@ def train_multitask(args):
         "pooling": args.pooling,
         "additional_inputs": args.additional_inputs,
         "add_layers": args.add_layers,
-        "layers": args.layers,
-        "train_mode": args.train_mode,
-        "dropout": args.dropout,
-        "max_position_embeddings": MAX_POSITION_EMBEDDINGS,
+        "max_position_embeddings": args.max_position_embeddings,
+        "hidden_dim": HIDDEN_DIM,
     }
 
-    config = SimpleNamespace(**config_dict)
+    config = SimpleNamespace(**config)
     print(f"config: {config}")
 
     ctx = (
@@ -443,17 +358,30 @@ def train_multitask(args):
             eps=1e-12,
             rho=0.03,
             betas=(0.985, 0.99),
-            weight_decay=2e-1,
+            weight_decay=1e-2,
         )
     hess_interval = 10
     iter_num = 0
 
     if args.scheduler == "linear_warmup":
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=0,
-            num_training_steps=len(sts_train_dataloader) * args.epochs,
-        )
+        if args.task == "sst":
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=0,
+                num_training_steps=len(sst_train_dataloader) * args.epochs,
+            )
+        elif args.task == "sts":
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=0,
+                num_training_steps=len(sts_train_dataloader) * args.epochs,
+            )
+        elif args.task == "qqp":
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer,
+                num_warmup_steps=0,
+                num_training_steps=len(quora_train_dataloader) * args.epochs,
+            )
     else:
         scheduler = None
 
@@ -556,13 +484,11 @@ def train_multitask(args):
                 b_mask_1 = b_mask_1.to(device)
                 b_ids_2 = b_ids_2.to(device)
                 b_mask_2 = b_mask_2.to(device)
-                b_labels = b_labels.to(device).float()
+                b_labels = b_labels.to(device)
 
                 optimizer.zero_grad()
                 logits = model.predict_paraphrase(b_ids_1, b_mask_1, b_ids_2, b_mask_2)
-                loss = F.binary_cross_entropy_with_logits(
-                    logits.float(), b_labels.view(-1)
-                )
+                loss = F.cross_entropy(logits, b_labels.view(-1))
                 loss.backward()
                 optimizer.step()
 
@@ -687,7 +613,8 @@ def test_model(args):
         model.load_state_dict(saved["model"])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
-        test_model_multitask(args, model, device, config_dict)
+
+        test_model_multitask(args, model, device, config)
 
 
 def split_csv(split=0.8):
@@ -695,7 +622,8 @@ def split_csv(split=0.8):
     file_path = "data/etpc-paraphrase-dev.csv"
     file = Path(file_path)
     if file.exists():
-        pass
+        print("The dev file already exists")
+        return
     with open("data/etpc-paraphrase-orig.csv", "r", encoding="utf-8") as f:
         reader = csv.reader(f, delimiter="\t")
         data = list(reader)
@@ -730,7 +658,6 @@ def get_args():
 
     # Model configuration
     parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument(
         "--option",
         type=str,
@@ -739,8 +666,14 @@ def get_args():
         default="finetune",
     )
     parser.add_argument("--use_gpu", action="store_true")
+    parser.add_argument("--smoketest", action="store_true", help="Run a smoke test")
 
     args, _ = parser.parse_known_args()
+
+    parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
+    parser.add_argument(
+        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
+    )
 
     # Dataset paths
     parser.add_argument("--sst_train", type=str, default="data/sst-sentiment-train.csv")
@@ -769,7 +702,8 @@ def get_args():
 
     # You should split the train data into a train and dev set first and change the
     # default path of the --etpc_dev argument to your dev set.
-    split_csv()
+
+    # split_csv()
 
     parser.add_argument(
         "--etpc_train", type=str, default="data/etpc-paraphrase-train.csv"
@@ -860,7 +794,10 @@ def get_args():
 
     # Hyperparameters
     parser.add_argument(
-        "--batch_size", help="sst: 64 can fit a 12GB GPU", type=int, default=32
+        "--batch_size",
+        help="sst: 64 can fit a 12GB GPU",
+        type=int,
+        default=64 if not args.smoketest else 64,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
@@ -885,7 +822,7 @@ def get_args():
     )
     parser.add_argument(
         "--pooling",
-        default="max",
+        default=None,
         choices=[None, "max", "mean"],
         help="choose the pooling method",
     )
@@ -899,24 +836,7 @@ def get_args():
         default=False,
         help="add more layers to the model",
     )
-    parser.add_argument(
-        "--layers",
-        default=[0],
-        help="choose the layers that used for downstream tasks, "
-        "-2 means use pooled output, -1 means all layer,"
-        "else means the detail layers. default is -2",
-    )
-    parser.add_argument(
-        "--train_mode",
-        default="all_pooled",
-        help="choose the layers to use for the model",
-        choices=["single_layers", "all_layers", "last_layer", "all_pooled"],
-    )
-    parser.add_argument(
-        "--dropout",
-        default=True,
-        help="add dropout to the model",
-    )
+
     parser.add_argument(
         "--improve_dir",
         type=str,
@@ -940,6 +860,12 @@ def get_args():
         type=str,
         default="./improve_dir/qqp",
         help="path to save the params",
+    )
+    parser.add_argument(
+        "--max_position_embeddings",
+        type=int,
+        default=512,
+        help="max position embeddings for the model",
     )
 
     args = parser.parse_args()

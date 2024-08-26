@@ -27,13 +27,21 @@ from datasets import (
     SentencePairTestDataset,
     load_multitask_data,
 )
+import os, json
+from datetime import datetime
 
 TQDM_DISABLE = True
 
 
 # Perform model evaluation
 def model_eval_multitask(
-    sst_dataloader, quora_dataloader, sts_dataloader, etpc_dataloader, model, device, task
+    sst_dataloader,
+    quora_dataloader,
+    sts_dataloader,
+    etpc_dataloader,
+    model,
+    device,
+    task,
 ):
     model.eval()  # switch to eval model, will turn off randomness like dropout
 
@@ -44,7 +52,9 @@ def model_eval_multitask(
 
         # Evaluate paraphrase detection.
         if task == "qqp" or task == "multitask":
-            for step, batch in enumerate(tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_labels, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -70,7 +80,8 @@ def model_eval_multitask(
         if task == "qqp" or task == "multitask":
             quora_accuracy = np.mean(np.array(quora_y_pred) == np.array(quora_y_true))
         else:
-            quora_accuracy = None
+            print("qqp task not included in the training and evaluation")
+            quora_accuracy = 0
 
         sts_y_true = []
         sts_y_pred = []
@@ -78,7 +89,9 @@ def model_eval_multitask(
 
         # Evaluate semantic textual similarity.
         if task == "sts" or task == "multitask":
-            for step, batch in enumerate(tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_labels, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -105,7 +118,8 @@ def model_eval_multitask(
             pearson_mat = np.corrcoef(sts_y_pred, sts_y_true)
             sts_corr = pearson_mat[1][0]
         else:
-            sts_corr = None
+            print("sts task not included in the training and evaluation")
+            sts_corr = 0
 
         sst_y_true = []
         sst_y_pred = []
@@ -113,7 +127,9 @@ def model_eval_multitask(
 
         # Evaluate sentiment classification.
         if task == "sst" or task == "multitask":
-            for step, batch in enumerate(tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 b_ids, b_mask, b_labels, b_sent_ids = (
                     batch["token_ids"],
                     batch["attention_mask"],
@@ -135,15 +151,18 @@ def model_eval_multitask(
         if task == "sst" or task == "multitask":
             sst_accuracy = np.mean(np.array(sst_y_pred) == np.array(sst_y_true))
         else:
-            sst_accuracy = None
+            print("sst task not included in the training and evaluation")
+            sst_accuracy = 0
 
         etpc_y_true = []
         etpc_y_pred = []
         etpc_sent_ids = []
 
         # Evaluate paraphrase type detection.
-        if task == "etpc" or task == "multitask":
-            for step, batch in enumerate(tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)):
+        if task == "etpc":
+            for step, batch in enumerate(
+                tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_labels, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -158,7 +177,9 @@ def model_eval_multitask(
                 b_ids2 = b_ids2.to(device)
                 b_mask2 = b_mask2.to(device)
 
-                logits = model.predict_paraphrase_types(b_ids1, b_mask1, b_ids2, b_mask2)
+                logits = model.predict_paraphrase_types(
+                    b_ids1, b_mask1, b_ids2, b_mask2
+                )
                 y_hat = logits.sigmoid().round().cpu().numpy()
                 b_labels = b_labels.cpu().numpy()
 
@@ -166,14 +187,16 @@ def model_eval_multitask(
                 etpc_y_true.extend(b_labels)
                 etpc_sent_ids.extend(b_sent_ids)
 
-        if task == "etpc" or task == "multitask":
-            correct_pred = np.all(np.array(etpc_y_pred) == np.array(etpc_y_true), axis=1).astype(
-                int
-            )
+        if task == "etpc":
+            correct_pred = np.all(
+                np.array(etpc_y_pred) == np.array(etpc_y_true), axis=1
+            ).astype(int)
             etpc_accuracy = np.mean(correct_pred)
             etpc_y_pred = etpc_y_pred.tolist()
         else:
+            print("etpc task not included in the multitask training and evaluation")
             etpc_accuracy = None
+            etpc_sent_ids = None
 
         if task == "qqp" or task == "multitask":
             print(f"Paraphrase detection accuracy: {quora_accuracy:.3f}")
@@ -181,8 +204,9 @@ def model_eval_multitask(
             print(f"Sentiment classification accuracy: {sst_accuracy:.3f}")
         if task == "sts" or task == "multitask":
             print(f"Semantic Textual Similarity correlation: {sts_corr:.3f}")
-        if task == "etpc" or task == "multitask":
+        if task == "etpc":
             print(f"Paraphrase Type detection accuracy: {etpc_accuracy:.3f}")
+        print("\n")
 
     model.train()  # switch back to train model
 
@@ -204,7 +228,13 @@ def model_eval_multitask(
 
 # Perform model evaluation in terms by averaging accuracies across tasks.
 def model_eval_test_multitask(
-    sst_dataloader, quora_dataloader, sts_dataloader, etpc_dataloader, model, device, task
+    sst_dataloader,
+    quora_dataloader,
+    sts_dataloader,
+    etpc_dataloader,
+    model,
+    device,
+    task,
 ):
     model.eval()  # switch to eval model, will turn off randomness like dropout
 
@@ -213,7 +243,9 @@ def model_eval_test_multitask(
         quora_sent_ids = []
         # Evaluate paraphrase detection.
         if task == "qqp" or task == "multitask":
-            for step, batch in enumerate(tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(quora_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -238,7 +270,9 @@ def model_eval_test_multitask(
 
         # Evaluate semantic textual similarity.
         if task == "sts" or task == "multitask":
-            for step, batch in enumerate(tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sts_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -263,7 +297,9 @@ def model_eval_test_multitask(
 
         # Evaluate sentiment classification.
         if task == "sst" or task == "multitask":
-            for step, batch in enumerate(tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)):
+            for step, batch in enumerate(
+                tqdm(sst_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 b_ids, b_mask, b_sent_ids = (
                     batch["token_ids"],
                     batch["attention_mask"],
@@ -281,8 +317,10 @@ def model_eval_test_multitask(
 
         etpc_y_pred = []
         etpc_sent_ids = []
-        if task == "etpc" or task == "multitask":
-            for step, batch in enumerate(tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)):
+        if task == "etpc":
+            for step, batch in enumerate(
+                tqdm(etpc_dataloader, desc="eval", disable=TQDM_DISABLE)
+            ):
                 (b_ids1, b_mask1, b_ids2, b_mask2, b_sent_ids) = (
                     batch["token_ids_1"],
                     batch["attention_mask_1"],
@@ -296,11 +334,17 @@ def model_eval_test_multitask(
                 b_ids2 = b_ids2.to(device)
                 b_mask2 = b_mask2.to(device)
 
-                logits = model.predict_paraphrase_types(b_ids1, b_mask1, b_ids2, b_mask2)
+                logits = model.predict_paraphrase_types(
+                    b_ids1, b_mask1, b_ids2, b_mask2
+                )
                 y_hat = logits.sigmoid().round().cpu().numpy().astype(int).tolist()
 
                 etpc_y_pred.extend(y_hat)
                 etpc_sent_ids.extend(b_sent_ids)
+        else:
+            print("etpc task not included in the multitask training and evaluation")
+            etpc_y_pred = None
+            etpc_sent_ids = None
 
         return (
             quora_y_pred,
@@ -314,9 +358,11 @@ def model_eval_test_multitask(
         )
 
 
-def test_model_multitask(args, model, device):
-    sst_test_data, _, quora_test_data, sts_test_data, etpc_test_data = load_multitask_data(
-        args.sst_test, args.quora_test, args.sts_test, args.etpc_test, split="test"
+def test_model_multitask(args, model, device, config):
+    sst_test_data, _, quora_test_data, sts_test_data, etpc_test_data = (
+        load_multitask_data(
+            args.sst_test, args.quora_test, args.sts_test, args.etpc_test, split="test"
+        )
     )
 
     sst_dev_data, _, quora_dev_data, sts_dev_data, etpc_dev_data = load_multitask_data(
@@ -327,10 +373,16 @@ def test_model_multitask(args, model, device):
     sst_dev_data = SentenceClassificationDataset(sst_dev_data, args)
 
     sst_test_dataloader = DataLoader(
-        sst_test_data, shuffle=True, batch_size=args.batch_size, collate_fn=sst_test_data.collate_fn
+        sst_test_data,
+        shuffle=True,
+        batch_size=args.batch_size,
+        collate_fn=sst_test_data.collate_fn,
     )
     sst_dev_dataloader = DataLoader(
-        sst_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=sst_dev_data.collate_fn
+        sst_dev_data,
+        shuffle=False,
+        batch_size=args.batch_size,
+        collate_fn=sst_dev_data.collate_fn,
     )
 
     quora_test_data = SentencePairTestDataset(quora_test_data, args)
@@ -353,10 +405,16 @@ def test_model_multitask(args, model, device):
     sts_dev_data = SentencePairDataset(sts_dev_data, args, isRegression=True)
 
     sts_test_dataloader = DataLoader(
-        sts_test_data, shuffle=True, batch_size=args.batch_size, collate_fn=sts_test_data.collate_fn
+        sts_test_data,
+        shuffle=True,
+        batch_size=args.batch_size,
+        collate_fn=sts_test_data.collate_fn,
     )
     sts_dev_dataloader = DataLoader(
-        sts_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=sts_dev_data.collate_fn
+        sts_dev_data,
+        shuffle=False,
+        batch_size=args.batch_size,
+        collate_fn=sts_dev_data.collate_fn,
     )
 
     etpc_test_data = SentencePairTestDataset(etpc_test_data, args)
@@ -419,7 +477,110 @@ def test_model_multitask(args, model, device):
         task,
     )
 
-    if task == "sst" or task == "multitask":
+    if task == "sst":
+        print(f"dev sentiment acc :: {dev_sst_accuracy :.3f}")
+
+        if dev_sst_accuracy > 0.522:
+            print("Your score is higher than the baseline for sst task")
+            print("saving params")
+            if not os.path.exists(args.sst_improve_dir):
+                os.makedirs(args.sst_improve_dir)
+
+            with open(
+                os.path.join(
+                    args.sst_improve_dir,
+                    f"sst_params_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+                ),
+                "w",
+            ) as f:
+                json.dump(config, f)
+
+            with open(args.sst_dev_out, "w+") as f:
+                f.write("id,Predicted_Sentiment\n")
+                for p, s in zip(dev_sst_sent_ids, dev_sst_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+            with open(args.sst_test_out, "w+") as f:
+                f.write("id,Predicted_Sentiment\n")
+                for p, s in zip(test_sst_sent_ids, test_sst_y_pred):
+                    f.write(f"{p}\t{s}\n")
+        else:
+            print("your score is lower than the baseline for sst task")
+
+    if task == "qqp":
+        print(f"dev paraphrase acc :: {dev_quora_accuracy :.3f}")
+
+        if dev_quora_accuracy > 0.806:
+            print("Your score is higher than the baseline for qqp task")
+            print("saving params")
+            if not os.path.exists(args.qqp_improve_dir):
+                os.makedirs(args.qqp_improve_dir)
+
+            with open(
+                os.path.join(
+                    args.qqp_improve_dir,
+                    f"qqp_params_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+                ),
+                "w",
+            ) as f:
+                json.dump(config, f)
+
+            with open(args.quora_dev_out, "w+") as f:
+                f.write("id,Predicted_Is_Paraphrase\n")
+                for p, s in zip(dev_quora_sent_ids, dev_quora_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+            with open(args.quora_test_out, "w+") as f:
+                f.write("id,Predicted_Is_Paraphrase\n")
+                for p, s in zip(test_quora_sent_ids, test_quora_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+        else:
+            print("your score is lower than the baseline for qqp task")
+
+    if task == "sts":
+        print(f"dev sts corr :: {dev_sts_corr :.3f}")
+
+        if dev_sts_corr > 0.414:
+            print("Your score is higher than the baseline for sts task")
+            print("saving params")
+            if not os.path.exists(args.sts_improve_dir):
+                os.makedirs(args.sts_improve_dir)
+
+            with open(
+                os.path.join(
+                    args.sts_improve_dir,
+                    f"sts_params_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+                ),
+                "w",
+            ) as f:
+                json.dump(config, f)
+
+            with open(args.sts_dev_out, "w+") as f:
+                f.write("id,Predicted_Similarity\n")
+                for p, s in zip(dev_sts_sent_ids, dev_sts_y_pred):
+                    f.write(f"{p}\t{s}\n")
+
+            with open(args.sts_test_out, "w+") as f:
+                f.write("id,Predicted_Similarity\n")
+                for p, s in zip(test_sts_sent_ids, test_sts_y_pred):
+                    f.write(f"{p}\t{s}\n")
+        else:
+            print("your score is lower than the baseline for sts task")
+
+    if task == "etpc":
+        with open(args.etpc_dev_out, "w+") as f:
+            print(f"dev etpc acc :: {dev_etpc_accuracy :.3f}")
+            f.write("id,Predicted_Paraphrase_Types\n")
+            for p, s in zip(dev_etpc_sent_ids, dev_etpc_y_pred):
+                f.write(f"{p}\t{s}\n")
+
+        with open(args.etpc_test_out, "w+") as f:
+            f.write("id,Predicted_Paraphrase_Types\n")
+            for p, s in zip(test_etpc_sent_ids, test_etpc_y_pred):
+                f.write(f"{p}\t{s}\n")
+
+    if task == "multitask":
         with open(args.sst_dev_out, "w+") as f:
             print(f"dev sentiment acc :: {dev_sst_accuracy :.3f}")
             f.write("id,Predicted_Sentiment\n")
@@ -431,7 +592,6 @@ def test_model_multitask(args, model, device):
             for p, s in zip(test_sst_sent_ids, test_sst_y_pred):
                 f.write(f"{p}\t{s}\n")
 
-    if task == "qqp" or task == "multitask":
         with open(args.quora_dev_out, "w+") as f:
             print(f"dev paraphrase acc :: {dev_quora_accuracy :.3f}")
             f.write("id,Predicted_Is_Paraphrase\n")
@@ -443,7 +603,6 @@ def test_model_multitask(args, model, device):
             for p, s in zip(test_quora_sent_ids, test_quora_y_pred):
                 f.write(f"{p}\t{s}\n")
 
-    if task == "sts" or task == "multitask":
         with open(args.sts_dev_out, "w+") as f:
             print(f"dev sts corr :: {dev_sts_corr :.3f}")
             f.write("id,Predicted_Similarity\n")
@@ -453,16 +612,4 @@ def test_model_multitask(args, model, device):
         with open(args.sts_test_out, "w+") as f:
             f.write("id,Predicted_Similarity\n")
             for p, s in zip(test_sts_sent_ids, test_sts_y_pred):
-                f.write(f"{p}\t{s}\n")
-
-    if task == "etpc" or task == "multitask":
-        with open(args.etpc_dev_out, "w+") as f:
-            print(f"dev etpc acc :: {dev_etpc_accuracy :.3f}")
-            f.write("id,Predicted_Paraphrase_Types\n")
-            for p, s in zip(dev_etpc_sent_ids, dev_etpc_y_pred):
-                f.write(f"{p}\t{s}\n")
-
-        with open(args.etpc_test_out, "w+") as f:
-            f.write("id,Predicted_Paraphrase_Types\n")
-            for p, s in zip(test_etpc_sent_ids, test_etpc_y_pred):
                 f.write(f"{p}\t{s}\n")
