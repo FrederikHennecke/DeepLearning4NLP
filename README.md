@@ -142,13 +142,13 @@ We describe the datasets we used in the following table
     <td>Two sentences are given as input and their mutual relation is to be evaluated on continuous labels from 0 (least similar) to 5 (most similar)</td>
     <td>Train: 5,149 <br /> Dev: 1,709 <br /> Test: 1,721</td>
   </tr>
+  <tr>
+    <td>Extended Typology Paraphrase Corpus (ETPC)</td>
+    <td>Paraphrase Detection / Generation</td>
+    <td>Two sentences are given as input and wether the pairs are paraphrases of each other, either "yes" (1) or "no" (0) according to mrpc and etpc annotation schema</td>
+    <td>Train: 2020 <br /> Dev: 505 <br /> Test: 573 (detection) <br /> 701 (generation)</td>
+  </tr>
 </table>
-
-<!-- | **Dataset**                       | **Task**                            | **Description**                                                                                                                               | **Size**                                                 |
-| --------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Quora Dataset (QQP)               | Paraphrase detection                | Two sentences are given as input and a binary label (0, 1) is output indicating if sentences are paraphrases of one another                   |<img width=200/> Train: 121, 620 <br /> Dev: 40, 540 <br /> Test: 40, 540 |
-| Stanford Sentiment Treebank (SST) | Sentiment analysis (classification) | One sentence is given as input to be classified on a scale from 0 (most negative) to 5 (most positive)                                        | Train: 7, 111 <br /> Dev: 2, 365 <br /> Test: 2, 371     |
-| SemEval STS Benchmark Dataset     | Textual Similarity (regression)     | Two sentences are given as input and their mutual relation is to be evaluated on continuous labels from 0 (least similar) to 5 (most similar) | Train: 5, 149 <br /> Dev: 1, 709 <br /> Test: 1, 721     | -->
 
 ## Training
 
