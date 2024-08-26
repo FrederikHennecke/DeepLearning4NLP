@@ -2,7 +2,7 @@
 
 **Table of Contents**
 
-- [DNLP SS24 Final Project – BERT for Multitask Learning and BART for Paraphrasing](#DNLP-SS24-Final-Project-BERT-for-Multitask-Learning-and-BART-for-Paraphrasing)
+- [DNLP SS24 Final Project – BERT for Multitask Learning and BART for Paraphrasing](#dnlp-ss24-final-project-bert-for-multitask-learning-and-bart-for-paraphrasing)
 
   - [Introduction](#introduction)
   - [Requirements](#requirements)
@@ -91,7 +91,7 @@
 This repository our official implementation of the Multitask BERT project for the Deep Learning for Natural Language
 Processing course at the University of Göttingen.
 
-A pretrained
+A pre-trained
 BERT ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805))
 model was used as the basis for our experiments. The model was fine-tuned on the three tasks using a multitask learning
 approach. The model was trained on the three tasks simultaneously, with a single shared BERT encoder and three separate
@@ -105,7 +105,7 @@ To install requirements and all dependencies using conda, run:
 bash setup_gwdg.sh
 ```
 
-This will download and install miniconda on your machine, create the project's conda environment and activate it. It will also download the models used through the project and the POS and NER tags from spacy.
+This will download and install Miniconda on your machine, create the project's conda environment and activate it. It will also download the models used through the project and the POS and NER tags from spaCy.
 
 ## Data
 
@@ -152,16 +152,16 @@ There are lots of parameters to set. To see all of them, run `python <filename> 
 | `--add_layers`                          | Add more linear layers to train before the classifier for the SST task                                                                                     |
 | `--combined_models`                     | Use combined BERT models to train                                                                                                                          |
 | `--train_mode`                          | Specifies if train the last hidden state, the pooler output or certain layers of the model. Options are `all_pooled`, `last_hidden_state`, `single_layers` |
-| `--max_length`                          | Maximum length of tekens to chunk                                                                                                                          |
+| `--max_length`                          | Maximum length of tokens to chunk                                                                                                                          |
 | `--n_hidden_layers`                     | Number of hidden layers to use                                                                                                                             |
 | `--task_scheduler`                      | Choose how to schedule the task during training. Options are `random`, `round_robin`, `pal`, `para`, `sts`, `sst`                                          |
 | `--projection`                          | How to handle competing gradients from different tasks. Options are `pcgrad`, `vaccine`, `none`                                                            |
 | `--combine_strategy`                    | Needed in case of using projection. Options are `encourage`, `force`, `none`                                                                               |
 | `--use_pal`                             | Add projected attention layers on top of BERT                                                                                                              |
 | `--patience`                            | Number of epochs to wait without improvement before the training stops                                                                                     |
-| `--use_smart_regularization`            | Implemented pytorch package to regularize the weights and reduce overfitting                                                                               |
+| `--use_smart_regularization`            | Implemented pytorch package to regularize the weights and reduce overfiting                                                                                |
 | `--write_summary` or `--no_tensorboard` | Whether to save training logs for later view on tensorboard                                                                                                |
-| `--model_name`                          | Choose the model to pretrain or fine-tune                                                                                                                  |
+| `--model_name`                          | Choose the model to pre-train or fine-tune                                                                                                                 |
 
 ## Evaluation
 
@@ -177,7 +177,7 @@ In the first phase of the project, we aimed at getting the baseline score for ea
 - hidden dropout prob: `0.1`
 - batch size: `64`
 
-In the second phase, we used multitask training to let the model train on the data of all tasks, but with a different classifier for each task. This helped the model learn and the performance to imrpove since the tasks are dependent. In addition we performed single task training for the ones that didn't improve through the multitasking and tried to apply other approaches to improve their score.
+In the second phase, we used multitask training to let the model train on the data of all tasks, but with a different classifier for each task. This helped the model learn and the performance to improve since the tasks are dependent. In addition we performed single task training for the ones that didn't improve through the multitasking and tried to apply other approaches to improve their score.
 
 For the multitask training, we used the following parameters:
 
@@ -216,7 +216,7 @@ the same semantic meaning. This task measures how well systems can understand fi
 | Bert-large                    | use bert-large model for multitasking                      | 82.4%        | [bert-large](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bert-large-%20train-multitask_classifier.out)               |
 | Max pooling                   | Max of the last hidden states' sequence                    | 81.9%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-QQP-MAX_Pooling-1296205.out)                         |
 | Baseline (single task)        | Single task training                                       | 80.6%        | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
-| Hirarchical-BERT              | Chunking the input up to a segment length                  | 75.6%        | [hirarchical bert](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-hirarchical-train-multitask-classifier.out)           |
+| Hierarchical-BERT             | Chunking the input up to a segment length                  | 75.6%        | [hierarchical bert](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-hirarchical-train-multitask-classifier.out)          |
 
 ### [Sentiment Classification on Stanford Sentiment Treebank (SST)](https://paperswithcode.com/sota/sentiment-analysis-on-sst-5-fine-grained)
 
@@ -257,7 +257,7 @@ allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
 | Combined BERT models          | 4 BERT models combined (3 sub-models and a gating network) | 85.1%        | [combined BERT](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-combined-models-traini-multitask_classifier-1332732.out) |
 | Sophia with additional inputs | Sophia optimizer with POS and NER inputs                   | 84.3%        | [sophia with additional inputs](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-sophia-add-input-multitask.out)          |
 | BiLSTM-Multitask              | BiLSTM layer on top of BERT                                | 80.7%        | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-multitask-classifier-1358610.out)        |
-| Hirarchical-BERT              | Chunking the input up to a segment length                  | 71.4%        | [hirarchical bert](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-hirarchical-train-multitask-classifier.out)           |
+| Hierarchical-BERT             | Chunking the input up to a segment length                  | 71.4%        | [hierarchical bert](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-hirarchical-train-multitask-classifier.out)          |
 | Max pooling                   | Max of the last hidden states' sequence                    | 53.4%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sts-single.out)                                   |
 | Baseline (single task)        | Single task training                                       | 41.4%        | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
 
@@ -281,7 +281,7 @@ In contrast to our expectations, adding POS and NER tags to the model combined w
 
 #### Explanation of Results
 
-The reason why including additional inputs did not enhance the performance is that Large Language Models (LLMs) like Bert are pretrained on massive corpora whose embeddings are contextual, meaning that the representation of a word depends on the context around it in the specified window which allows the model to capture information relevant to POS and NER from the text. Researchers have conducted studies where they probe the hidden layers to asses the amount of syntactic or semantic information encoded in the layers. ([A Structural Probe for Finding Syntax in Word Representations](https://aclanthology.org/N19-1419.pdf), [BERT Rediscovers the Classical NLP Pipeline](https://arxiv.org/pdf/1905.05950)).
+The reason why including additional inputs did not enhance the performance is that Large Language Models (LLMs) like Bert are pre-trained on massive corpora whose embeddings are contextual, meaning that the representation of a word depends on the context around it in the specified window which allows the model to capture information relevant to POS and NER from the text. Researchers have conducted studies where they probe the hidden layers to asses the amount of syntactic or semantic information encoded in the layers. ([A Structural Probe for Finding Syntax in Word Representations](https://aclanthology.org/N19-1419.pdf), [BERT Rediscovers the Classical NLP Pipeline](https://arxiv.org/pdf/1905.05950)).
 
 ---
 
@@ -293,11 +293,11 @@ Sophia is a **S**econd-**O**rder Cli**p**ped Stoc**h**astic Optimiz**a**tion met
 
 ##### Implementation
 
-We used the Hutchinson's unbiased estimator of the Hessian diagonal in our implementaion, which is to sample from the spherical Gaussian distribution. It can be activated in the training script by setting the `--optimizer` option to `sophiah`. The estimator can be used for all tasks including classification and regression, and requires only a Hessian vector product instead of the full Hessian matrix. It also has efficient implementation in PyTorch and JAX as mentioned in the original paper by H. Liu, et al. [Sophia: A Scalable Stochastic Second-order Optimizer for Language Model Pre-training](https://arxiv.org/pdf/2305.14342).
+We used the Hutchinson's unbiased estimator of the Hessian diagonal in our implementation, which is to sample from the spherical Gaussian distribution. It can be activated in the training script by setting the `--optimizer` option to `sophiah`. The estimator can be used for all tasks including classification and regression, and requires only a Hessian vector product instead of the full Hessian matrix. It also has efficient implementation in PyTorch and JAX as mentioned in the original paper by H. Liu, et al. [Sophia: A Scalable Stochastic Second-order Optimizer for Language Model Pre-training](https://arxiv.org/pdf/2305.14342).
 
 ##### Experimental Results
 
-The implementation of Sophiah with additional inputs from Spacy did actually improve the performance for the QQP and STS tasks compared to the baseline AdamW, however it did not improve the SST task. Running Sophiah without POS and NER tags, we observed that the convergence is slower than AdamW.
+The implementation of Sophiah with additional inputs from spaCy did actually improve the performance for the QQP and STS tasks compared to the baseline AdamW, however it did not improve the SST task. Running Sophiah without POS and NER tags, we observed that the convergence is slower than AdamW.
 
 ##### Explanation of Results
 
@@ -311,9 +311,9 @@ It is an optimization technique to handle the conflicting gradients during multi
 
 #### Pcgrad
 
-T. Yu et al. ([Gradient Surgery for Multi-Task Learning](https://arxiv.org/pdf/2001.06782)) proposed the Projected Gradient Descent or Pcgrad method which is a form of gradient surgery. They do the surgery by projecting the gradients of each task onto the normal plane of the gradient of any other task. if the projection is large, then the gradients are conflicting. At the end the projected gradients are summed up and used to update the model. This method proved to effectevely reduce the conflict between gradients and enhance the converging speed of the model.
+T. Yu et al. ([Gradient Surgery for Multi-Task Learning](https://arxiv.org/pdf/2001.06782)) proposed the Projected Gradient Descent or Pcgrad method which is a form of gradient surgery. They do the surgery by projecting the gradients of each task onto the normal plane of the gradient of any other task. if the projection is large, then the gradients are conflicting. At the end the projected gradients are summed up and used to update the model. This method proved to effectively reduce the conflict between gradients and enhance the converging speed of the model.
 
-##### Exprimental results
+##### Experimental results
 
 PCgrad achieved a high performance on the QQP (first rank) and the STS (second rank) tasks, however it worsened the SST (lower than the baseline).
 
@@ -323,9 +323,9 @@ Our hypothesis is that the pair sequence tasks (STS, QQP) are complicated and th
 
 #### GradVac
 
-GradVac stands for Gradient Vaccine which was originally proposed by Z. Wang, et al. ([GRADIENT VACCINE: INVESTIGATING AND IMPROVING MULTI-TASK OPTIMIZATION IN MASSIVELY MULTILINGUAL MODELS](https://arxiv.org/pdf/2010.05874)). This technique was developed to mitigate the negative effects of conflict gradients in multitask-training. It works the same as Pcgrad, but involoves a process of first clipping the gradients before aligning them, which adds computational overhead, however it is still efficient and scalable to large models and corpora.
+GradVac stands for Gradient Vaccine which was originally proposed by Z. Wang, et al. ([GRADIENT VACCINE: INVESTIGATING AND IMPROVING MULTI-TASK OPTIMIZATION IN MASSIVELY MULTILINGUAL MODELS](https://arxiv.org/pdf/2010.05874)). This technique was developed to mitigate the negative effects of conflict gradients in multitask-training. It works the same as Pcgrad, but involves a process of first clipping the gradients before aligning them, which adds computational overhead, however it is still efficient and scalable to large models and corpora.
 
-##### Exprimental results
+##### Experimental results
 
 It achieved relatively comparable results to Pcgrad, additionally it performed better on the SST task.
 
@@ -337,15 +337,15 @@ The additional clipping introduced in GradVac can prevent the model from making 
 
 ### Schedulers
 
-Schedulers in general are mechanisms that help adjusting the learning rate dynamically during training, which can lead to better performance and faster convergence. Schedulers are useful for escaping the local minima by momentarily increasing the learning rate, preventing overfitting, and efficient training. There are lots of schedule algorithms and we will consider some of them.
+Schedulers in general are mechanisms that help adjusting the learning rate dynamically during training, which can lead to better performance and faster convergence. Schedulers are useful for escaping the local minima by momentarily increasing the learning rate, preventing overfiting, and efficient training. There are lots of schedule algorithms and we will consider some of them.
 
 #### Linear Warmup
 
-The idea behind it is to start with a small learning rate so that the basic features of the data are learned, then gradually increase it in a linear way over a predefined number of steps or epochs. After the warmup period, the learning rate transits to another schedule such as constant rate or a decay rate. Linear warmup has the benefits of stabilizing the training and avoiding exploding gradients in case of using large batch sizes, large models or large dataset. Therefore, it was used by the state-of-the-art LLM research ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding:](https://arxiv.org/pdf/1810.04805), [Attention Is All You Need](https://arxiv.org/pdf/1706.03762)). We implemented the hyperparameters parameters of the scheduler from the first link (Delvin, et al.).
+The idea behind it is to start with a small learning rate so that the basic features of the data are learned, then gradually increase it in a linear way over a predefined number of steps or epochs. After the warmup period, the learning rate transits to another schedule such as constant rate or a decay rate. Linear warmup has the benefits of stabilizing the training and avoiding exploding gradients in case of using large batch sizes, large models or large dataset. Therefore, it was used by the state-of-the-art LLM research ([BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding:](https://arxiv.org/pdf/1810.04805), [Attention Is All You Need](https://arxiv.org/pdf/1706.03762)). We implemented the hyper-parameters parameters of the scheduler from the first link (Delvin, et al.).
 
-##### Exprimental results
+##### Experimental results
 
-We applied the linear warmup scheduler on the single SST task combined with a Bidirectional LSTM (BiLSTM) layer on top of BERT. We set the scheduler hyperparameters `num_train_steps = len(sst_train_dataloader) * num_train_epochs` and `num_warmup_steps = 0` as the default. This achieved a relatively higher performance than the baseline.
+We applied the linear warmup scheduler on the single SST task combined with a Bidirectional LSTM (BiLSTM) layer on top of BERT. We set the scheduler hyper-parameters `num_train_steps = len(sst_train_dataloader) * num_train_epochs` and `num_warmup_steps = 0` as the default. This achieved a relatively higher performance than the baseline.
 
 #### Plateau
 
@@ -361,7 +361,7 @@ WARM RESTARTS](https://arxiv.org/pdf/1608.03983)) proposed a warm restart techni
 This algorithm is basically implemented by process and network schedulers in computing in which time slices (from 10 to 100 milliseconds) are assigned to each process in equal portions and in circular order, namely cycling trough the different tasks one after the other. The problem with round robin scheduler technique is that if the dataset contains more instances of one task than another (e.g QQP and SST), it will repeat several times all the examples of the task with few data points before it repeats all the examples of the other task. This will lead to overfitting for the task that repeats a lot and underfitting for the other one. To this end Stickland and Murray ([BERT and PALs: Projected Attention Layers for
 Efficient Adaptation in Multi-Task Learning](https://arxiv.org/pdf/1902.02671)) proposed a novel method for scheduling training. At first the tasks are sampled proportionally to their training set size but then to avoid interferences, the weighting is reduced to have tasks sampled more uniformly.
 
-##### Exprimental results
+##### Experimental results
 
 We implemented the round robin schedulers with the gradient surgery algorithm and showed a high performance. However, we need to turn off the other optimization methods to have a rough estimate of the effect of the scheduler on the training in terms of score and convergence speed.
 
@@ -369,7 +369,7 @@ We implemented the round robin schedulers with the gradient surgery algorithm an
 
 The PAL (Performance and Locality) scheduler was developed by R. Jain, et al ([PAL: A Variability-Aware Policy for Scheduling ML Workloads in GPU Clusters](https://arxiv.org/pdf/2408.11919v1)) to address the issue of performance variability in large-scale computing environments and to handle machine Learning workloads in GPU clusters. Thus, this method aims at harnessing the performance variability by redesigning scheduling policies for GPU clusters to consider performance variability. First, the authors identified which GPUs exhibit similar performance variability and the used K-Means clustering to group them. Then they extend their novel algorithm by including also locality of GPUs that are widely distributed on the cluster.
 
-##### Exprimental results
+##### Experimental results
 
 We used the PAL scheduler without vaccine and showed relatively good performance on the STS and QQP tasks. However, we could not run it with the Gradient surgery algorithms due to memory issues on the GWDG cluster.
 
@@ -413,9 +413,6 @@ The dataset we worked is imbalanced, either inside the individual datasets, such
 
 Although, the data augmentation approach seems more promising, we unfortunately came about its idea a bit late in the project's schedule, which is why we only implement the first approach and leave the latter for further investigations.
 
-<!-- <details>
-  <summary>A lot more about the model architecture and the approaches we used.</summary> -->
-
 ### Classifier Architecture
 
 We share the BERT layers among all the datasets and build a classifier on top that is characteristic for each task. We tried many different architectures to improve the performance of both single and multitask training. We use the first token of the sequence **[CLS]** of the last hidden state that encodes all the learned parameters of the model during the open domain pre-training phase and feed it to the classifiers, as already described in these research studies ([Devlin et al. ](https://arxiv.org/pdf/1810.04805), [Sun et al.](https://arxiv.org/pdf/1905.05583#page=9&zoom=100,402,290), [Karimi et al.](https://arxiv.org/pdf/2001.11316)). The classifiers we build are:
@@ -457,10 +454,6 @@ We tried to run BERT-Large on our multitask training, which has a larger embeddi
 ### PALs
 
 Projected Attention Layers (PALs) are a novel technique introduced by ([BERT and PALs: Projected Attention Layers for Efficient Adaptation in Multi-Task Learning](https://proceedings.mlr.press/v97/stickland19a/stickland19a.pdf)) to efficiently adapt LLMs to new tasks without the need to pre-train the model. This can be done by introducing multi-head attention layers parallel to the BERT layers. The additional layers can be fine-tuned separately from the base model. The attention layers project the input into task-specific subspace and only the parameters of the PALs get updated, while keeping the parameters of the base model unchanged or frozen which saves computational costs. Also, PAls allow for sharing parameters among layers in multitask-learning which could have a high positive impact on the performance. Although, We integrated the PAls functions into our framework in branch [BERT_PALs-Aly](https://github.com/FrederikHennecke/DeepLearning4NLP/tree/BERT_PALs-Aly), we haven't measured its performance yet, since we still have to complete processing and debuging its implementation. We leave that part to further investigations of the project.
-
-<!-- <img src="pals.png" alt="pal with bert" style="transform: rotate(-90deg);"> -->
-
-<!-- </details> -->
 
 ---
 
