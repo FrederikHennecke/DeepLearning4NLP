@@ -36,14 +36,14 @@ tasks=("sst" "sts" "qqp")
 for task in "${tasks[@]}" 
 do
     echo "task: $task"
-#    python -u multitask_classifier.py --use_gpu --local_files_only --option finetune --task "$task" --hidden_dropout_prob 0.1
+    python -u multitask_classifier.py --epochs 1 --use_gpu --local_files_only --option finetune --task "$task" --hidden_dropout_prob 0.1
 done
 
-bart_files=("bart_detection.py")
+bart_files=("bart_detection.py" "bart_generation.py")
 for file in "${bart_files[@]}"
 do
     echo "Running file: $file for etpc tasks"
-    python -u "$file" --use_gpu --epochs 5 --lr 1e-5
+    python -u "$file" --use_gpu --epochs 1 --lr 1e-5
     echo
 done
 

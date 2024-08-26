@@ -22,14 +22,16 @@ install_miniconda() {
     source ~/.bashrc
 }
 
+conda config --set channel_priority disabled
+conda config --set allow_non_channel_urls True
+conda update conda -c https://software.repos.intel.com/python/conda/ --override-channels
+
 # Function to check if conda environment exists
 check_conda_env() {
     if conda env list | grep -q "dnlp"; then
         echo "Conda environment 'dnlp' already exists."
     else
         echo "Conda environment 'dnlp' does not exist. Creating environment..."
-        # conda create -n dnlp python=3.10 -y
-        wget https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/dnlp.yml
         conda env create -f dnlp.yml
     fi
 }
@@ -44,7 +46,6 @@ set -e
 eval "$(conda shell.bash hook)"
 
 echo "Activating conda environment 'dnlp'..."
-module load anaconda3
 source activate dnlp
 
 echo $CONDA_DEFAULT_ENV
@@ -86,3 +87,4 @@ python -c "from tokenizer import BertTokenizer; from bert import BertModel; Bert
 
 python -c "from transformers import RobertaTokenizer; RobertaTokenizer.from_pretrained('roberta-base'); from transformers import RobertaModel; RobertaModel.from_pretrained('roberta-base')"
 python -c "from transformers import AutoTokenizer, AutoModel; AutoTokenizer.from_pretrained('facebook/bart-large'); from transformers import BartModel; BartModel.from_pretrained('facebook/bart-large')"
+python -c "import nltk; nltk.download('wordnet')"
