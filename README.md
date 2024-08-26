@@ -1,5 +1,68 @@
 # DNLP SS24 Final Project – BERT for Multitask Learning and BART for Paraphrasing
 
+**Table of Contents**
+
+- [DNLP SS24 Final Project – BERT for Multitask Learning and BART for Paraphrasing](#DNLP-SS24-Final-Project-BERT-for-Multitask-Learning-and-BART-for-Paraphrasing)
+
+  - [Introduction](#introduction)
+  - [Requirements](#requirements)
+  - [Data](#data)
+  - [Training](#training)
+  - [Evaluation](#evaluation)
+  - [Results](#results)
+    - [Paraphrase Identification on Quora Question Pairs (QQP)](#paraphrase-identification-on-quora-question-pairs-qqp)
+    - [Sentiment Classification on Stanford Sentiment Treebank (SST)](#sentiment-classification-on-stanford-sentiment-treebank-sst)
+    - [Semantic Textual Similarity on STS](#semantic-textual-similarity-on-sts)
+  - [Methodology](#methodology)
+    - [POS and NER Tag Embeddings](#pos-and-ner-tag-embeddings)
+      - [Experimental Results](#experimental-results)
+      - [Explanation of Results](#explanation-of-results)
+    - [Optimizers](#optimizers)
+      - [Sophia](#sophia)
+        - [Implementation](#implementation)
+        - [Experimental Results](#experimental-results)
+        - [Explanation of Results](#explanation-of-results)
+    - [Gradient Optimization (Projectors)](#gradient-optimization-projectors)
+      - [Pcgrad](#pcgrad)
+      - [Experimental Results](#experimental-results)
+      - [Explanation of Results](#explanation-of-results)
+      - [GradVac](#gradvac)
+      - [Experimental Results](#experimental-results)
+      - [Explanation of Results](#explanation-of-results)
+    - [Schedulers](#schedulers)
+      - [Linear Warmup](#linear-warmup)
+        - [Experimental Results](#experimental-results)
+      - [Plateau](#plateau)
+      - [Cosine](#cosine)
+      - [Round Robin](#round-robin)
+        - [Experimental Results](#experimental-results)
+      - [PAL](#pal)
+        - [Experimental Results](#experimental-results)
+      - [Random](#random)
+    - [Regularization](#regularization)
+      - [SMART](#smart)
+        - [Experimental Results](#experimental-results)
+  - [Details](#details)
+    - [Data Imbalance](#data-imbalance)
+    - [Classifier Architecture](#classifier-architecture)
+    - [Augmented Attention](#augmented-attention)
+    - [BiLSTM](#bilstm)
+    - [Feed more Sequences](#feed-more-sequences)
+    - [Hierarchical BERT](#hierarchical-bert)
+    - [CNN BERT](#cnn-bert)
+    - [Combined Models](#combined-models)
+    - [BERT-Large](#bert-large)
+    - [PALs](#pals)
+  - [Hyperparameter Search](#hyperparameter-search)
+  - [Computation Resources](#computation-resources)
+  - [Contributors](#contributors)
+  - [Licence](#licence)
+  - [Usage Guidelines](#usage-guidelines)
+    - [Pre-commit Hooks](#pre-commit-hooks)
+    - [GWDG Cluster](#gwdg-cluster)
+  - [AI-Usage Card](#ai-usage-card)
+  - [Acknowledgement](#acknowledgement)
+
 - **Group name:** BERT's Buddies
 
 - **Group code:** G04
@@ -102,7 +165,7 @@ There are lots of parameters to set. To see all of them, run `python <filename> 
 
 ## Evaluation
 
-The model is evaluated after each epoch on the validation set. The results are printed to the console and saved in the `--logdir`in case of setting `--no_tensorboard` to `store-false`. The model checkpoints are saved after each epoch in the `filepath` directory. After finishing the training, the model is loaded to be testedon the test set. The model's predictions are then saved in the `predictions_path`.
+The model is evaluated after each epoch on the validation set. The results are printed to the console and saved in the `--logdir`in case of setting `--no_tensorboard` to `store-false`. The model checkpoints are saved after each epoch in the `filepath` directory. After finishing the training, the model is loaded to be evaluated on the test set. The model's predictions are then saved in the `predictions_path`.
 
 ## Results
 
@@ -350,8 +413,8 @@ The dataset we worked is imbalanced, either inside the individual datasets, such
 
 Although, the data augmentation approach seems more promising, we unfortunately came about its idea a bit late in the project's schedule, which is why we only implement the first approach and leave the latter for further investigations.
 
-<details>
-  <summary>A lot more about the model architecture and the approaches we used.</summary>
+<!-- <details>
+  <summary>A lot more about the model architecture and the approaches we used.</summary> -->
 
 ### Classifier Architecture
 
@@ -395,167 +458,148 @@ We tried to run BERT-Large on our multitask training, which has a larger embeddi
 
 Projected Attention Layers (PALs) are a novel technique introduced by ([BERT and PALs: Projected Attention Layers for Efficient Adaptation in Multi-Task Learning](https://proceedings.mlr.press/v97/stickland19a/stickland19a.pdf)) to efficiently adapt LLMs to new tasks without the need to pre-train the model. This can be done by introducing multi-head attention layers parallel to the BERT layers. The additional layers can be fine-tuned separately from the base model. The attention layers project the input into task-specific subspace and only the parameters of the PALs get updated, while keeping the parameters of the base model unchanged or frozen which saves computational costs. Also, PAls allow for sharing parameters among layers in multitask-learning which could have a high positive impact on the performance. Although, We integrated the PAls functions into our framework in branch [BERT_PALs-Aly](https://github.com/FrederikHennecke/DeepLearning4NLP/tree/BERT_PALs-Aly), we haven't measured its performance yet, since we still have to complete processing and debuging its implementation. We leave that part to further investigations of the project.
 
-</details>
+<!-- <img src="pals.png" alt="pal with bert" style="transform: rotate(-90deg);"> -->
+
+<!-- </details> -->
 
 ---
 
-## Experiments
+## Hyperparameter Search
 
-Keep track of your experiments here. What are the experiments? Which tasks and models are you considering?
+We used [Ray Tune](https://docs.ray.io/en/latest/tune/index.html) to perform hyperparameter tuning for the multitasking and select the best parameters that reduce overfitting. We used [Optuna](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html) to search the hyperparameter space and [AsyncHyperBandScheduler](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.AsyncHyperBandScheduler.html) as the scheduler. The hyperparameters were searched for the whole model on all training data, not for each task individually to avoid overfitting to a single task. The trained models were evaluated on the validation data and the best one was selected based on the validation results. The metrics applied were accuracy for the sentiment analysis and paraphrase detection, and the Pearson correlation for the semantic textual similarity.
 
-Write down all the main experiments and results you did, even if they didn't yield an improved performance. Bad results are also results. The main findings/trends should be discussed properly. Why a specific model was better/worse than the other?
+---
 
-You are **required** to implement one baseline and improvement per task. Of course, you can include more experiments/improvements and discuss them.
+## Computation Resources
 
-You are free to include other metrics in your evaluation to have a more complete discussion.
+We trained our models on the [GWDG](https://docs.hpc.gwdg.de/usage_guide/slurm/gpu_usage/index.html) HPC clusters of the George-August university of Göttingen. We used differents set ups depending on the implemented approach and how much computation costs it needs, We mainly used Grete and Emmy cluster nodes and trained the basic multitasking approach (with augmented attention) with the following configurations:
 
-Be creative and ambitious.
+- **GPU cores:** 4
+- **Model:** NVIDIA A100-SXM4-40GB
+- **NVIDIA driver version:** 535.104.12
+- **XNNPACK available:** True
+- **OS:** Rocky Linux 8.8 (Green Obsidian) (x86_64)
+- **CPU cores per socket:** 32
 
-For each experiment answer briefly the questions:
+More details about the computation utilities can be found in the slurm file corresponding to each training.
 
-- What experiments are you executing? Don't forget to tell how you are evaluating things.
-- What were your expectations for this experiment?
-- What have you changed compared to the base model (or to previous experiments, if you run experiments on top of each other)?
-- What were the results?
-- Add relevant metrics and plots that describe the outcome of the experiment well.
-- Discuss the results. Why did improvement _A_ perform better/worse compared to other improvements? Did the outcome match your expectations? Can you recognize any trends or patterns?
+---
 
-**BART paraphrase detection:**
-SophiaG
-learning rate scheduler
-costumloss
+## Contributors
 
-- What experiments are you executing? Don't forget to tell how you are evaluating things.
-- What were your expectations for this experiment?
-- What have you changed compared to the base model (or to previous experiments, if you run experiments on top of each other)?
-- What were the results?
-- Add relevant metrics and plots that describe the outcome of the experiment well.
-- Discuss the results. Why did improvement _A_ perform better/worse compared to other improvements? Did the outcome match your expectations? Can you recognize any trends or patterns?
+| **Mohamed Aly**                                             | **Contrib1** | **contrib2** |
+| ----------------------------------------------------------- | ------------ | ------------ |
+| BERT Tasks (SST, STS, QQP) and their implemented approaches |              |              |
+| Writing the README file                                     |              |              |
 
-## Results
+---
 
-Summarize all the results of your experiments in tables:
+## Licence
 
-| **Stanford Sentiment Treebank (SST)** | **Metric 1** | **Metric n** |
-| ------------------------------------- | ------------ | ------------ |
-| Baseline                              | 45.23%       | ...          |
-| Improvement 1                         | 58.56%       | ...          |
-| Improvement 2                         | 52.11%       | ...          |
-| ...                                   | ...          | ...          |
+The project involves the creation of software and documentation to be released under an open source licence.
+This license is the Apache License 2.0, which is a permissive licence that allows the use of the software for
+commercial purposes. The licence is also compatible with the licences of the libraries used in the project. Parts of the project were inspired by other open source codes (see acknowledgment). Using or modifying these parts in this project should adhere to the licence (Copyrights) of the original authors.
 
-| **Quora Question Pairs (QQP)** | **Metric 1** | **Metric n** |
-| ------------------------------ | ------------ | ------------ |
-| Baseline                       | 45.23%       | ...          |
-| Improvement 1                  | 58.56%       | ...          |
-| Improvement 2                  | 52.11%       | ...          |
-| ...                            | ...          | ...          |
+---
 
-| **Semantic Textual Similarity (STS)** | **Metric 1** | **Metric n** |
-| ------------------------------------- | ------------ | ------------ |
-| Baseline                              | 45.23%       | ...          |
-| Improvement 1                         | 58.56%       | ...          |
-| Improvement 2                         | 52.11%       | ...          |
-| ...                                   | ...          | ...          |
+## Usage Guidelines
 
-| **Paraphrase Type Detection (PTD)** | **Metric 1** | **Metric n** |
-| ----------------------------------- | ------------ | ------------ |
-| Baseline                            | 45.23%       | ...          |
-| Improvement 1                       | 58.56%       | ...          |
-| Improvement 2                       | 52.11%       | ...          |
-| ...                                 | ...          | ...          |
+To run or contribute to this project, please follow these steps:
 
-| **Paraphrase Type Generation (PTG)** | **Metric 1** | **Metric n** |
-| ------------------------------------ | ------------ | ------------ |
-| Baseline                             | 45.23%       | ...          |
-| Improvement 1                        | 58.56%       | ...          |
-| Improvement 2                        | 52.11%       | ...          |
-| ...                                  | ...          | ...          |
+Clone the repository to your local machine
 
-Discuss your results, observations, correlations, etc.
+```sh
+git clone git@github.com:FrederikHennecke/DeepLearning4NLP.git
+```
 
-Results should have three-digit precision.
+Add the upstream repository as a remote and disable pushing to it (only pull but not push)
 
-### Hyperparameter Optimization
+```sh
+git remote add upstream https://github.com/FrederikHennecke/DeepLearning4NLP.git
+git remote set-url --push upstream DISABLE
+```
 
-Describe briefly how you found your optimal hyperparameter. If you focussed strongly on Hyperparameter Optimization, you can also include it in the Experiment section.
+You can pull the latest updates of the project with
 
-_Note: Random parameter optimization with no motivation/discussion is not interesting and will be graded accordingly_
+```sh
+git fetch upstream
+git merge upstream/main
+```
 
-## Visualizations
+or you can specify a branch to pull from after fetching the changes
 
-Add relevant graphs of your experiments here. Those graphs should show relevant metrics (accuracy, validation loss, etc.) during the training. Compare the different training processes of your improvements in those graphs.
+```sh
+git pull <branch-name>
+```
 
-For example, you could analyze different questions with those plots like:
+### Pre-commit Hooks
 
-- Does improvement A converge faster during training than improvement B?
-- Does Improvement B converge slower but perform better in the end?
-- etc...
+The code quality and integrity is checked with pre-commit hooks. This is used to ensure that the code quality is consistent and that the code is formatted uniformly. To install the pre-commit hooks in your local repository, run the following
 
-## Members Contribution
+```sh
+pip install pre-commit
+pre-commit install
+```
 
-Explain what member did what in the project:
+The pre-commit hooks will run automatically before each commit. If the hooks fail, the commit will be aborted. You can skip the pre-commit hooks by add `--no-verify`flag to your commit command.
 
-**Member 1:** _implemented the training objective using X, Y, and Z. Supported member 2 in refactoring the code. Data cleaning, etc._
+The installed pre-commit hooks are:
 
-- **Group member 1:** Hennecke, Frederik
+- [`black`](https://github.com/psf/black) - Code formatter (Line length 100)
+- [`flake8`](https://github.com/PyCQA/flake8) - Code linter (Selected rules)
+- [`isort`](https://github.com/PyCQA/isort) - Import sorter
 
-- **Group member 2:** Aly, Mohamed
+### GWDG Cluster
 
-- **Group member 3:** Tillmann, Arne implemented the costum loss function for the paraphrase type detection task. He also implemented the grid search to optimize the hyperparameters (weights).
+You can run the project on the GWDG cluster, in case you are a memeber of the GWDG community and specify the [GPU usage](https://docs.hpc.gwdg.de/how_to_use/slurm/gpu_usage/index.html) you need. To start an interactive session for testing the project, execute the following
 
-- **Group member 4:** Chang, Yue
+```sh
+srun -p grete:shared --pty -n 1 -C inet -c 32 -G A100:1 --interactive /bin/bash
+```
 
-- **Group member 5:** Yaghoubi, Forough
-  ...
+This command will allocate resources of one node with 32 CPU cores and A100:1 GPU NVIDIA core on the grete shared cluster. For the actual run of the script and usage of higher computational power, you need to submit a job. The job configurations are found in the `run_train.sh` script where you can select the file to run with the options you like to activate and your prefered parameters. You can also adjust the resources you want to use (nodes per task, GPU cores, memory, etc.) and add your email to receive a notification of the job's status. You can submit a job with the following command
 
-We should be able to understand each member's contribution within 5 minutes.
+```sh
+sbatch run_train.sh
+```
 
-# AI-Usage Card
+You can check the status of your submitted jobs with
 
-Artificial Intelligence (AI) aided the development of this project. Please add a link to your AI-Usage card [here](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/ai-usage-card.pdf) [here the website to create a new one](https://ai-cards.org/).
+```sh
+squeue --me
+```
 
-# References
+This will show the job-id, if the job is running or still pending allocation, time elapsed since submission and the gpu node assigned to it.
 
-Write down all your references (other repositories, papers, etc.) that you used for your project.
+The job details will be saved to the `slurm_files` directory where you can see a summary of the resources used, the installed packages, the executed command and the git related information (current branch, latest commit, etc.). If `checkpoint`and `write_summary` options are activated, then the training logs will be saved to the `logdir` directory. The saved results can be viewed on the tensorboard. To create a tunnel to your local machine and start the tensorboard on the cluster, run the following
 
-@article{liu2023sophia,
-title={Sophia: A Scalable Stochastic Second-order Optimizer for Language Model Pre-training},
-author={Liu, Hong and Li, Zhiyuan and Hall, David and Liang, Percy and Ma, Tengyu},
-journal={arXiv preprint arXiv:2305.14342},
-year={2023}
-}
+```sh
+ssh -L localhost:16006:localhost:6006 <username>@glogin.hlrn.de
+module load anaconda3
+conda activate dnlp2
+tensorboard --logdir logdir
+```
 
-# DNLP SS24 Final Project
+---
 
-This is the starting code for the default final project for the Deep Learning for Natural Language Processing course at the University of Göttingen. You can find the handout [here](https://docs.google.com/document/d/1pZiPDbcUVhU9ODeMUI_lXZKQWSsxr7GO/edit?usp=sharing&ouid=112211987267179322743&rtpof=true&sd=true)
+## AI-Usage Card
 
-In this project, you will implement some important components of the BERT model to better understanding its architecture.
-You will then use the embeddings produced by your BERT model on three downstream tasks: sentiment classification, paraphrase detection and semantic similarity.
+Artificial Intelligence (AI) aided the development of this project. For transparency, we provide our [AI-Usage Card](./ai-usage-card-Aly.pdf/) at the top. The card is based on [https://ai-cards.org/](https://ai-cards.org/).
 
-After finishing the BERT implementation, you will have a simple model that simultaneously performs the three tasks.
-You will then implement extensions to improve on top of this baseline.
+---
 
-## Setup instructions
+## Acknowledgement
 
-- Follow `setup.sh` to properly setup a conda environment and install dependencies.
-- There is a detailed description of the code structure in [STRUCTURE.md](./STRUCTURE.md), including a description of which parts you will need to implement.
-- You are only allowed to use libraries that are installed by `setup.sh` (Use `setup_gwdg.sh` if you are using the GWDG clusters).
-- Libraries that give you other pre-trained models or embeddings are not allowed (e.g., `transformers`).
-- Use this template to create your README file of your repository: <https://github.com/gipplab/dnlp_readme_template>
+- The project description, partial implementation, and scripts were adapted from the default final project for the
+  Stanford [CS 224N class](https://web.stanford.edu/class/cs224n/) developed by Gabriel Poesia, John, Hewitt, Amelie Byun,
+  John Cho, and their (large) team (Thank you!)
 
-## Project Description
+- The BERT implementation part of the project was adapted from the "minbert" assignment developed at Carnegie Mellon
+  University's [CS11-711 Advanced NLP](http://phontron.com/class/anlp2021/index.html),
+  created by Shuyan Zhou, Zhengbao Jiang, Ritam Dutt, Brendon Boldt, Aditya Veerubhotla, and Graham Neubig (Thank you!)
 
-Please refer to the project description for a through explanation of the project and its parts.
+- Multitask-training with augmented attention is inspired from [Lars Kaesberg and Niklas Bauer](https://github.com/token-tricksters/deep-learning-nlp) under [Apache License 2.0](https://github.com/token-tricksters/deep-learning-nlp/blob/main/LICENSE) (Thank you!).
 
-### Acknowledgement
+- PALs and schedulers implementations are inspired from [Josselin Roberts, Marie Huynh and Tom Pritsky](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning) under [Apache License 2.0](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning/blob/main/LICENSE) (Thank you!).
 
-The project description, partial implementation, and scripts were adapted from the default final project for the Stanford [CS 224N class](https://web.stanford.edu/class/cs224n/) developed by Gabriel Poesia, John, Hewitt, Amelie Byun, John Cho, and their (large) team (Thank you!)
-
-The BERT implementation part of the project was adapted from the "minbert" assignment developed at Carnegie Mellon University's [CS11-711 Advanced NLP](http://phontron.com/class/anlp2021/index.html),
-created by Shuyan Zhou, Zhengbao Jiang, Ritam Dutt, Brendon Boldt, Aditya Veerubhotla, and Graham Neubig (Thank you!)
-
-Parts of the code are from the [`transformers`](https://github.com/huggingface/transformers) library ([Apache License 2.0](./LICENSE)).
-
-Parts of the scripts and code were altered by [Jan Philip Wahle](https://jpwahle.com/) and [Terry Ruas](https://terryruas.com/).
-
-For the 2024 edition of the DNLP course at the University of Göttingen, the project was modified by [Niklas Bauer](https://github.com/ItsNiklas/), [Jonas Lührs](https://github.com/JonasLuehrs), ...
+- The structure of README file is adapted from [good_example](https://github.com/maly-phy/dnlp_readme_template/tree/main/good_example) (Thank you!)
