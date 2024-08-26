@@ -33,7 +33,7 @@ from transformers import RobertaModel, RobertaTokenizer
 
 from tokenizer import BertTokenizer
 from bert import BertModel, BertLayer, BertModelWithPAL
-from datasets import (
+from datasets_pal_processing import (
     SentenceClassificationDataset,
     SentencePairDataset,
     load_multitask_data,

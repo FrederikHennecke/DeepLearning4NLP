@@ -19,27 +19,21 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from transformers import RobertaModel, RobertaTokenizer
-from tokenizer import BertTokenizer
-from bert import BertModel, BertLayer, BertModelWithPAL
+from bert import BertModel
 from datasets import (
     SentenceClassificationDataset,
     SentencePairDataset,
     load_multitask_data,
 )
-from config import BertConfig
-from combined_models import CombinedModel
-from layers import AttentionLayer
-
 from evaluation import model_eval_multitask, test_model_multitask
 from optimizer import AdamW, SophiaG, SophiaH
 from contextlib import nullcontext
+from bert import BertLayer
 from transformers import get_linear_schedule_with_warmup
 import math
 import warnings
 import json
 import uuid
-from filelock import FileLock
 
 warnings.filterwarnings("ignore", category=UserWarning, module="torch.autograd")
 
@@ -59,10 +53,24 @@ TQDM_DISABLE = False
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 N_HIDDEN_LAYERS = 12
-HIDDEN_DIM = 512
-output_dim = 64
-
+MAX_Position_EMBEDDINGS = 128
 os.environ["RAY_CHDIR_TO_TRIAL_DIR"] = "0"
+
+
+class AttentionLayer(nn.Module):
+    def __init__(self, input_size):
+        super(AttentionLayer, self).__init__()
+        self.linear_transform = nn.Linear(input_size, input_size)
+        self.linear_transform1 = nn.Linear(input_size, 1, bias=False)
+
+    def forward(self, embeddings):
+        # embeddings: [batch_size, seq_len, hidden_size]
+        transformed_embeddings = torch.tanh(self.linear_transform(embeddings))
+        attention_weights = torch.softmax(
+            self.linear_transform1(transformed_embeddings), dim=1
+        )
+        attended_embeddings = torch.sum(attention_weights * embeddings, dim=1)
+        return attended_embeddings
 
 
 class MultitaskBERT(nn.Module):
@@ -78,27 +86,10 @@ class MultitaskBERT(nn.Module):
     def __init__(self, config):
         super(MultitaskBERT, self).__init__()
 
-        if args.model_name == "roberta-base":
-            self.bert = RobertaModel.from_pretrained(
-                "roberta-base", local_files_only=config.local_files_only
-            )
-            self.tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+        self.bert = BertModel.from_pretrained(
+            "bert-base-uncased", local_files_only=config.local_files_only
+        )
 
-        elif args.model_name == "bert-large-uncased":
-            self.bert = BertModel.from_pretrained(
-                "bert-large-uncased", local_files_only=config.local_files_only
-            )
-            self.tokenizer = BertTokenizer.from_pretrained("bert-large-uncased")
-            config.hidden_size = 1024
-            BERT_HIDDEN_SIZE = 1024
-
-        else:
-            self.bert = BertModel.from_pretrained(
-                "bert-base-uncased", local_files_only=config.local_files_only
-            )
-            self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-
-        # initialize params
         for param in self.bert.parameters():
             if config.option == "pretrain":
                 param.requires_grad = False
@@ -106,10 +97,23 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
 
         self.config = config
-        self.attention_layer = AttentionLayer(BERT_HIDDEN_SIZE)
+        if config.train_mode == "single_layers":
+            self.layers = config.layers
+        else:
+            self.layers = []
 
         # Dropout for regularization
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        # attention layer
+        self.attention_layer = AttentionLayer(config.hidden_size)
+
+        # all pooled train mode
+        self.d_a = 128
+        self.attn_heads = 1
+
+        self.linear_first = torch.nn.Linear(config.hidden_size, self.d_a)
+        self.linear_second = torch.nn.Linear(self.d_a, self.attn_heads)
 
         # sentiment
         self.sentiment_linear = torch.nn.Linear(config.hidden_size, config.hidden_size)
@@ -127,35 +131,87 @@ class MultitaskBERT(nn.Module):
         )
         self.paraphrase_classifier = nn.Linear(config.hidden_size, 2)
 
-    def forward(self, input_ids, attention_mask, task_id):
+    def forward(self, input_ids, attention_mask):
+        all_encoded_layers, pooled_output, all_sequences, all_pooled = self.bert(
+            input_ids, attention_mask
+        )
+        if self.config.train_mode == "all_pooled":
+            pooler_output = self.dropout(all_pooled["pooler_output"]).unsqueeze(0)
+            pooled_output2 = self.dropout(all_pooled["pooled_output2"]).unsqueeze(0)
+            pooled_output3 = self.dropout(all_pooled["pooled_output3"]).unsqueeze(0)
+            pooled_output4 = self.dropout(all_pooled["pooled_output4"]).unsqueeze(0)
+            pooled_output5 = self.dropout(all_pooled["pooled_output5"]).unsqueeze(0)
+            pooled_output6 = self.dropout(all_pooled["pooled_output6"]).unsqueeze(0)
+            pooled_output7 = self.dropout(all_pooled["pooled_output7"]).unsqueeze(0)
+            pooled_output8 = self.dropout(all_pooled["pooled_output8"]).unsqueeze(0)
+            pooled_output9 = self.dropout(all_pooled["pooled_output9"]).unsqueeze(0)
+            pooled_output10 = self.dropout(all_pooled["pooled_output10"]).unsqueeze(0)
+            pooled_output11 = self.dropout(all_pooled["pooled_output11"]).unsqueeze(0)
+            pooled_output12 = self.dropout(all_pooled["pooled_output12"]).unsqueeze(
+                0
+            )  # 12, batchsize, hidden_dim
+            all_pooled_output = torch.cat(
+                (
+                    pooler_output,
+                    pooled_output2,
+                    pooled_output3,
+                    pooled_output4,
+                    pooled_output5,
+                    pooled_output6,
+                    pooled_output7,
+                    pooled_output8,
+                    pooled_output9,
+                    pooled_output10,
+                    pooled_output11,
+                    pooled_output12,
+                ),
+                0,
+            )
 
-        # if isinstance(self.bert, BertModelWithPAL):
-        #     bert_output = self.bert(input_ids, attention_mask, task_id)[
-        #         "last_hidden_state"
-        #     ]
-        # else:
-        # _, pooler_output, all_sequences, _ = self.bert(input_ids, attention_mask)
-        # bert_output = all_sequences["last_hidden_state"]
+            seq_len, batch_size, hidden_dim = all_pooled_output.size()
 
-        bert_output = self.bert(input_ids, attention_mask)["last_hidden_state"]
-        bert_output = self.attention_layer(bert_output)
-        bert_output = self.dropout(bert_output)
+            add_layer = self.linear_first(
+                all_pooled_output
+            )  # seq_len. batchsize. hidden_dim
+            add_layer = F.tanh(add_layer)
+            add_layer = self.linear_second(add_layer)
+            add_layer = F.softmax(add_layer, dim=0)
+
+            b = []
+            y = []
+            for i in range(self.attn_heads):
+                b.append(add_layer[:, :, i])
+                b[i] = b[i].unsqueeze(2).expand(seq_len, batch_size, hidden_dim)
+                y.append(
+                    (b[i] * all_pooled_output).sum(dim=0)
+                )  #  batchsize, hidden_dim
+            hidden_states = torch.cat(y, 1)  # batchsize, hidden_dim*heads
+
+        elif self.config.train_mode == "last_hidden_state":
+            self.layers = []
+            hidden_states = self.attention_layer(all_sequences["last_hidden_state"])
+
+        elif len(self.layers) > 0 and self.config.train_mode == "single_layers":
+            hidden_states = []
+            for l in self.layers:
+                hidden_states.append(all_encoded_layers[l][:, 0].unsqueeze(1))
+            hidden_states = torch.cat(hidden_states, dim=1)
 
         if self.config.pooling == None:
-            pooled_output = bert_output
+            output = hidden_states
 
         elif self.config.pooling == "max":
-            pooled_output, _ = torch.max(bert_output, dim=1)
-            # pooled_output = nn.MaxPool1d(kernel_size=self.config.max_position_embeddings)(bert_output).squeeze(-1)
+            # output, _ = torch.max(hidden_states, dim=1)
+            output = nn.MaxPool1d(1)(hidden_states).squeeze(-1)
 
         elif self.config.pooling == "mean":
-            pooled_output = torch.mean(bert_output, dim=1)
-            # pooled_output = nn.AvgPool1d(kernel_size= self.config.max_position_embeddings)(bert_output).squeeze(-1)
+            # output = torch.mean(hidden_states, dim=1)
+            output = nn.AvgPool1d(1)(hidden_states).squeeze(-1)
 
-        return pooled_output
+        return output
 
     def predict_sentiment(self, input_ids, attention_mask):
-        bert_embeddings = self.forward(input_ids, attention_mask, task_id=2)
+        bert_embeddings = F.relu(self.forward(input_ids, attention_mask))
         sentiment_logits = F.relu(self.sentiment_linear(bert_embeddings))
         sentiment_logits = F.relu(self.sentiment_linear1(sentiment_logits))
         sentiment_logits = F.relu(self.sentiment_linear2(sentiment_logits))
@@ -163,11 +219,11 @@ class MultitaskBERT(nn.Module):
         return sentiment_logits
 
     def predict_paraphrase_train(
-        self, input_ids1, attention_mask1, input_ids2, attention_mask2, task_id=1
+        self, input_ids1, attention_mask1, input_ids2, attention_mask2
     ):
 
-        bert_embeddings1 = self.forward(input_ids1, attention_mask1, task_id=task_id)
-        bert_embeddings2 = self.forward(input_ids2, attention_mask2, task_id=task_id)
+        bert_embeddings1 = self.forward(input_ids1, attention_mask1)
+        bert_embeddings2 = self.forward(input_ids2, attention_mask2)
 
         # apply relu later
         combined_bert_embeddings1 = self.paraphrase_linear(bert_embeddings1)
@@ -175,6 +231,7 @@ class MultitaskBERT(nn.Module):
 
         abs_diff = torch.abs(combined_bert_embeddings1 - combined_bert_embeddings2)
         abs_sum = torch.abs(combined_bert_embeddings1 + combined_bert_embeddings2)
+
         concatenated_features = torch.cat((abs_diff, abs_sum), dim=1)
 
         paraphrase_logits = F.relu(self.paraphrase_linear1(concatenated_features))
@@ -186,15 +243,15 @@ class MultitaskBERT(nn.Module):
         self, input_ids1, attention_mask1, input_ids2, attention_mask2
     ):
         paraphrase_logits = self.predict_paraphrase_train(
-            input_ids1, attention_mask1, input_ids2, attention_mask2, task_id=1
+            input_ids1, attention_mask1, input_ids2, attention_mask2
         )
         return paraphrase_logits.argmax(dim=-1)
 
     def predict_similarity(
         self, input_ids1, attention_mask1, input_ids2, attention_mask2
     ):
-        bert_embeddings1 = self.forward(input_ids1, attention_mask1, task_id=0)
-        bert_embeddings2 = self.forward(input_ids2, attention_mask2, task_id=0)
+        bert_embeddings1 = self.forward(input_ids1, attention_mask1)
+        bert_embeddings2 = self.forward(input_ids2, attention_mask2)
 
         similarity = F.cosine_similarity(bert_embeddings1, bert_embeddings2)
         return similarity * 5
@@ -211,67 +268,27 @@ def save_model(model, optimizer, args, config, filepath):
         "torch_rng": torch.random.get_rng_state(),
     }
 
-    if not config.combined_models:
-        print(f"Saving the model to {filepath}.")
-        torch.save(save_info, filepath)
-
-    else:
-        lock_path = filepath.split(".")[0] + ".lock"
-        lock = FileLock(lock_path)
-
-        try:
-            with lock:
-                with open(filepath, "wb") as file:
-                    torch.save(save_info, file)
-                    print(f"Saving the model to {filepath}.")
-
-        except Exception as e:
-            print(f"Error saving model to {filepath}")
-            print(e)
+    torch.save(save_info, filepath)
+    print(f"Saving the model to {filepath}.")
 
 
-def load_model(filepath, model, optimizer, use_gpu, combined_models=False):
+def load_model(filepath, model, optimizer, use_gpu):
     if not os.path.isfile(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
 
-    if not combined_models:
-        save_info = torch.load(
-            filepath, map_location=torch.device("cuda") if use_gpu else "cpu"
-        )
-        print(f"Loading the model from {filepath}.")
-        model.load_state_dict(save_info["model"])
-        optimizer.load_state_dict(save_info["optim"])
-        args = save_info["args"]
-        args.use_gpu = use_gpu
-        config = save_info["model_config"]
-        random.setstate(save_info["system_rng"])
-        np.random.set_state(save_info["numpy_rng"])
-        torch.random.set_rng_state(save_info["torch_rng"])
+    save_info = torch.load(
+        filepath, map_location=torch.device("cuda") if use_gpu else "cpu"
+    )
+    model.load_state_dict(save_info["model"])
+    optimizer.load_state_dict(save_info["optim"])
+    args = save_info["args"]
+    args.use_gpu = use_gpu
+    config = save_info["model_config"]
 
-    else:
-        lock_path = filepath.split(".")[0] + ".lock"
-        lock = FileLock(lock_path)
-
-        try:
-            with lock:
-                with open(filepath, "rb") as file:
-                    print(f"Loading the model from {file}.")
-                    save_info = torch.load(
-                        file, map_location=torch.device("cuda") if use_gpu else "cpu"
-                    )
-                    model.load_state_dict(save_info["model"])
-                    optimizer.load_state_dict(save_info["optim"])
-                    args = save_info["args"]
-                    args.use_gpu = use_gpu
-                    config = save_info["model_config"]
-                    random.setstate(save_info["system_rng"])
-                    np.random.set_state(save_info["numpy_rng"])
-                    torch.random.set_rng_state(save_info["torch_rng"])
-
-        except Exception as e:
-            print(f"Error loading model from {filepath}")
-            print(e)
-
+    random.setstate(save_info["system_rng"])
+    np.random.set_state(save_info["numpy_rng"])
+    torch.random.set_rng_state(save_info["torch_rng"])
+    print(f"Loading the model from {filepath}.")
     return model, optimizer, args, config
 
 
@@ -387,20 +404,21 @@ def train_multitask(args):
         "additional_inputs": args.additional_inputs,
         "hidden_size": BERT_HIDDEN_SIZE,
         "num_hidden_layers": N_HIDDEN_LAYERS,
-        "max_position_embeddings": args.max_position_embeddings,
+        "max_position_embeddings": MAX_Position_EMBEDDINGS,
+        "train_mode": args.train_mode,
         "pooling": args.pooling,
         "layers": args.layers,
-        "hidden_dim": HIDDEN_DIM,
-        "max_length": args.max_length,
-        "combined_models": args.combined_models,
     }
 
-    save_params_dir = args.config_save_dir + args.name + ".json"
+    file_uuid = str(uuid.uuid4())
+    name = f"{file_uuid}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
+    args.filepath = f"models1/multitask_classifier/{name}.pt"  # save path
+
+    save_params_dir = args.config_save_dir + name + ".json"
     train_params = pformat({k: v for k, v in vars(args).items() if "csv" not in str(v)})
 
-    if args.write_summary:
-        with open(save_params_dir, "w") as f:
-            json.dump(train_params, f)
+    with open(save_params_dir, "w") as f:
+        json.dump(train_params, f)
 
     config = SimpleNamespace(**config)
 
@@ -438,11 +456,6 @@ def train_multitask(args):
     print(separator)
 
     model = MultitaskBERT(config)
-    bert_config = BertConfig()
-
-    if args.use_pal:
-        BertModelWithPAL.from_BertModel(model.bert, bert_config, train_pal=True)
-
     device = torch.device("cpu")
     if torch.cuda.is_available() and args.use_gpu:
         device = torch.device("cuda")
@@ -475,10 +488,19 @@ def train_multitask(args):
         raise ValueError(f"Invalid optimizer: {args.optimizer}")
 
     if args.scheduler == "linear_warmup":
+        num_training_steps = int(
+            (
+                len(sst_train_dataloader)
+                + len(sts_train_dataloader)
+                + len(para_train_dataloader)
+            )
+            / args.batch_size
+            * args.epochs
+        )
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=0,
-            num_training_steps=len(sst_train_dataloader) * args.epochs,
+            num_training_steps=num_training_steps,
+            num_warmup_steps=int(num_training_steps * 0.1),
         )
     elif args.scheduler == "plateau":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -497,21 +519,20 @@ def train_multitask(args):
 
     if args.checkpoint:
         model, optimizer, _, config = load_model(
-            args.checkpoint, model, optimizer, args.use_gpu, args.combined_models
+            args.checkpoint, model, optimizer, args.use_gpu
         )
     path = (
         args.logdir
         + "/multitask_classifier/"
         + (f"{args.tensorboard_subfolder}/" if args.tensorboard_subfolder else "")
-        + args.name
+        + name
     )
-    if args.write_summary:
-        writer = SummaryWriter(log_dir=path)
-        writer.add_hparams(
-            vars(args),
-            {},
-            run_name="hparams",
-        )
+    writer = SummaryWriter(log_dir=path)
+    writer.add_hparams(
+        vars(args),
+        {},
+        run_name="hparams",
+    )
 
     if args.profiler:
         prof = torch.profiler.profile(
@@ -629,23 +650,20 @@ def train_multitask(args):
             train_loss += full_loss.item()
             num_batches += 1
 
+            if args.scheduler == "linear_warmup":
+                scheduler.step()
+
             if args.scheduler == "cosine":
                 scheduler.step(epoch + num_batches / total_num_batches)
-
-            if args.write_summary:
-                writer.add_scalar(
-                    "Loss/train",
-                    full_loss.item(),
-                    epoch * total_num_batches + num_batches,
-                )
+            writer.add_scalar(
+                "Loss/train", full_loss.item(), epoch * total_num_batches + num_batches
+            )
 
             if args.profiler:
                 prof.step()
 
         train_loss = train_loss / num_batches
-
-        if args.write_summary:
-            writer.add_scalar("Loss/train", train_loss, epoch)
+        writer.add_scalar("Loss/train", train_loss, epoch)
 
         # Evaluate
         (
@@ -683,13 +701,12 @@ def train_multitask(args):
             )
         )
 
-        if args.write_summary:
-            writer.add_scalar("para_acc/train/Epochs", para_train_acc, epoch)
-            writer.add_scalar("para_acc/dev/Epochs", para_dev_acc, epoch)
-            writer.add_scalar("sst_acc/train/Epochs", sst_train_acc, epoch)
-            writer.add_scalar("sst_acc/dev/Epochs", sst_dev_acc, epoch)
-            writer.add_scalar("sts_acc/train/Epochs", sts_train_acc, epoch)
-            writer.add_scalar("sts_acc/dev/Epochs", sts_dev_acc, epoch)
+        writer.add_scalar("para_acc/train/Epochs", para_train_acc, epoch)
+        writer.add_scalar("para_acc/dev/Epochs", para_dev_acc, epoch)
+        writer.add_scalar("sst_acc/train/Epochs", sst_train_acc, epoch)
+        writer.add_scalar("sst_acc/dev/Epochs", sst_dev_acc, epoch)
+        writer.add_scalar("sts_acc/train/Epochs", sts_train_acc, epoch)
+        writer.add_scalar("sts_acc/dev/Epochs", sts_dev_acc, epoch)
 
         if (
             para_dev_acc > best_dev_acc_para
@@ -703,13 +720,6 @@ def train_multitask(args):
                 args.filepath = f"ray_checkpoint/{session.get_trial_name()}-{epoch}.pt"
 
             save_model(model, optimizer, args, config, args.filepath)
-            print("Model saved at", args.filepath)
-
-        else:
-            print(
-                f"Model not saved since the metrics are did not exceed the starting point. Best Dev Acc: Para: {best_dev_acc_para:.3f}, SST: {best_dev_acc_sst:.3f}, STS: {best_dev_acc_sts:.3f}"
-            )
-
         train_acc = para_train_acc + sst_train_acc + sts_train_acc
         dev_acc = para_dev_acc + sst_dev_acc + sts_dev_acc
 
@@ -726,10 +736,9 @@ def train_multitask(args):
         if args.scheduler == "plateau":
             scheduler.step(dev_acc)
 
-        if args.write_summary:
-            writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
-            writer.add_scalar("acc/train/Epochs", train_acc, epoch)
-            writer.add_scalar("acc/dev/Epochs", dev_acc, epoch)
+        writer.add_scalar("lr", optimizer.param_groups[0]["lr"], epoch)
+        writer.add_scalar("acc/train/Epochs", train_acc, epoch)
+        writer.add_scalar("acc/dev/Epochs", dev_acc, epoch)
         print(
             f"Epoch {epoch}: Avg Train Loss :: {train_loss/3 :.3f}, Avg Train Acc :: {train_acc/3:.3f}, Avg Dev Acc :: {dev_acc/3:.3f}"
         )
@@ -738,35 +747,15 @@ def train_multitask(args):
 def test_model(args):
     with torch.no_grad():
         device = torch.device("cuda") if args.use_gpu else torch.device("cpu")
-        if not args.combined_models:
-            saved = torch.load(args.filepath)
-            config = saved["model_config"]
-            model = MultitaskBERT(config)
-            bert_config = BertConfig()
-            if args.use_pal:
-                BertModelWithPAL.from_BertModel(model.bert, bert_config, train_pal=True)
+        saved = torch.load(args.filepath)
+        config = saved["model_config"]
 
-            model.load_state_dict(saved["model"])
-            model = model.to(device)
-            print(f"Loaded model to test from {args.filepath}")
+        model = MultitaskBERT(config)
+        model.load_state_dict(saved["model"])
+        model = model.to(device)
+        print(f"Loaded model to test from {args.filepath}")
 
-        else:
-            lock_path = args.filepath.split(".")[0] + ".lock"
-            lock = FileLock(lock_path)
-            try:
-                with lock:
-                    with open(args.filepath, "rb") as file:
-                        print(f"Loaded model to test from {file}")
-                        saved = torch.load(file, map_location=device)
-                        config = saved["model_config"]
-                        model = MultitaskBERT(config)
-                        model.load_state_dict(saved["model"])
-                        model = model.to(device)
-
-            except Exception as e:
-                print(f"Error loading model from {e}")
-
-        test_model_multitask(args, model, device)
+        test_model_multitask(args, model, device, config)
 
 
 def get_args():
@@ -848,7 +837,7 @@ def get_args():
         ),
     )
     parser.add_argument("--unfreeze_interval", type=int, default=None)
-    parser.add_argument("--additional_inputs", action="store_false")
+    parser.add_argument("--additional_inputs", action="store_true")
     parser.add_argument("--profiler", action="store_true")
     parser.add_argument("--sts", action="store_true")
     parser.add_argument("--sst", action="store_true")
@@ -879,21 +868,21 @@ def get_args():
 
     args, _ = parser.parse_known_args()
 
-    parser.add_argument("--epochs", type=int, default=20 if not args.smoketest else 1)
+    parser.add_argument("--epochs", type=int, default=10 if not args.smoketest else 1)
 
     # hyper parameters
     parser.add_argument(
         "--batch_size",
         help="sst: 64 can fit a 12GB GPU",
         type=int,
-        default=64 if not args.smoketest else 64,
+        default=32 if not args.smoketest else 64,
     )
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1)
     parser.add_argument(
         "--clip", type=float, default=0.25, help="value used gradient clipping"
     )
     parser.add_argument(
-        "--samples_per_epoch", type=int, default=20_000 if not args.smoketest else 10
+        "--samples_per_epoch", type=int, default=10_000 if not args.smoketest else 10
     )
 
     parser.add_argument(
@@ -901,7 +890,7 @@ def get_args():
         type=float,
         help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
         default=(
-            8e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
+            5e-5 * (1 / args.rho if args.optimizer == "sophiah" else 1)
             if args.option == "finetune"
             else 1e-3 * (1 / args.rho if args.optimizer == "sophiah" else 1)
         ),
@@ -912,8 +901,8 @@ def get_args():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="plateau",
-        choices=("plateau", "cosine", "linear_warmup"),
+        default="cosine",
+        choices=("plateau", "cosine", "linear_warmup", "none"),
     )
     parser.add_argument(
         "--hpo", action="store_false", help="Activate hyperparameter optimization"
@@ -924,7 +913,11 @@ def get_args():
         default=10 if not args.smoketest else 1,
         help="Number of trials for HPO",
     )
-
+    parser.add_argument(
+        "--train_mode",
+        default="last_hidden_state",
+        choices=["all_pooled", "last_hidden_state", "single_layers"],
+    )
     parser.add_argument(
         "--pooling",
         default=None,
@@ -934,16 +927,9 @@ def get_args():
         "--layers", default=None, type=int, nargs="+", help="Layers to train"
     )
 
-    parser.add_argument(
-        "--write_summary",
-        action="store_false",
-        help="Write summary to tensorboard",
-    )
-
     args, _ = parser.parse_known_args()
     record_time = datetime.now().strftime("%m%d-%H%M")
     path = f"{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.task}"
-
     predictions_path = f"./predictions/bert/multitask/{path}"
     if not os.path.exists(predictions_path):
         os.makedirs(predictions_path, exist_ok=True)
@@ -1005,44 +991,6 @@ def get_args():
             else f"{predictions_path}/{record_time}_sts-similarity-test-output.csv"
         ),
     )
-    parser.add_argument(
-        "--add_layers",
-        action="store_false",
-        help="Add extra layers to the model",
-    )
-    parser.add_argument(
-        "--combined_models",
-        action="store_false",
-        help="Combine models for multitask learning",
-    )
-    parser.add_argument(
-        "--improve_dir",
-        type=str,
-        default="./improve_dir",
-        help="path to save the params",
-    )
-    parser.add_argument(
-        "--max_position_embeddings",
-        type=int,
-        default=512,
-        help="Max position embeddings",
-    )
-    parser.add_argument(
-        "--max_length",
-        type=int,
-        default=512,
-        help="max length for the model",
-    )
-    parser.add_argument(
-        "--use_pal",
-        action="store_false",
-        help="Use PAL for the model",
-    )
-    parser.add_argument(
-        "--model_name",
-        default="bert-large-uncased",
-        help="Model name to use",
-    )
 
     args = parser.parse_args()
 
@@ -1059,8 +1007,6 @@ if __name__ == "__main__":
 
     args = get_args()
     seed_everything(args.seed)
-    args.name = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{args.option}-{args.epochs}-{args.samples_per_epoch}-{args.batch_size}-{args.optimizer}-{args.lr}-{args.scheduler}-{args.hpo}-{args.task}"
-    args.filepath = f"models1/multitask_classifier/{args.name}.pt"  # save path
 
     if args.hpo:
 

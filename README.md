@@ -62,6 +62,7 @@
     - [GWDG Cluster](#gwdg-cluster)
   - [AI-Usage Card](#ai-usage-card)
   - [Acknowledgement](#acknowledgement)
+  - [Disclaimer](#disclaimer)
 
 - **Group name:** BERT's Buddies
 
@@ -204,7 +205,7 @@ Paraphrases are “rewordings of something written or spoken by someone else”;
 detection thus essentially seeks to determine whether particular words or phrases convey
 the same semantic meaning. This task measures how well systems can understand fine-grained notions of semantic meaning.
 
-| **Model name**                | **Description**                                            | **Accuracy** | **link to slurm**                                                                                                                                                  |
+| **Model name**                | **Description**                                            | **Accuracy** | **Link to Slurm**                                                                                                                                                  |
 | ----------------------------- | ---------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Pcgrad projection             | Projected gradient descent with round robin scheduler      | 86.4%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
 | Vaccine projection            | Surgery of the gradient with round robin scheduler         | 85.9%        | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
@@ -226,7 +227,7 @@ determine individual feelings towards particular products, politicians, or withi
 Each phrase has a label of negative, somewhat negative,
 neutral, somewhat positive, or positive.
 
-| **Model name**                | **Description**                                            | **Accuracy** | **link to slurm**                                                                                                                                                  |
+| **Model name**                | **Description**                                            | **Accuracy** | **Link to Slurm**                                                                                                                                                  |
 | ----------------------------- | ---------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | BiLSTM-Multitask              | BiLSTM layer on top of BERT                                | 53.0%        | [bilstm multitask](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-bilstm-train-sst-classifier-1360936.out)              |
 | Max pooling                   | Max of the last hidden states' sequence                    | 52.8%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sst-single.out)                                   |
@@ -247,7 +248,7 @@ more similar than others; STS seeks to measure the degree of semantic equivalenc
 et al., 2013]. STS differs from paraphrasing in it is not a yes or no decision; rather it
 allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
 
-| **Model name**                | **Description**                                            | **Accuracy** | **link to slurm**                                                                                                                                                  |
+| **Model name**                | **Description**                                            | **Accuracy** | **Link to Slurm**                                                                                                                                                  |
 | ----------------------------- | ---------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Vaccine projection            | Surgery of the gradient with round robin scheduler         | 89.3%        | [vaccine](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train-vaccine_classifier.out)                                  |
 | Pcgrad projection             | Projected gradient descent with round robin scheduler      | 89.0%        | [pcgrad](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-train_pcgrad_classifier.out)                                    |
@@ -596,3 +597,9 @@ Artificial Intelligence (AI) aided the development of this project. For transpar
 - PALs and schedulers implementations are inspired from [Josselin Roberts, Marie Huynh and Tom Pritsky](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning) under [Apache License 2.0](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning/blob/main/LICENSE) (Thank you!).
 
 - The structure of README file is adapted from [good_example](https://github.com/maly-phy/dnlp_readme_template/tree/main/good_example) (Thank you!)
+
+---
+
+## Disclaimer
+
+We didn't get enough time to clean the repository and arrange the scripts in a perfectly engineered way. We also couldn't merge all the implemented approaches of the BERT part to the main. Therefore, we advise the user to refer to the original branches, which can be found in the slurm file in the tables of the [results section](#results)
