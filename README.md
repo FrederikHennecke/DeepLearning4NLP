@@ -42,6 +42,11 @@
     - [Regularization](#regularization)
       - [SMART](#smart)
         - [Experimental Results](#experimental-results)
+    - [Custom Loss for BART generation](#custom-loss-for-bart-generation)
+    - [Noise for training for BART](#noise-for-training-for-bart)
+    - [Synonyms for training for BART](#synonyms-for-training-for-bart)
+    - [Generally: BART generation](#generally-bart-generation)
+    - [Custom Loss for BART detection](#custom-loss-for-bart-detection)
   - [Details](#details)
     - [Data Imbalance](#data-imbalance)
     - [Classifier Architecture](#classifier-architecture)
@@ -112,15 +117,16 @@ This will download and install Miniconda on your machine, create the project's c
 
 We describe the datasets we used in the following table
 
-| **Dataset**                       | **Task**                            | **Description**                                                                                                                               | **Size**                                                 |
-| --------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Quora Dataset (QQP)               | Paraphrase detection                | Two sentences are given as input and a binary label (0, 1) is output indicating if sentences are paraphrases of one another                   | Train: 121, 620 <br /> Dev: 40, 540 <br /> Test: 40, 540 |
-| Stanford Sentiment Treebank (SST) | Sentiment analysis (classification) | One sentence is given as input to be classified on a scale from 0 (most negative) to 5 (most positive)                                        | Train: 7, 111 <br /> Dev: 2, 365 <br /> Test: 2, 371     |
-| SemEval STS Benchmark Dataset     | Textual Similarity (regression)     | Two sentences are given as input and their mutual relation is to be evaluated on continuous labels from 0 (least similar) to 5 (most similar) | Train: 5, 149 <br /> Dev: 1, 709 <br /> Test: 1, 721     |
+| **Dataset**                      | **Task**                            | **Description**                                                                                                                                                 | **Size**                                                                        |
+|----------------------------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| Quora Dataset (QQP)              | Paraphrase detection                | Two sentences are given as input and a binary label (0, 1) is output indicating if sentences are paraphrases of one another                                     | Train: 121, 620 <br /> Dev: 40, 540 <br /> Test: 40, 540                        |
+| Stanford Sentiment Treebank (SST) | Sentiment analysis (classification) | One sentence is given as input to be classified on a scale from 0 (most negative) to 5 (most positive)                                                          | Train: 7, 111 <br /> Dev: 2, 365 <br /> Test: 2, 371                            |
+| SemEval STS Benchmark Dataset    | Textual Similarity (regression)     | Two sentences are given as input and their mutual relation is to be evaluated on continuous labels from 0 (least similar) to 5 (most similar)                   | Train: 5, 149 <br /> Dev: 1, 709 <br /> Test: 1, 721                            |
+| Extended Typology Paraphrase Corpus (ETPC)  | Paraphrase Detection / Generation   | Two sentences are given as input and wether the pairs are paraphrases of each other, either "yes" (1) or "no" (0) according to mrpc and etpc annotation schema. | Train: 2020 <br /> Dev: 505 <br /> Test: 573(detection) <br /> 701 (generation) |
 
 ## Training
 
-To train the multitask BERT, you need to activate the environment and run
+To train the multitask BERT, and BART you need to activate the environment and run
 
 ```sh
 python -u train_multitask_pal.py --option finetune --use_gpu --local_files_only --smoketest --no_tensorboard --no_train_classifier --use_smart_regularization --use_pal --use_amp
@@ -164,6 +170,44 @@ There are lots of parameters to set. To see all of them, run `python <filename> 
 | `--write_summary` or `--no_tensorboard` | Whether to save training logs for later view on tensorboard                                                                                                |
 | `--model_name`                          | Choose the model to pre-train or fine-tune                                                                                                                 |
 
+The parameters for bart_generation.py are the following:
+
+| **Parameter**            | **Description**                                                      |
+|--------------------------|----------------------------------------------------------------------|
+| `--seed`                 | Seed for random numbers                                              |
+| `--use_gpu`              | Whether to use the GPU.                                              |
+| `--batch_size`           | Batch size.                                                          |
+| `--epochs`               | Number of epochs.                                                    |
+| `--lr`                   | Learning rate.                                                       |
+| `--etpc_train`           | Train dataset                                                        |
+| `--etpc_dev`             | Dev dataset                                                          |
+| `--etpc_test`            | Test dataset                                                         |
+| `--similarity_weight`    | Weight for similarity loss (default: 0.0).                           |
+| `--dissimilarity_weight` | Weight for dissimilarity loss (default: 0.0).                        |
+| `--copy_penalty_weight`  | Weight for copy penalty loss (default: 0.0).                         |
+| `--noise`                | Proportion of words to modify (Swap, Delete, Replace) (default: 0.0). |
+| `--synonym_prob`     | Probability of replacing a word with its synonym (default 0.0).      |
+
+The parameters for bart_detection.py are the following:
+
+| **Parameter**    | **Description**                                                       |
+|------------------|-----------------------------------------------------------------------|
+| `--seed`         | Seed for random numbers                                               |
+| `--use_gpu`      | Whether to use the GPU.                                               |
+| `--batch_size`   | Batch size.                                                           |
+| `--epochs`       | Number of epochs.                                                     |
+| `--lr`           | Learning rate.                                                        |
+| `--etpc_train`   | Train dataset                                                         |
+| `--etpc_dev`     | Dev dataset                                                           |
+| `--etpc_test`    | Test dataset                                                          |
+| `--noise`        | Proportion of words to modify (Swap, Delete, Replace) (default: 0.0). |
+| `--synonym_prob` | Probability of replacing a word with its synonym (default 0.0).       |
+| `--type_2`       | Weight multiplier for paraphrase type 2 (default 0.3).                |
+| `--type_6`       | Weight multiplier for paraphrase type 6 (default 0.3).                |
+| `--type_7`       | Weight multiplier for paraphrase type 7 (default 0.3).                |
+
+
+
 ## Evaluation
 
 The model is evaluated after each epoch on the validation set. The results are printed to the console and saved in the `--logdir`in case of setting `--no_tensorboard` to `store-false`. The model checkpoints are saved after each epoch in the `filepath` directory. After finishing the training, the model is loaded to be evaluated on the test set. The model's predictions are then saved in the `predictions_path`.
@@ -191,6 +235,25 @@ For the multitask training, we used the following parameters:
 - clip: `0.25`
 - weight decay: `0.05`
 - samples per epoch: `20000`
+
+For bart_generation, we used the following parameters:
+- use_gpu 
+- epochs `5`
+- lr `1e-5`
+- similarity_weight `0.2`
+- dissimilarity_weight `0.6`
+- copy_penalty_weight `1.5`
+- noise `0.2`
+- synonym_prob `0.3`
+
+
+For bart_detection, we used the following parameters:
+- use_gpu 
+- epochs `12` 
+- lr `1e-5` 
+- noise `0.2` 
+- synonym_prob `0.3`
+
 
 This allowed us to set a standard training framework and try with other options for the sake of further improvement. The training parameters used as well as the branch where the related scripts exist can be found in the corresponding slurm file.
 
@@ -261,6 +324,42 @@ allows degrees of similarity from 5 (same meaning) to 0 (not at all related).
 | Hierarchical-BERT             | Chunking the input up to a segment length                  | 71.4%        | [hierarchical bert](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-hirarchical-train-multitask-classifier.out)          |
 | Max pooling                   | Max of the last hidden states' sequence                    | 53.4%        | [max pooling](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/BERT_PALs-Aly/slurm_clean/slurm-max-pool-sts-single.out)                                   |
 | Baseline (single task)        | Single task training                                       | 41.4%        | [baseline](https://github.com/FrederikHennecke/DeepLearning4NLP/blob/main/slurm_files/slurm-train-multitask_classifier-711664.out)                                 |
+
+
+### [Paraphrase Type Generation (PTG)](https://github.com/jpwahle/emnlp23-paraphrase-types)
+The paraphrase generation task is closely related to the paraphrase type detection task. Instead of detecting the paraphrase types, you will give the model one sentence and a list of paraphrase types as input. The model should generate a paraphrased version of the given sentence using the given paraphrase types. 
+The data for this task is the same as the data for the paraphrase type detection task.
+
+
+| **Paraphrase Type Generation (PTG)** | **Epoch 1 Loss** | **Epoch 2 Loss** | **Epoch 3 Loss** | **Epoch 4 Loss** | **Epoch 5 Loss** | **BLEU Score** | **Negative BLEU Score** | **Penalized BLEU Score** |
+|--------------------------------------|------------------|------------------|------------------|------------------|------------------|----------------|-------------------------|--------------------------|
+| Version                              | Train / Dev      | Train / Dev      | Train / Dev      | Train / Dev      | Train / Dev      | any%           | any%                    | any%                     |
+| Baseline                             | 1.0534 / 0.7594  | 0.4610 / 0.7924  | 0.2781 / 0.8906  | 0.1774 / 1.0377  | 0.1486 / 1.0930  | 43.990%        | 21.245%                 | 17.972%                  |
+| Custom Loss                          | 1.7079 / 1.2498  | 1.1150 / 0.7403  | 0.5095 / 0.8056  | 0.7873 / 1.5433  | 0.7170 / 1.6292  | 42.832%        | 23.125%                 | 19.048%                  |
+| Noise                                | 1.2543 / 0.7036  | 0.6770 / 0.7924  | 0.2781 / 0.8906  | 0.3845 / 0.8993  | 0.2993 / 1.0415  | 38.224%        | 33.796%                 | 24.843%                  |
+| Synonym                              | 1.0890 / 0.7034  | 0.4985 / 0.7895  | 0.3096 / 0.8880  | 0.1967 / 1.0476  | 0.1390 / 1.1058  | 43.643%        | 20.845%                 | 17.495%                  |
+| All Improvisation                    | 1.8247 / 1.2030  | 1.2837 / 1.2078  | 1.0804 / 1.3721  | 0.9594 / 1.4304  | 0.8729 / 1.5008  | 39.772%        | 30.850%                 | 23.596%                  |
+While the Penalized BLEU Score is the highest with only the noise function active, only half the sentences on the dev dataset did change, While ~85% of the sentences did change for all improvisations together.
+These scores are all after only 5 epochs. We also did a test with 12 epochs with all improvs and there we have the following scores: 
+- BLEU Score: 30.926384502652546 
+- Negative BLEU Score with input: 48.47821009206475 
+- Penalized BLEU Score: 28.831841640530108
+
+### [Paraphrase Type Detection (PTD)](https://github.com/jpwahle/emnlp23-paraphrase-types)
+
+While the QQP dataset only differentiates between two sentences being paraphrased or not, the paraphrase type detection task is a bit more advanced. Instead of asking if two sentences are paraphrases, the task is to find the correct type of paraphrase. There are seven different types of paraphrases. 
+Note that one sentence pair can belong to multiple paraphrase types. 
+The two columns sentence1(2)_segment_location contain information about which token belongs to which paraphrase type. The two columns sentence1(2)_tokenized contain each token of the sentence in the original sentence ordering.
+
+| **Paraphrase Type Generation (PTG)** | **Epoch 12 Accuracy** | **MCC Score** | 
+|--------------------------------------|-----------------------|-------|
+| Version                              | Train / Dev           | any%  | 
+| Baseline                             | 0.9320 / 0.7567       | 13.3% | 
+| Custom Loss                          | 0.9320 / 0.7567       | 63.5% | 
+| Noise + Custom Loss                  | 0.8804 / 0.7253       | 55.3% | 
+| Synonym + Custom Loss                | 0.9178 / 0.7661       | 64.8% | 
+| All Improvisation + Custom Loss      | 0.8770 / 0.7443       | 56.2% | 
+
 
 ## Methodology
 
@@ -395,6 +494,44 @@ We implemented the SMART regularization in our gradient surgery training (Pcgrad
 
 ---
 
+### Custom Loss for BART generation
+The loss function  improves the performance the model by penalizing the model for simply copying input sentences while still encouraging meaningful similarity. This loss function incorporates several components that work together to create a more nuanced and effective training process.:
+1. Calculates the cross entropy loss (just like the default BART model we are using)
+2. Cosine Similarity Loss:
+   - Similarity Loss: This measures how similar the embeddings of the input and output sentences are. The function computes the cosine similarity between the mean embeddings of the input (`input_embeddings`) and output sentences (`output_embeddings`). A similarity loss is calculated as `1 - cosine_sim.mean()`, which encourages the model to generate output sentences that retain some similarity to the input.
+   - Dissimilarity Loss: This is simply the mean cosine similarity itself (`cosine_sim.mean()`). It acts as a counterbalance, ensuring that the output is not overly similar to the input. By tuning this component, the model is encouraged to create variations that still make sense contextually.
+
+Score: Slighly better scores and around 15-20% more sentences changed
+
+--- 
+
+### Noise for training for BART
+The noise function introduces noise into a sentence by randomly modifying its content. This noise can be in the form of word swaps, deletions, or replacements with a special token (e.g., a mask token). The primary goal of this function is to simulate noisy or imperfect input data, which can be useful in training models that are better at handling variations in text.
+
+Generation Score: Way better score than the baseline and around 35% more sentences changed. This was the biggest improvement
+Detection Score: Slightly worse. Probably because each word is important in detection the paraphrases
+---
+
+### Synonyms for training for BART
+The synonym function augments the dataset by generating additional sentences with synonyms substituted for some words in the original sentences. The function processes each sentence in the dataframe, identifies synonyms for specific words using the NLTK WordNet library, and appends these new sentences to the dataframe. This helps to expand the training dataset, improving the robustness and generalization of a language model by exposing it to a wider variety of sentence structures.
+
+Generation Score: Slightly worse score (more or less equal, depending on the random seed), but more sentences changed. Overall less overfitting. Would be better than the baseline with more epochs.
+Detection Score: Slightly worse. Probably because each word is important in detection the paraphrases
+---
+
+### Generally: BART generation
+While it looks like every model is overfitting, not only do the resulting sentences do look much better, but the BLEU scores are also better. Therefore, the losses are not that important for our metrics.
+
+---
+
+
+### Custom Loss for BART detection
+Implemented a new custom loss function that combines the Matthews Correlation Coefficient (MCC) with the traditional BCEWithLogitsLoss (Binary Cross-Entropy with Logits). This was done to balance the strengths of both metrics, with the penalizing weights for each determined through a grid search to find the most effective combination.
+
+Score: The scores improved and there is less overfitting now.
+
+--- 
+
 ## Details
 
 ### Data Imbalance
@@ -460,9 +597,14 @@ Projected Attention Layers (PALs) are a novel technique introduced by ([BERT and
 
 ## Hyperparameter Search
 
-We used [Ray Tune](https://docs.ray.io/en/latest/tune/index.html) to perform hyperparameter tuning for the multitasking and select the best parameters that reduce overfitting. We used [Optuna](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html) to search the hyperparameter space and [AsyncHyperBandScheduler](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.AsyncHyperBandScheduler.html) as the scheduler. The hyperparameters were searched for the whole model on all training data, not for each task individually to avoid overfitting to a single task. The trained models were evaluated on the validation data and the best one was selected based on the validation results. The metrics applied were accuracy for the sentiment analysis and paraphrase detection, and the Pearson correlation for the semantic textual similarity.
-
+- We used [Ray Tune](https://docs.ray.io/en/latest/tune/index.html) to perform hyperparameter tuning for the multitasking and select the best parameters that reduce overfitting. We used [Optuna](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html) to search the hyperparameter space and [AsyncHyperBandScheduler](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.AsyncHyperBandScheduler.html) as the scheduler. The hyperparameters were searched for the whole model on all training data, not for each task individually to avoid overfitting to a single task. The trained models were evaluated on the validation data and the best one was selected based on the validation results. The metrics applied were accuracy for the sentiment analysis and paraphrase detection, and the Pearson correlation for the semantic textual similarity.
+- For BART_generation:
+  - Loss function: There are three parameters. Similarity Weight, Dissimilarity Weight, and Copy Penalty Weight. We started with higher weights for Dissimilarity Weight  and Copy Penalty Weight, and lower values for Similarity Weight because we wanted to penalize sentences, which were too similar. We got good results and only finetuned a little bit more with gridsearch to get good dev scores.
+  - Noise: We only wanted a little bit of lose, so that the sentences would still make sence. Therefore we started with 0.1 (10% of words changed threw noise) and later went up to 0.2, because 0.1 did not change much.
+  - Synonym: For the synonyms, we originally started with a high value of 0.5 (50% of changed words), but this too much of the sentences and the original meaning was partly lost. Therefore we went down to 0.3, which helped increase our scores.
+- For BART_detection: A mixture of grid search for some hyperparameter, intuition for others and rule of thumb found in the the pytroch documentation.
 ---
+
 
 ## Computation Resources
 
@@ -481,10 +623,16 @@ More details about the computation utilities can be found in the slurm file corr
 
 ## Contributors
 
-| **Mohamed Aly**                                             | **Contrib1** | **contrib2** |
-| ----------------------------------------------------------- | ------------ | ------------ |
-| BERT Tasks (SST, STS, QQP) and their implemented approaches |              |              |
-| Writing the README file                                     |              |              |
+| **Task**                               | **Contrib1**      | **Contrib2**      | **Contrib3**  |
+|----------------------------------------|-------------------|-------------------|---------------|
+| BERT Tasks (SST, STS, QQP) Basic       | Mohamed Aly       | Frederik Hennecke | Arne Tillmann |
+| BERT Tasks (SST, STS, QQP) Improvement | Mohamed Aly       |                   |               |
+| BART Tasks Generation Basic            | Mohamed Aly       | Frederik Hennecke | Arne Tillmann |
+| BART Tasks Generation Improvement      | Frederik Hennecke |                   |               |
+| BERT Tasks Detection Basic             | Mohamed Aly       | Frederik Hennecke | Arne Tillmann |
+| BERT Tasks Detection Improvement       | Arne Tillmann     | Frederik Hennecke |               |
+| Writing the README file                | Mohamed Aly       | Frederik Hennecke | Arne Tillmann |
+| Bash Scripts                           | Mohamed Aly       | Frederik Hennecke | Arne Tillmann |
 
 ---
 
