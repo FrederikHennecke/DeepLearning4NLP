@@ -92,7 +92,7 @@
 [![Apache License 2.0](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Final](https://img.shields.io/badge/Status-Final-purple.svg)](https://https://img.shields.io/badge/Status-Final-blue.svg)
 [![Black Code Style](https://img.shields.io/badge/Code%20Style-Black-black.svg)](https://black.readthedocs.io/en/stable/)
-[![AI-Usage Card](https://img.shields.io/badge/AI_Usage_Card-pdf-blue.svg)](./AI-Usage-Card.pdf/)
+[![AI-Usage Card](https://img.shields.io/badge/AI_Usage_Card-pdf-blue.svg)](#ai-usage-card)
 
 This repository our official implementation of the Multitask BERT project for the Deep Learning for Natural Language
 Processing course at the University of Göttingen.
@@ -771,9 +771,9 @@ Artificial Intelligence (AI) aided the development of this project. For transpar
   University's [CS11-711 Advanced NLP](http://phontron.com/class/anlp2021/index.html),
   created by Shuyan Zhou, Zhengbao Jiang, Ritam Dutt, Brendon Boldt, Aditya Veerubhotla, and Graham Neubig (Thank you!)
 
-- Multitask-training with augmented attention is inspired from [Lars Kaesberg and Niklas Bauer](https://github.com/token-tricksters/deep-learning-nlp) under [Apache License 2.0](https://github.com/token-tricksters/deep-learning-nlp/blob/main/LICENSE) (Thank you!).
+- Multitask-training with augmented attention is inspired from [Lars Kaesberg and Niklas Bauer](https://github.com/token-tricksters/deep-learning-nlp) under [Apache License 2.0](./LICENSE) (Thank you!).
 
-- PALs and schedulers implementations are inspired from [Josselin Roberts, Marie Huynh and Tom Pritsky](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning) under [Apache License 2.0](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning/blob/main/LICENSE) (Thank you!).
+- PALs and schedulers implementations are inspired from [Josselin Roberts, Marie Huynh and Tom Pritsky](https://github.com/JosselinSomervilleRoberts/BERT-Multitask-learning) under [Apache License 2.0](./LICENSE) (Thank you!).
 
 - The structure of README file is adapted from [good_example](https://github.com/maly-phy/dnlp_readme_template/tree/main/good_example) (Thank you!)
 
